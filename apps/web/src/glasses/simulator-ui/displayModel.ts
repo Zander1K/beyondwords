@@ -21,7 +21,9 @@ export const DISPLAY_LIMITS = {
 export type DisplayContent =
   | { kind: "phrase"; text: string; emphasis?: [number, number] }
   | { kind: "word"; word: string; short: string }
-  | { kind: "image"; url: string };
+  | { kind: "image"; url: string }
+  /** Live camera view, to line up the page. */
+  | { kind: "viewfinder" };
 
 /** Collapse all whitespace (including newlines) to single spaces: no paragraphs on the display. */
 export function normaliseText(text: string): string {

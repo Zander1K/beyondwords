@@ -20,6 +20,9 @@ Decisions left open during the step 1 scaffold (2026-11-14). Each one is also ma
 | 12 | ~~What GPU and memory are available on Verda, and does Nemotron 3.5 Super VL fit?~~ Resolved 2026-11-14: Verda hosts it for Junction (vLLM 0.32, NVFP4 on B300, 1M context) at the `NEMOTRON_BASE_URL` in `.env.example`, so we don't self-host. Still open: rate limits on the shared endpoint. | Matthew | `infra/verda/README.md` | 3 |
 | 13 | Where does the team keep the eval page photos? They are git-ignored and must not be committed. | Matthew | `eval/pages/README.md` | 3 |
 | 14 | What audio format does Gemini Live expect from the web app (sample rate, chunk size), and is the `/live` message protocol JSON or binary? The simulator mic emits PCM16 at the browser's native rate. | Mick Ola + Alex | `apps/web/src/live/index.ts`, `apps/web/src/glasses/web-simulator/WebSimulatorAdapter.ts` | 7 |
+| 16 | Neural Band and touchpad on real glasses: the exact gesture set, and which gestures DAT forwards to third-party apps (touchpad hold and the capture button may be reserved for Meta AI / the system camera). The simulator mapping is our assumption. | Alex | `apps/web/src/glasses/web-simulator/gestures.ts`, `docs/glasses-adapter.md` | 5 |
+| 17 | Voice on real glasses: can a DAT app have a wake word, or only push-to-talk? "Hey Meta" wakes Meta AI. The simulator's wake phrase is simulator-only. | Alex + Mick Ola | `apps/web/src/glasses/web-simulator/voice.ts` | 5, 7 |
+| 18 | Does DAT report battery level, volume and worn/folded state to apps (the mock kit has don/doff and fold)? | Alex | `apps/web/src/glasses/meta-dat/MetaDatAdapter.ts` | 5 |
 | 15 | `GlassesAdapter` has no connect/register step, and `startCamera()` returns a `MediaStream`; real DAT needs registration and does not hand JS a `MediaStream`. Change the interface before building `MetaDatAdapter`? | Alex | `apps/web/src/glasses/adapter.ts` | 5 |
 
 ## Not yet verified (environment gaps)

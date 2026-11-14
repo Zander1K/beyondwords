@@ -4,6 +4,13 @@
 // demo phrases and gestures; add pacing and fading support.
 import type { Gesture } from "@/glasses";
 
+/** The gestures that move through the text. */
+export type NavGesture = Extract<Gesture, "next" | "prev" | "select" | "dismiss">;
+
+export function isNavGesture(g: Gesture): g is NavGesture {
+  return g === "next" || g === "prev" || g === "select" || g === "dismiss";
+}
+
 export type ReaderView = "phrase" | "word" | "cleared";
 
 export interface ReaderState {
@@ -25,7 +32,7 @@ export const initialReaderState: ReaderState = { index: 0, view: "phrase" };
  */
 export function readerStep(
   state: ReaderState,
-  gesture: Gesture,
+  gesture: NavGesture,
   phraseCount: number,
   hasWord: (index: number) => boolean,
 ): ReaderStep {

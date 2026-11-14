@@ -19,8 +19,12 @@ The frontend is a **web app** (`apps/web`), not a mobile app. (It replaced an ea
 | Glasses camera (aimed at the page) | Browser camera |
 | Glasses mic and speakers | Browser mic and speaker |
 | Ray-Ban Display (600x600, ~20 degree FOV, right lens only) | Display simulator panel |
-| Neural Band gestures | Keys (`ArrowRight`, `ArrowLeft`, `Enter`, `Escape`) and on-screen buttons |
+| Neural Band gestures, temple touchpad, capture button | Keys and on-screen buttons (mapping in `docs/glasses-adapter.md`) |
+| Privacy LED, worn / folded / connected / battery | Simulated device state |
+| Voice | Browser speech recognition (push-to-talk) with a typed fallback |
 | Ray-Ban Meta Gen 2 (no display) | Audio-only mode |
+
+Only glasses features relevant to reading are simulated; add others when a use case needs them.
 
 All glasses I/O goes through one interface, `GlassesAdapter`, so a real `MetaDatAdapter` can replace the simulator later without rewriting the app. See `docs/glasses-adapter.md`.
 

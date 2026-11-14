@@ -37,13 +37,32 @@ The API should be running for the Settings screen's connection check (`make api`
 
 ## Trying the glasses simulator
 
-Open **Reader**:
+Open **Reader**. Full mapping in [`docs/glasses-adapter.md`](../../docs/glasses-adapter.md).
 
-- `←` / `→` move between phrases, `Enter` shows the word card, `Esc` dismisses. The on-screen
-  buttons under the display do the same (they stand in for Neural Band gestures).
-- **Audio-only mode** simulates Ray-Ban Meta Gen 2: the display goes blank, and gestures play
-  cues (also shown as a "♪" badge, in case your sound is off).
-- **Start camera** asks for camera permission and shows the feed with a "Camera on" indicator.
+| Key       | Glasses input               | Does                         |
+| --------- | --------------------------- | ---------------------------- |
+| `→` / `←` | Neural Band thumb swipe     | Next / previous phrase       |
+| `Enter`   | Neural Band index pinch     | Word card for the hard word  |
+| `Esc`     | Neural Band middle pinch    | Back / close the viewfinder  |
+| `+` / `-` | Neural Band pinch and twist | Volume                       |
+| `Space`   | Touchpad tap                | Read the phrase aloud / stop |
+| `V`       | Touchpad hold               | Speak a command              |
+| `C`       | Capture button              | Photo of the page            |
+
+1. **Start camera**: the glasses' point-of-view camera. The privacy LED on the simulated frame
+   lights up, and the display shows a viewfinder to line up the page.
+2. **Capture** (`C`): shutter cue, LED flash, the photo shows briefly on the display and under
+   the camera. It stays in memory only; nothing is saved or uploaded.
+3. **Voice**: press `V` and say "next", "read this", "what does lamp mean", "take a photo" or
+   "show the camera". Chrome, Edge and Safari have speech recognition (Chrome and Edge send the
+   audio to their speech service); in other browsers, or without a mic, use the typed box.
+   "Always listen for hey meta" is a simulator-only option.
+4. **Device state**: untick _Worn_ (reading pauses, display off), tick _Folded_ (camera stops),
+   untick _Connected_, drag _Battery_ to 0, or tick _Audio-only_ (Ray-Ban Meta Gen 2: no display,
+   cues and speech instead). Cues also show as a "♪" badge in case your sound is off.
+
+Word help and answers are canned until the API exists (HACK). Only the demo hard words
+(lighthouse, lamp, restless) have definitions.
 
 ## Config
 

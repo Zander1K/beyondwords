@@ -6,5 +6,11 @@
 //   simulator-ui/   Ray-Ban Display simulator panel (600x600, right lens) and its constraints
 //   meta-dat/       MetaDatAdapter stub for real glasses via Meta DAT (later)
 export * from "./adapter";
-export { createGlassesAdapter, glasses, GlassesContext, useGlasses } from "./context";
+export {
+  createGlassesAdapter,
+  glasses,
+  GlassesContext,
+  useGlasses,
+  useGlassesState,
+} from "./context";
 export { GlassesPanel } from "./GlassesPanel";

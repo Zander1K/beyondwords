@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { WebSimulatorAdapter } from "../web-simulator/WebSimulatorAdapter";
 import { DISPLAY_LIMITS, makePhrase, makeWordCard, normaliseText, truncate } from "./displayModel";
+import { INITIAL_DEVICE, isDisplayOn } from "./simulatorStore";
 
 const LONG =
   "The old lighthouse stood alone at the edge of the grey cliffs and every night its lamp swept slowly across the water";
@@ -64,9 +65,20 @@ describe("simulated display shows one item at a time", () => {
     });
     adapter.showImage("https://example.test/picture.png");
     expect(adapter.store.getState().content?.kind).toBe("image");
+    adapter.showViewfinder();
+    expect(adapter.store.getState().content).toEqual({ kind: "viewfinder" });
     adapter.clearDisplay();
     expect(adapter.store.getState().content).toBeNull();
     adapter.dispose();
+  });
+
+  it("turns the display off when the glasses are not worn, folded or disconnected", () => {
+    const on = { audioOnly: false, device: { ...INITIAL_DEVICE } };
+    expect(isDisplayOn(on)).toBe(true);
+    expect(isDisplayOn({ ...on, audioOnly: true })).toBe(false);
+    expect(isDisplayOn({ ...on, device: { ...on.device, worn: false } })).toBe(false);
+    expect(isDisplayOn({ ...on, device: { ...on.device, folded: true } })).toBe(false);
+    expect(isDisplayOn({ ...on, device: { ...on.device, connected: false } })).toBe(false);
   });
 
   it("reports no display in audio-only mode", () => {

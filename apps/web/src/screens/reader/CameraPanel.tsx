@@ -1,37 +1,41 @@
-// Glasses camera preview. The stream comes from GlassesAdapter.startCamera() (the browser camera
-// in the simulator), never from navigator.mediaDevices directly.
-import { useEffect, useRef, useState } from "react";
+// Glasses camera preview: what the glasses' point-of-view camera sees. The stream comes from
+// GlassesAdapter.startCamera(), never from navigator.mediaDevices directly.
+import { useEffect, useRef } from "react";
 
-import { GlassesError, type GlassesErrorCode, useGlasses } from "@/glasses";
+import type { GlassesErrorCode } from "@/glasses";
 
 import styles from "./CameraPanel.module.css";
-
-type CameraState =
-  | { kind: "off" }
-  | { kind: "starting" }
-  | { kind: "on"; stream: MediaStream }
-  | { kind: "error"; code: GlassesErrorCode };
+import type { CameraStatus } from "./useReaderController";
 
 const MESSAGES: Record<GlassesErrorCode, string> = {
   "permission-denied":
     "Camera access is blocked. Allow the camera for this site (the camera icon in the address bar), then try again.",
-  "no-device": "No camera was found. Connect a camera and try again.",
+  "no-device": "No camera was found, or another app is using it. Close that app and try again.",
   "insecure-context":
     "The camera only works on localhost or over HTTPS. See apps/web/README.md for testing on a phone.",
   unsupported: "This browser cannot use the camera. Try a recent Chrome, Edge, Firefox or Safari.",
+  "camera-off": "Start the camera first.",
+  "glasses-unavailable":
+    "The glasses can't use the camera right now. Check they're connected and unfolded (simulator panel).",
   "not-implemented": "The camera is not available on these glasses yet.",
   unknown: "The camera could not start. Try again.",
 };
 
-function stopStream(stream: MediaStream) {
-  for (const track of stream.getTracks()) track.stop();
+interface Props {
+  camera: CameraStatus;
+  cameraOn: boolean;
+  stoppedByDevice: boolean;
+  capture: { url: string; at: number } | null;
+  onStart: () => void;
+  onStop: () => void;
+  onCapture: () => void;
+  onViewfinder: () => void;
 }
 
-export function CameraPanel() {
-  const glasses = useGlasses();
-  const [camera, setCamera] = useState<CameraState>({ kind: "off" });
+export function CameraPanel(props: Props) {
+  const { camera, cameraOn, stoppedByDevice, capture } = props;
   const videoRef = useRef<HTMLVideoElement>(null);
-  const stream = camera.kind === "on" ? camera.stream : null;
+  const stream = camera.kind === "on" && cameraOn ? camera.stream : null;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -39,35 +43,33 @@ export function CameraPanel() {
     video.srcObject = stream;
     return () => {
       video.srcObject = null;
-      stopStream(stream);
     };
   }, [stream]);
-
-  const start = async () => {
-    setCamera({ kind: "starting" });
-    try {
-      setCamera({ kind: "on", stream: await glasses.startCamera() });
-    } catch (error) {
-      setCamera({ kind: "error", code: error instanceof GlassesError ? error.code : "unknown" });
-    }
-  };
 
   return (
     <div className={styles.camera}>
       <div className={styles.status}>
-        {camera.kind === "on" ? (
+        {cameraOn ? (
           <span className={styles.on} role="status">
             <span className={styles.dot} aria-hidden="true" /> Camera on
           </span>
         ) : (
           <span className={styles.off}>Camera off</span>
         )}
-        {camera.kind === "on" ? (
-          <button type="button" onClick={() => setCamera({ kind: "off" })}>
-            Stop camera
-          </button>
+        {cameraOn ? (
+          <>
+            <button type="button" onClick={props.onCapture}>
+              Capture page <kbd>C</kbd>
+            </button>
+            <button type="button" onClick={props.onViewfinder}>
+              Viewfinder on glasses
+            </button>
+            <button type="button" onClick={props.onStop}>
+              Stop camera
+            </button>
+          </>
         ) : (
-          <button type="button" onClick={start} disabled={camera.kind === "starting"}>
+          <button type="button" onClick={props.onStart} disabled={camera.kind === "starting"}>
             {camera.kind === "starting" ? "Starting…" : "Start camera"}
           </button>
         )}
@@ -78,16 +80,35 @@ export function CameraPanel() {
           {MESSAGES[camera.code]}
         </p>
       )}
+      {stoppedByDevice && (
+        <p className={styles.error} role="alert">
+          The camera stopped because the glasses were folded or disconnected. Start it again when
+          they're ready.
+        </p>
+      )}
 
-      {camera.kind === "on" && (
-        <video
-          ref={videoRef}
-          className={styles.video}
-          autoPlay
-          playsInline
-          muted
-          aria-label="Glasses camera preview"
-        />
+      {stream && (
+        <div className={styles.pov}>
+          <video
+            ref={videoRef}
+            className={styles.video}
+            autoPlay
+            playsInline
+            muted
+            aria-label="Glasses camera preview"
+          />
+          <span className={styles.povLabel}>Glasses camera (point of view)</span>
+        </div>
+      )}
+
+      {capture && (
+        <figure className={styles.capture}>
+          <img src={capture.url} alt="Last captured page" />
+          <figcaption>
+            Last capture, {new Date(capture.at).toLocaleTimeString()}. Kept in memory only, never
+            saved or uploaded.
+          </figcaption>
+        </figure>
       )}
     </div>
   );

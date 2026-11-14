@@ -2,6 +2,8 @@
 export { DEMO_PHRASES, type DemoPhrase } from "./demoPhrases";
 export {
   initialReaderState,
+  isNavGesture,
+  type NavGesture,
   readerStep,
   type ReaderState,
   type ReaderStep,

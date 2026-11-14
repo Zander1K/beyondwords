@@ -15,6 +15,8 @@ const BROWSER_MEDIA_GLOBALS = [
   "OfflineAudioContext",
   "SpeechSynthesisUtterance",
   "speechSynthesis",
+  "SpeechRecognition",
+  "webkitSpeechRecognition",
 ].map((name) => ({
   name,
   message: "Browser audio/camera APIs are only allowed in src/glasses/web-simulator/.",
@@ -24,6 +26,8 @@ const BROWSER_MEDIA_PROPERTIES = [
   { object: "navigator", property: "mediaDevices" },
   { object: "window", property: "speechSynthesis" },
   { object: "window", property: "AudioContext" },
+  { object: "window", property: "SpeechRecognition" },
+  { object: "window", property: "webkitSpeechRecognition" },
 ].map((rule) => ({
   ...rule,
   message: "Browser audio/camera APIs are only allowed in src/glasses/web-simulator/.",
