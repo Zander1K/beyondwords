@@ -119,6 +119,18 @@ Acceptance: pressing Interrupt, then Resume, returns the user to the same phrase
 | Double tap middle on thumb | system wake/sleep | Simulate as the sleep/wake event, not an app action | "Sleep/Wake" button |
 | Frame touchpad tap / swipe | same as select/directional | Alternative input; the main one on Gen 2 | On-screen touchpad buttons |
 
+**Camera as the eyes (decision 2026-11-14).** In the simulation the camera view is the only source of what the glasses "see", including the hands. Camera hand gestures stand in for the Neural Band; keys and the on-screen pad stay as a fallback:
+
+| Hand on camera | Action | Notes |
+|---|---|---|
+| Pointing index finger | (none) | The reading cursor: the line just above the fingertip and the phrase along it (SIM-VIS-03). Never a gesture. |
+| Thumb-index pinch | `select` | Same shape as the band's gesture. Fires once per pinch. |
+| Thumb-middle pinch | `back` | Same shape as the band's gesture. |
+| Open-palm swipe left / right | `left` / `right` | Phrase back / forward. |
+| Open-palm swipe up / down | `up` / `down` | Line back / forward. |
+
+[ASSUMPTION] The real band reads wrist muscles, not video; this mapping only exists in the simulation. A "mirror swipes" toggle covers cameras that face the user.
+
 | ID | Priority | Requirement |
 |---|---|---|
 | SIM-GST-01 | P0 | **Six-action gesture pad.** On-screen buttons and keyboard keys for `select`, `back`, `left`, `right`, `up`, `down`; visible press feedback and a short haptic-like animation. |
@@ -186,7 +198,7 @@ A webcam is faster and cleaner than the real pipeline. The control strip must in
 - **Meta AI's own on-glasses vision.** Not exposed to third-party apps.
 - **Highlighting on the paper.** The display cannot draw on the page; the highlight lives only in the glasses panel (and as a debug overlay in the camera view).
 - **Video on the display,** and **Neural Handwriting.**
-- **Real Neural Band hardware or raw EMG.** Simulated by buttons and keys only.
+- **Real Neural Band hardware or raw EMG.** Simulated by hand gestures on the camera (section 2.5), with buttons and keys as a fallback.
 
 ---
 

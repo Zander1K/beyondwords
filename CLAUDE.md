@@ -19,7 +19,8 @@ The frontend is a **web app** (`apps/web`), not a mobile app. (It replaced an ea
 | Glasses camera (aimed at the page) | Browser camera |
 | Glasses mic and speakers | Browser mic and speaker |
 | Ray-Ban Display (600x600, ~20 degree FOV, right lens only) | Display simulator panel |
-| Neural Band and touchpad input | Six abstract actions `select`, `back`, `left`, `right`, `up`, `down`: keys (`Enter`, `Escape`, arrows) and an on-screen gesture pad |
+| Neural Band and touchpad input | Six abstract actions `select`, `back`, `left`, `right`, `up`, `down`, recognised from hands on the camera (pinches, open-palm swipes); keys (`Enter`, `Escape`, arrows) and an on-screen pad as fallback |
+| What the glasses see | The live camera view: OCR reads the page, the pointing fingertip picks the line and phrase |
 | Display session (stopped / starting / started / stopping; interrupt, sleep/wake, disconnect) | Adapter-owned session with simulator controls |
 | Voice | Push-to-talk mic streamed to `/live` |
 | Ray-Ban Meta Gen 2 (no display) | Audio-only mode |

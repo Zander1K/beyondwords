@@ -23,6 +23,8 @@ Decisions left open during the step 1 scaffold (2026-11-14). Each one is also ma
 | 16 | Neural Band and touchpad on real glasses: the exact gesture set, and which gestures DAT forwards to third-party apps (touchpad hold and the capture button may be reserved for Meta AI / the system camera). The simulator mapping is our assumption. | Alex | `apps/web/src/glasses/web-simulator/gestures.ts`, `docs/glasses-adapter.md` | 5 |
 | 17 | Voice on real glasses: can a DAT app have a wake word, or only push-to-talk? "Hey Meta" wakes Meta AI. The simulator's wake phrase is simulator-only. | Alex + Mick Ola | `apps/web/src/glasses/web-simulator/voice.ts` | 5, 7 |
 | 18 | Does DAT report battery level, volume and worn/folded state to apps (the mock kit has don/doff and fold)? | Alex | `apps/web/src/glasses/meta-dat/MetaDatAdapter.ts` | 5 |
+| 19 | Browser OCR (Tesseract.js) accuracy on real camera photos: curved pages, glare, small print, two columns. Measured only on synthetic photos (98.5% word recall, ~250 ms). Compare with Nemotron VL in `eval/`. | Alex + Matthew | `apps/web/src/vision/ocr.ts` | 3 |
+| 20 | Camera gestures vs finger reading with one camera: thresholds for pinches, swipes, line hysteresis and hand-lost are guesses. Tune on real footage. | Alex | `apps/web/src/glasses/web-simulator/cameraGestures.ts`, `apps/web/src/vision/` | 4 |
 | 15 | `GlassesAdapter` has no connect/register step, and `startCamera()` returns a `MediaStream`; real DAT needs registration and does not hand JS a `MediaStream`. Change the interface before building `MetaDatAdapter`? | Alex | `apps/web/src/glasses/adapter.ts` | 5 |
 
 ## Not yet verified (environment gaps)

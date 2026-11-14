@@ -26,6 +26,11 @@ app [VERIFIED], but the exact event names a third-party app receives are **OPEN*
 | Double tap middle on thumb | system wake/sleep (not an app action) | Sleep/Wake button |
 | Frame touchpad | same actions | on-screen pad |
 
+In the simulation the camera is the eyes: thumb-index pinch = `select`, thumb-middle pinch =
+`back`, open-palm swipes = `left`/`right`/`up`/`down`, recognised from the camera's hand frames
+inside the web simulator (`web-simulator/cameraGestures.ts`) and delivered through `onGesture`
+like band events. A pointing finger is the reading cursor (app vision), never a gesture.
+
 ## Method mapping
 
 | `GlassesAdapter` | Web simulator | Meta DAT (planned `MetaDatAdapter`) |

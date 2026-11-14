@@ -37,32 +37,35 @@ The API should be running for the Settings screen's connection check (`make api`
 
 ## Trying the glasses simulator
 
-Open **Reader**. Full mapping in [`docs/glasses-adapter.md`](../../docs/glasses-adapter.md).
+The camera view is the glasses' eyes: what is read, where you are and your gestures all come
+from it. Open **Reader**:
 
-| Key       | Glasses input               | Does                         |
-| --------- | --------------------------- | ---------------------------- |
-| `→` / `←` | Neural Band thumb swipe     | Next / previous phrase       |
-| `Enter`   | Neural Band index pinch     | Word card for the hard word  |
-| `Esc`     | Neural Band middle pinch    | Back / close the viewfinder  |
-| `+` / `-` | Neural Band pinch and twist | Volume                       |
-| `Space`   | Touchpad tap                | Read the phrase aloud / stop |
-| `V`       | Touchpad hold               | Speak a command              |
-| `C`       | Capture button              | Photo of the page            |
+1. **Start camera** and aim it down at an open book so the page fills most of the frame. A page
+   still is taken after ~1.5 s (or press **Scan page**): Tesseract.js reads the lines (boxes are
+   drawn over the view) and a **mock** page analysis splits them into phrases and hard words.
+   No camera? **Upload a page photo** instead. Nothing is saved or uploaded.
+2. **Start reading** (the glasses display session needs your go-ahead).
+3. **Point** just under a line: the line and phrase under your fingertip are highlighted on the
+   glasses panel and the camera view. Lift your hand away for 0.7 s: the last line is held, the
+   lost-hand cue plays and the panel shows the hand-lost icon.
+4. **Gestures from the camera** (the simulated Neural Band):
 
-1. **Start camera**: the glasses' point-of-view camera. The privacy LED on the simulated frame
-   lights up, and the display shows a viewfinder to line up the page.
-2. **Capture** (`C`): shutter cue, LED flash, the photo shows briefly on the display and under
-   the camera. It stays in memory only; nothing is saved or uploaded.
-3. **Voice**: press `V` and say "next", "read this", "what does lamp mean", "take a photo" or
-   "show the camera". Chrome, Edge and Safari have speech recognition (Chrome and Edge send the
-   audio to their speech service); in other browsers, or without a mic, use the typed box.
-   "Always listen for hey meta" is a simulator-only option.
-4. **Device state**: untick _Worn_ (reading pauses, display off), tick _Folded_ (camera stops),
-   untick _Connected_, drag _Battery_ to 0, or tick _Audio-only_ (Ray-Ban Meta Gen 2: no display,
-   cues and speech instead). Cues also show as a "♪" badge in case your sound is off.
+   | Hand                         | Action                 |
+   | ---------------------------- | ---------------------- |
+   | Thumb + index pinch          | select (word card)     |
+   | Thumb + middle pinch         | back                   |
+   | Open-palm swipe left / right | previous / next phrase |
+   | Open-palm swipe up / down    | previous / next line   |
 
-Word help and answers are canned until the API exists (HACK). Only the demo hard words
-(lighthouse, lamp, restless) have definitions.
+   The fallback keys are `Enter`, `Esc` and the arrow keys, plus the on-screen pad. Every gesture
+   shows in the gesture log with its source. If swipes go the wrong way (camera facing you),
+   tick **Mirror swipes**.
+
+5. **System events** in the panel: Interrupt/Resume, Sleep/Wake, Disconnect/Reconnect,
+   Recreate adapter. **Stress test** checks the 5 updates/s display limit.
+
+The first camera start downloads the hand model (~7.8 MB) and the OCR model; this needs an
+internet connection (HACK: vendor them for an offline demo). Word help definitions are mock.
 
 ## Config
 
