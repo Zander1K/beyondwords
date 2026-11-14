@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { mapPosition, mergePages, textSimilarity } from "./pageMerge";
-import { line, type Page, phrase } from "./page";
+import { EMPTY_PAGE, line, type Page, phrase } from "./page";
 
 const TEXT = [
   "The old lighthouse stood alone",
@@ -80,8 +80,8 @@ describe("mergePages (continuous scanning)", () => {
     expect(page.id).toBe("s");
   });
 
-  it("replaces the demo page on the first read", () => {
-    expect(mergePages(pageOf("demo", [0]), pageOf("s", [0]), null, true).newPage).toBe(true);
+  it("takes the first read when there is no page yet", () => {
+    expect(mergePages(EMPTY_PAGE, pageOf("s", [0]), null).newPage).toBe(true);
   });
 });
 

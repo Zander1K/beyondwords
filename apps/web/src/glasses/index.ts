@@ -16,3 +16,18 @@ export {
 export { GlassesControlsPanel, GlassesHudLayer } from "./GlassesPanel";
 export { GlassesProvider } from "./GlassesProvider";
 export { useControlsShortcut } from "./useControlsShortcut";
+export { useNoteActivity } from "./useNoteActivity";
+export {
+  REMOTE_PREFIX,
+  type RemoteVoice,
+  useVoices,
+  type VoiceInfo,
+  type VoiceLibrary,
+} from "./useVoices";
+export {
+  HearingError,
+  type HearingProblem,
+  type SpeechInput,
+  useSpeechInput,
+} from "./useSpeechInput";
+export { useWakeWord, type WakeProblem, type WakeWord } from "./useWakeWord";

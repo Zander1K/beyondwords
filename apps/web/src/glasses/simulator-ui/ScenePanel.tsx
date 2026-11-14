@@ -95,6 +95,17 @@ function Node({ node }: { node: SceneNode }) {
           style={{ width: px(node.width), height: px(node.height), borderRadius: px(node.radius) }}
         />
       );
+    case "placeholder":
+      return (
+        <div
+          className={styles.placeholder}
+          role="status"
+          aria-label={node.label}
+          style={{ width: px(node.width), height: px(node.height), borderRadius: px(node.radius) }}
+        >
+          <span className={styles.placeholderLabel}>{node.label}</span>
+        </div>
+      );
     case "button":
       return (
         <span className={styles.button} data-focused={node.focused}>

@@ -25,7 +25,7 @@ import type { OverlayHand } from "./VisionOverlay";
 /** Detection rate cap. [ASSUMPTION] 20/s keeps the main thread responsive (knob is P1). */
 const MAX_DETECT_FPS = 20;
 /** SIM-VIS-04: no pointing hand for this long = hand lost (tunable, default 700 ms). */
-export const HAND_LOST_MS = 700;
+export const HAND_LOST_MS = 1200;
 /**
  * A hand whose index tip is within this distance (fraction of the image) of last frame's
  * pointer tip is the same pointing hand: it keeps the looser "still pointing" test.
@@ -73,10 +73,16 @@ export function useHandTracking(
   videoRef: RefObject<HTMLVideoElement | null>,
   active: boolean,
   onControlsGesture?: () => void,
+  onPageGesture?: () => void,
 ) {
   const glasses = useGlasses();
   const [attempt, setAttempt] = useState(0);
   const [holdProgress, setHoldProgress] = useState(0);
+  const [pageHoldProgress, setPageHoldProgress] = useState(0);
+  const pageHandler = useRef(onPageGesture);
+  useEffect(() => {
+    pageHandler.current = onPageGesture;
+  });
   const controlsHandler = useRef(onControlsGesture);
   useEffect(() => {
     controlsHandler.current = onControlsGesture;
@@ -96,6 +102,8 @@ export function useHandTracking(
     let raf = 0;
     let lastDetect = 0;
     let lastPointerAt = Number.NEGATIVE_INFINITY;
+    // The last time ANY hand or finger was in the frame (not only a pointing one).
+    let lastSeenAt = Number.NEGATIVE_INFINITY;
     let frames = 0;
     let fpsSince = performance.now();
     let fps = 0;
@@ -104,7 +112,9 @@ export function useHandTracking(
     let lastSource: "hand" | "finger" | null = null;
     const cursor = new PointFilter();
     const hold = new HoldDetector();
+    const pageHold = new HoldDetector();
     let shownProgress = 0;
+    let shownPageProgress = 0;
     const store = useReaderStore.getState;
 
     const loop = (now: number) => {
@@ -125,8 +135,16 @@ export function useHandTracking(
       const poses = frame.hands.map((h, i) =>
         classifyPose(h.landmarks, null, h.world, i === previous),
       );
-      const pointerIndex =
+      let pointerIndex =
         previous >= 0 && poses[previous] === "pointing" ? previous : poses.indexOf("pointing");
+      // No hand is clearly pointing, but one relaxed hand is in view (not a pinch, swipe or
+      // controls gesture): it is most likely reading, so its index fingertip stays the cursor.
+      // Otherwise a hand that is merely not "pointing" enough would be reported lost.
+      if (pointerIndex < 0) {
+        const relaxed = poses.flatMap((pose, i) => (pose === "other" ? [i] : []));
+        if (previous >= 0 && poses[previous] === "other") pointerIndex = previous;
+        else if (relaxed.length === 1) pointerIndex = relaxed[0] ?? -1;
+      }
 
       // Thumb and little finger out, held for a moment, shows or hides the controls. Progress is
       // shown in steps, so the ring does not re-render the screen on every frame.
@@ -136,6 +154,14 @@ export function useHandTracking(
       if (stepped !== shownProgress) {
         shownProgress = stepped;
         setHoldProgress(stepped);
+      }
+      // The rock sign, held, asks for the whole page's gist (its own ring, same stepping).
+      const pageHeld = pageHold.update(poses.includes("horns"), now);
+      if (pageHeld.fired) pageHandler.current?.();
+      const pageStepped = Math.round(pageHeld.progress * 20) / 20;
+      if (pageStepped !== shownPageProgress) {
+        shownPageProgress = pageStepped;
+        setPageHoldProgress(pageStepped);
       }
       const handTip = tips[pointerIndex];
 
@@ -165,6 +191,8 @@ export function useHandTracking(
       else if (now - lastPointerAt > HAND_LOST_MS) lastTip = null;
       const tip = rawTip ? cursor.filter(rawTip, now) : undefined;
       const s = store();
+      // Lost means nothing hand-like in view for a while, not "not pointing right now".
+      if (frame.hands.length || finger) lastSeenAt = now;
 
       if (tip) {
         lastPointerAt = now;
@@ -174,7 +202,10 @@ export function useHandTracking(
           picker.current = pickLine(page, tip, picker.current);
           if (picker.current.position) s.setPosition(picker.current.position);
         }
-      } else if (now - lastPointerAt > HAND_LOST_MS && Number.isFinite(lastPointerAt)) {
+      } else if (
+        now - Math.max(lastPointerAt, lastSeenAt) > HAND_LOST_MS &&
+        Number.isFinite(lastPointerAt)
+      ) {
         // Hold the last line; manual gestures keep working.
         if (!s.handLost) {
           s.setHandLost(true);
@@ -227,6 +258,7 @@ export function useHandTracking(
       cancelAnimationFrame(raf);
       setHands([]);
       setHoldProgress(0);
+      setPageHoldProgress(0);
       setStats({ status: "off", fps: 0, detectMs: 0, fingerOnly: false });
       useReaderStore.getState().setHandLost(false);
     };
@@ -248,6 +280,8 @@ export function useHandTracking(
     connections: tracker.connections,
     /** 0-1: how far through holding the controls gesture. */
     holdProgress,
+    /** 0-1: how far through holding the page gesture (rock sign). */
+    pageHoldProgress,
     /** Try loading the hand model again after it failed. */
     retry: () => setAttempt((a) => a + 1),
   };

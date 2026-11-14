@@ -228,3 +228,45 @@ describe("simulated display", () => {
     adapter.dispose();
   });
 });
+
+describe("word card pronunciation", () => {
+  it("carries the pronunciation between the word and its definition", () => {
+    expect(makeWordCard({ word: "aloof", pronunciation: " uh-LOOF ", short: "Distant." })).toEqual({
+      kind: "word",
+      word: "aloof",
+      pronunciation: "uh-LOOF",
+      short: "Distant.",
+      actions: [],
+    });
+  });
+
+  it("leaves it out when there is none", () => {
+    expect(makeWordCard({ word: "aloof", short: "Distant." })).not.toHaveProperty("pronunciation");
+  });
+
+  it("carries an illustration for under the definition", () => {
+    const card = makeWordCard({
+      word: "lamp",
+      short: "A light.",
+      imageUrl: " /api/illustrations/a ",
+    });
+    expect(card).toMatchObject({ imageUrl: "/api/illustrations/a" });
+  });
+});
+
+describe("word card picture loading", () => {
+  it("marks the card as drawing until a picture exists", () => {
+    expect(makeWordCard({ word: "lamp", short: "A light.", imageLoading: true })).toMatchObject({
+      imageLoading: true,
+    });
+    // Once there is a picture, loading no longer applies.
+    const done = makeWordCard({
+      word: "lamp",
+      short: "A light.",
+      imageLoading: true,
+      imageUrl: "/x",
+    });
+    expect(done).not.toHaveProperty("imageLoading");
+    expect(done).toMatchObject({ imageUrl: "/x" });
+  });
+});

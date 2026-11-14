@@ -67,10 +67,8 @@ export function derivePills(h: ReaderHealth): StatusPill[] {
     pills.push({ id: "glasses", label: "Glasses off", tone: "off" });
   }
 
-  if (!camOn) {
-    pills.push({ id: "page", label: "Demo page", tone: "off" });
-    return pills;
-  }
+  // Camera off: there is no camera page to report on (an ebook shows its own page).
+  if (!camOn) return pills;
 
   switch (h.scan.status) {
     case "idle":

@@ -1,6 +1,8 @@
 // Who is signed in. Kept in sessionStorage (this tab only) and read back on load.
 import { create } from "zustand";
 
+import { loginUser, type Profile } from "@/api";
+
 import {
   ACCESS_PASSWORD_SHA256,
   checkPassword,
@@ -19,9 +21,23 @@ export interface SessionStorageLike {
 export type SignInResult =
   { ok: true; username: string } | { ok: false; field: "username" | "password"; message: string };
 
+/** Tells the server who signed in (POST /users/login); resolves to the reader's profile. */
+export type RegisterUser = (username: string) => Promise<Profile>;
+
 export interface AccessState {
   /** The signed-in username, or null. */
   user: string | null;
+  /** The reader's id on the server. Null until it answers (or when the API is unreachable). */
+  userId: number | null;
+  /**
+   * The reader's profile from the server (support level, comfort settings, whether they have done
+   * first-run setup). Null until the server answers, or when it cannot be reached.
+   */
+  profile: Profile | null;
+  /** They chose "Skip for now" on the welcome screen: do not send them back this session. */
+  onboardingSkipped: boolean;
+  setProfile: (profile: Profile) => void;
+  skipOnboarding: () => void;
   signIn: (username: string, password: string) => SignInResult;
   signOut: () => void;
 }
@@ -38,20 +54,40 @@ function browserStorage(): SessionStorageLike | null {
 /**
  * @param storage where a sign-in is kept (a fake in tests).
  * @param passwordDigest SHA-256 of the password to accept (a test password of their own in tests).
+ * @param register called after a sign-in to find or create the reader on the server. If it fails
+ *   (API or database down) they are still signed in: the demo never blocks on the backend.
  */
 export function createAccessStore(
   storage: SessionStorageLike | null = browserStorage(),
   passwordDigest: string = ACCESS_PASSWORD_SHA256,
+  register?: RegisterUser,
 ) {
   const read = () => {
     try {
-      return parseSession(storage?.getItem(SESSION_KEY) ?? null)?.username ?? null;
+      return parseSession(storage?.getItem(SESSION_KEY) ?? null);
     } catch {
       return null;
     }
   };
-  return create<AccessState>((set) => ({
-    user: read(),
+  const saved = read();
+  const remember = (username: string, userId: number) => {
+    try {
+      storage?.setItem(SESSION_KEY, JSON.stringify({ username, at: Date.now(), userId }));
+    } catch {
+      // Not remembered across a reload; the id is still held for this page.
+    }
+  };
+  const store = create<AccessState>((set, get) => ({
+    user: saved?.username ?? null,
+    userId: saved?.userId ?? null,
+    profile: null,
+    onboardingSkipped: false,
+    setProfile: (profile) => {
+      set({ profile, userId: profile.id });
+      const user = get().user;
+      if (user) remember(user, profile.id);
+    },
+    skipOnboarding: () => set({ onboardingSkipped: true }),
     signIn: (username, password) => {
       const name = checkUsername(username);
       if (!name.ok) return { ok: false, field: "username", message: name.message };
@@ -63,7 +99,13 @@ export function createAccessStore(
       } catch {
         // Storage refused (full, blocked): they are still signed in for this page load.
       }
-      set({ user: name.value });
+      set({ user: name.value, userId: null, profile: null, onboardingSkipped: false });
+      void register?.(name.value)
+        .then((profile) => {
+          // Only if the same person is still signed in when the server answers.
+          if (get().user === name.value) get().setProfile(profile);
+        })
+        .catch(() => undefined);
       return { ok: true, username: name.value };
     },
     signOut: () => {
@@ -72,10 +114,19 @@ export function createAccessStore(
       } catch {
         // Nothing stored that could be removed.
       }
-      set({ user: null });
+      set({ user: null, userId: null, profile: null, onboardingSkipped: false });
     },
   }));
+  // A reload while signed in: ask the server for the profile again.
+  if (saved && register) {
+    void register(saved.username)
+      .then((profile) => {
+        if (store.getState().user === saved.username) store.getState().setProfile(profile);
+      })
+      .catch(() => undefined);
+  }
+  return store;
 }
 
 /** The app's one access store. */
-export const useAccess = createAccessStore();
+export const useAccess = createAccessStore(undefined, undefined, loginUser);

@@ -7,9 +7,7 @@
 import { API_BASE_URL } from "@/config";
 import type { Page } from "@/reader";
 
-import type { WordCard } from "@/glasses";
-
-import { type AnalyzeLine, mockAnalyzePage, mockDefineWord } from "./mock";
+import { type AnalyzeLine, mockAnalyzePage } from "./mock";
 
 /** Mirrors apps/api/app/schemas/health.py:HealthResponse. */
 export interface HealthResponse {
@@ -88,6 +86,99 @@ export function askQuestion(body: AskRequest, signal?: AbortSignal): Promise<Ask
   return postJson<AskResponse>("/ask", body, signal);
 }
 
+/** Mirrors apps/api/app/schemas/words.py:DefineWordResponse. */
+export interface DefineWordResponse {
+  word: string;
+  syllables: string[];
+  say_as: string;
+  meaning: string;
+  example: string | null;
+  illustratable: boolean;
+  degraded: boolean;
+}
+
+/** A word's meaning in context (real call: POST /words/define). */
+export function defineWordRemote(
+  body: { word: string; sentence: string; book_id?: number | null },
+  signal?: AbortSignal,
+): Promise<DefineWordResponse> {
+  return postJson<DefineWordResponse>("/words/define", body, signal);
+}
+
+/** Mirrors apps/api/app/schemas/users.py:Spacing. */
+export interface ProfileSpacing {
+  letter_spacing: number;
+  word_spacing: number;
+  line_height: number;
+  font_size: number;
+}
+
+export type SupportLevel = "listen" | "read_along" | "solo";
+export type GlassesKind = "display" | "gen2";
+
+/** Mirrors apps/api/app/schemas/users.py:Profile. */
+export interface Profile {
+  id: number;
+  username: string;
+  display_name: string | null;
+  support_level: SupportLevel;
+  glasses_type: GlassesKind | null;
+  voice: string | null;
+  spacing: ProfileSpacing | null;
+  /** False for a reader who has not done first-run setup. */
+  onboarded: boolean;
+}
+
+/** Mirrors apps/api/app/schemas/users.py:OnboardingRequest. */
+export interface OnboardingAnswers {
+  support_level: SupportLevel;
+  glasses_type: GlassesKind | null;
+  display_name: string | null;
+  spacing: ProfileSpacing | null;
+}
+
+/** Find or create the reader for a username (real call: POST /users/login). */
+export async function loginUser(username: string, signal?: AbortSignal): Promise<Profile> {
+  const r = await postJson<Profile & { created: boolean }>("/users/login", { username }, signal);
+  return r;
+}
+
+/** Save first-run setup (real call: PUT /users/{id}/onboarding). Returns the updated profile. */
+export async function saveOnboarding(
+  userId: number,
+  answers: OnboardingAnswers,
+  signal?: AbortSignal,
+): Promise<Profile> {
+  const response = await fetch(`${API_BASE_URL}/users/${userId}/onboarding`, {
+    method: "PUT",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(answers),
+    signal,
+  });
+  if (!response.ok) {
+    throw new ApiError(
+      response.status,
+      `PUT /users/${userId}/onboarding failed with ${response.status}`,
+      response.headers.get("X-Request-ID"),
+    );
+  }
+  return (await response.json()) as Profile;
+}
+
+/** Mirrors apps/api/app/schemas/illustrations.py:IllustrateResponse (the fields used here). */
+export interface IllustrateResponse {
+  id: string;
+  url: string;
+}
+
+/** Draw a word (real call: POST /illustrate). `url` is relative to the API. */
+export function illustrate(
+  body: { text: string; book_id?: number | null },
+  signal?: AbortSignal,
+): Promise<IllustrateResponse> {
+  return postJson<IllustrateResponse>("/illustrate", body, signal);
+}
+
 export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return getJson<HealthResponse>("/health", signal);
 }
@@ -99,13 +190,4 @@ export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
  */
 export async function analyzePage(lines: AnalyzeLine[]): Promise<Page> {
   return mockAnalyzePage(lines);
-}
-
-/**
- * Word help: a short definition for the word under the finger.
- * MOCK: TODO(alex, with Matthew) replace with the real POST /words/define (with the sentence
- * as context). Synchronous for now so the card opens instantly.
- */
-export function defineWord(word: string): WordCard {
-  return mockDefineWord(word);
 }

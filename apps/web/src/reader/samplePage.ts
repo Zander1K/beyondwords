@@ -1,9 +1,9 @@
-// HACK: a hard-coded demo page until page analysis exists. Written for this repo; not taken
-// from any book (never commit copyrighted book text).
+// A small page for TESTS ONLY (the app shows nothing until it has text). Written for this repo; not
+// taken from any book (never commit copyrighted book text).
 import { line, type Page, phrase } from "./page";
 
-export const DEMO_PAGE: Page = {
-  id: "demo-page-1",
+export const SAMPLE_PAGE: Page = {
+  id: "sample-page-1",
   lines: [
     line(
       phrase("The old lighthouse", "lighthouse", "A tall tower with a light that guides ships."),

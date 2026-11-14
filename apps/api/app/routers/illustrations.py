@@ -1,5 +1,6 @@
 """POST /illustrate and GET /illustrations/{id}. Thin layer over app.gemini.images."""
 
+import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
@@ -14,6 +15,8 @@ from app.gemini.images import (
 )
 from app.routers.books import get_library
 from app.schemas.illustrations import IllustrateRequest, IllustrateResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["illustrations"])
 
@@ -47,6 +50,10 @@ async def illustrate(
             IllustrationErrorReason.NOT_ALLOWED,
             IllustrationErrorReason.NOT_SUITABLE,
         ):
+            # Say which text and why, so a 422 in the log is not a mystery.
+            logger.info(
+                "Illustration declined (%s) for %r: %s", exc.reason.value, body.text, exc.detail
+            )
             raise HTTPException(422, exc.detail) from exc
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, PAUSED_MESSAGE) from exc
     return IllustrateResponse(

@@ -1,5 +1,7 @@
 """define(word, sentence): meaning in the context of this sentence and book (Nemotron).
 
+Prompt: define.v2 (stricter `illustratable`: physical common nouns only; v1 is kept for history).
+
 Also used directly for Word Breakdown when the word was not prepared by page analysis.
 """
 
@@ -39,7 +41,7 @@ async def define_word(
     definition = await chat_json(
         llm or get_llm(),
         [
-            Message(role="system", content=load_prompt("define.v1")),
+            Message(role="system", content=load_prompt("define.v2")),
             Message(role="user", content=json.dumps(payload, ensure_ascii=False)),
         ],
         Definition,

@@ -4,11 +4,11 @@
 import { create } from "zustand";
 
 import type { GlassesGesture, SessionState, WordCard } from "@/glasses";
-import { defineWord } from "@/api";
+import { fetchIllustration, fetchWordCard, isLoading, willIllustrate, wordCardNow } from "@/api";
 import {
   type Box,
   currentPhrase,
-  DEMO_PAGE,
+  EMPTY_PAGE,
   mapPosition,
   mergePages,
   initialReaderState,
@@ -37,7 +37,46 @@ export type ScanState =
 function cardFor(page: Page, position: ReaderPosition): WordCard | undefined {
   const pointed =
     position.word !== undefined ? page.lines[position.line]?.words?.[position.word] : undefined;
-  return pointed ? defineWord(pointed.text) : currentPhrase(page, position)?.hardWord?.card;
+  return pointed
+    ? wordCardNow(pointed.text, page.lines[position.line]?.text ?? "")
+    : currentPhrase(page, position)?.hardWord?.card;
+}
+
+/**
+ * If the open card is still a placeholder, fetch the real definition and swap it in, provided
+ * the card is still open on that same word when the answer arrives.
+ */
+function refreshCard(): void {
+  const { reader, page } = useReaderStore.getState();
+  const card = reader.card;
+  if (reader.view !== "card" || !card || !isLoading(card)) return;
+  const sentence = page.lines[reader.position.line]?.text ?? "";
+  void fetchWordCard(card.word, sentence).then((real) => {
+    const now = useReaderStore.getState().reader;
+    if (now.view !== "card" || now.card?.word !== card.word || !isLoading(now.card)) return;
+    // A picture follows the words: it is slower, and the card is useful without it. Show that it
+    // is coming (a loading placeholder) from the moment the words are in.
+    const drawing = !real.problem && willIllustrate(card.word, sentence);
+    useReaderStore.setState({
+      reader: {
+        ...now,
+        card: { ...real, focused: now.card.focused, ...(drawing ? { imageLoading: true } : {}) },
+      },
+    });
+    if (drawing) {
+      void fetchIllustration(card.word, sentence).then((imageUrl) => {
+        const open = useReaderStore.getState().reader;
+        if (open.view !== "card" || open.card?.word !== real.word) return;
+        // The picture, or (declined, failed) no picture: either way the loading state ends.
+        useReaderStore.setState({
+          reader: {
+            ...open,
+            card: { ...open.card, imageLoading: false, ...(imageUrl ? { imageUrl } : {}) },
+          },
+        });
+      });
+    }
+  });
 }
 
 export interface ReaderStore {
@@ -55,6 +94,8 @@ export interface ReaderStore {
   /** Apply a glasses gesture; returns what happened so the caller can give feedback. */
   applyGesture: (gesture: GlassesGesture) => ReaderStep;
   goToLine: (line: number) => void;
+  /** Put a card on the display (view "card") at the current position, e.g. the page's gist. */
+  showCard: (card: WordCard) => void;
   /** Finger tracking put the reader here. Closes the word card if the line changes. */
   setPosition: (position: ReaderPosition) => void;
   setHandLost: (lost: boolean) => void;
@@ -71,8 +112,8 @@ export interface ReaderStore {
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
-  // HACK: demo page until the camera's first read replaces it.
-  page: DEMO_PAGE,
+  // No text until the camera (or the ebook) gives the reader some.
+  page: EMPTY_PAGE,
   reader: initialReaderState,
   session: "stopped",
   offline: false,
@@ -86,13 +127,15 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       step = { ...step, state: { ...step.state, card: cardFor(page, step.state.position) } };
     }
     if (step.state !== get().reader) set({ reader: step.state });
+    refreshCard();
     return step;
   },
   goToLine: (line) => set((s) => ({ reader: moveToLine(s.page, s.reader, line) })),
+  showCard: (card) => set((s) => ({ reader: { ...s.reader, view: "card", card, cardFocus: 0 } })),
   setPage: (page) => set({ page, reader: initialReaderState }),
   mergeScan: (next, occluded) => {
     const { page, reader } = get();
-    const merged = mergePages(page, next, occluded, page.id === DEMO_PAGE.id);
+    const merged = mergePages(page, next, occluded);
     if (merged.newPage) {
       set({ page: merged.page, reader: initialReaderState });
       return true;
@@ -112,7 +155,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   setOffline: (offline) => set({ offline }),
   setAsleep: (asleep) => set({ asleep }),
   setScan: (scan) => set({ scan }),
-  setPosition: (position) =>
+  setPosition: (position) => {
     set((s) => {
       const { page, reader } = s;
       const cur = reader.position;
@@ -139,6 +182,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       // Pointing at another phrase with no word to follow closes a word card
       // ([ASSUMPTION]: the finger moved on).
       return { reader: { ...reader, position, view: "phrase", cardFocus: 0, card: undefined } };
-    }),
+    });
+    refreshCard();
+  },
   setHandLost: (handLost) => set((s) => (s.handLost === handLost ? {} : { handLost })),
 }));

@@ -4,7 +4,13 @@ import { RequireAccess, useAccess } from "@/access";
 import { useApiStatus } from "@/api";
 import { APP_NAME } from "@/config";
 import { Landing } from "@/landing";
-import { LibraryScreen, ReaderScreen, SettingsScreen, WordBankScreen } from "@/screens";
+import {
+  LibraryScreen,
+  ReaderScreen,
+  SettingsScreen,
+  WelcomeScreen,
+  WordBankScreen,
+} from "@/screens";
 import { SpacingVars } from "@/ui";
 
 import styles from "./App.module.css";
@@ -83,6 +89,8 @@ export function App() {
         <Route index element={<Landing />} />
         {/* Everything else needs the username and access password. */}
         <Route element={<RequireAccess />}>
+          {/* First-run setup: its own page, without the app frame. */}
+          <Route path="welcome" element={<WelcomeScreen />} />
           <Route element={<Layout />}>
             <Route path="library" element={<LibraryScreen />} />
             <Route path="reader" element={<ReaderScreen />} />

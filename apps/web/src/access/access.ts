@@ -17,7 +17,10 @@ export const ACCESS_PASSWORD_SHA256 =
 /** Where a sign-in is kept: this tab only, gone when it closes. */
 export const SESSION_KEY = "beyondwords.session";
 
-export const USERNAME_LIMITS = { min: 2, max: 32 } as const;
+// Same rules as the API (apps/api/app/schemas/users.py), so a name that signs in here is one the
+// server accepts: 3-32 characters of a-z, 0-9, "_", "." and "-", starting with a letter or number.
+// Typed capitals are folded to lower case ("Ada" and "ada" are the same reader).
+export const USERNAME_LIMITS = { min: 3, max: 32 } as const;
 
 /** Tidy a typed username: control characters out, runs of spaces collapsed, ends trimmed. */
 export function normaliseUsername(raw: string): string {
@@ -31,11 +34,10 @@ export function normaliseUsername(raw: string): string {
 
 export type UsernameCheck = { ok: true; value: string } | { ok: false; message: string };
 
-/** Letters and numbers (any language), with spaces and . _ - ' between them. */
-const ALLOWED = /^[\p{L}\p{N}][\p{L}\p{N} ._'’-]*$/u;
+const ALLOWED = /^[a-z0-9][a-z0-9._-]*$/;
 
 export function checkUsername(raw: string): UsernameCheck {
-  const value = normaliseUsername(raw);
+  const value = normaliseUsername(raw).toLowerCase();
   if (value.length < USERNAME_LIMITS.min) {
     return { ok: false, message: `Enter a username (at least ${USERNAME_LIMITS.min} characters).` };
   }
@@ -45,7 +47,7 @@ export function checkUsername(raw: string): UsernameCheck {
   if (!ALLOWED.test(value)) {
     return {
       ok: false,
-      message: "Use letters and numbers, with spaces, dots, dashes or apostrophes between them.",
+      message: "Use letters and numbers, with dots, dashes or underscores. No spaces.",
     };
   }
   return { ok: true, value };
@@ -71,6 +73,8 @@ export interface Session {
   username: string;
   /** When they signed in (ms since 1970). */
   at: number;
+  /** The reader's id on the server, once it knew them (POST /users/login). */
+  userId?: number;
 }
 
 /** A stored session, or null if there is none or it is not one of ours. */
@@ -79,10 +83,13 @@ export function parseSession(raw: string | null): Session | null {
   try {
     const data: unknown = JSON.parse(raw);
     if (typeof data !== "object" || data === null) return null;
-    const { username, at } = data as Record<string, unknown>;
+    const { username, at, userId } = data as Record<string, unknown>;
     if (typeof username !== "string" || typeof at !== "number") return null;
     const check = checkUsername(username);
-    return check.ok ? { username: check.value, at } : null;
+    if (!check.ok) return null;
+    return typeof userId === "number"
+      ? { username: check.value, at, userId }
+      : { username: check.value, at };
   } catch {
     return null;
   }

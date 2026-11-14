@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { getHealth, type HealthResponse } from "@/api";
 import { API_BASE_URL } from "@/config";
+import { REMOTE_PREFIX, useVoices } from "@/glasses";
 import { SPACING_RANGES, type SpacingSettings, useSettings } from "@/state";
 
 import styles from "./SettingsScreen.module.css";
@@ -14,6 +15,122 @@ const LABELS: Record<keyof SpacingSettings, { label: string; unit: string }> = {
   wordSpacing: { label: "Word spacing", unit: "em" },
   lineHeight: { label: "Line spacing", unit: "×" },
 };
+
+/** What a voice preview says. */
+const VOICE_SAMPLE = "The old lighthouse stood alone at the edge of the grey cliffs.";
+
+/** The voice library: choose how read-aloud sounds, and how fast. */
+function VoiceSettings() {
+  const lib = useVoices();
+  const [allLanguages, setAllLanguages] = useState(false);
+  if (!lib.available) return null;
+
+  // The first voice's language is the reader's own (the library lists theirs first).
+  const own = lib.voices[0]?.lang.slice(0, 2);
+  const shown = allLanguages ? lib.voices : lib.voices.filter((v) => v.lang.slice(0, 2) === own);
+  const best = lib.voices[0];
+  const hasRemote = lib.remoteVoices.length > 0;
+
+  return (
+    <section className={styles.card}>
+      <h2>Voice</h2>
+      <p className={styles.note}>
+        How read-aloud sounds.{" "}
+        {hasRemote
+          ? "ElevenLabs voices are the most natural. The others come from your browser and computer."
+          : "Voices come from your browser and computer; the ones marked Natural sound the most lifelike."}
+      </p>
+      {lib.voices.length === 0 && !hasRemote ? (
+        <p role="status">
+          No voices found yet. If this stays empty, try Chrome, Edge or Safari, or add a voice in
+          your system settings.
+        </p>
+      ) : (
+        <>
+          <div className={styles.voice} data-selected={lib.selected === null}>
+            <label>
+              <input
+                type="radio"
+                name="voice"
+                checked={lib.selected === null}
+                onChange={() => lib.choose(null)}
+              />
+              <span>
+                Best available
+                {hasRemote ? " (ElevenLabs)" : best ? ` (${best.name})` : ""}
+                <span className={styles.badge}>Recommended</span>
+              </span>
+            </label>
+            <button type="button" onClick={() => lib.preview(null, VOICE_SAMPLE)}>
+              Play
+            </button>
+          </div>
+          {lib.remoteVoices.map((v) => {
+            const id = `${REMOTE_PREFIX}${v.id}`;
+            return (
+              <div key={id} className={styles.voice} data-selected={lib.selected === id}>
+                <label>
+                  <input
+                    type="radio"
+                    name="voice"
+                    checked={lib.selected === id}
+                    onChange={() => lib.choose(id)}
+                  />
+                  <span>
+                    {v.name}
+                    <span className={styles.badge}>ElevenLabs</span>
+                  </span>
+                </label>
+                <button type="button" onClick={() => lib.preview(id, VOICE_SAMPLE)}>
+                  Play
+                </button>
+              </div>
+            );
+          })}
+          {shown.map((v) => (
+            <div key={v.id} className={styles.voice} data-selected={lib.selected === v.id}>
+              <label>
+                <input
+                  type="radio"
+                  name="voice"
+                  checked={lib.selected === v.id}
+                  onChange={() => lib.choose(v.id)}
+                />
+                <span>
+                  {v.name}
+                  <span className={styles.meta}> {v.lang}</span>
+                  {v.natural && <span className={styles.badge}>Natural</span>}
+                </span>
+              </label>
+              <button type="button" onClick={() => lib.preview(v.id, VOICE_SAMPLE)}>
+                Play
+              </button>
+            </div>
+          ))}
+          {lib.voices.length > shown.length || allLanguages ? (
+            <button type="button" onClick={() => setAllLanguages((a) => !a)}>
+              {allLanguages ? "Only my language" : "Show other languages"}
+            </button>
+          ) : null}
+        </>
+      )}
+      <label className={styles.slider}>
+        <span>Speed: {lib.rate.toFixed(2)}×</span>
+        <input
+          type="range"
+          min={0.6}
+          max={1.4}
+          step={0.05}
+          value={lib.rate}
+          onChange={(e) => lib.setRate(Number(e.target.value))}
+        />
+      </label>
+      <button type="button" onClick={() => lib.preview(lib.selected, VOICE_SAMPLE)}>
+        Play a sample
+      </button>
+    </section>
+  );
+}
 
 type Health = { kind: "checking" } | { kind: "ok"; body: HealthResponse } | { kind: "down" };
 
@@ -72,6 +189,8 @@ export function SettingsScreen() {
           Reset to defaults
         </button>
       </section>
+
+      <VoiceSettings />
 
       <section className={styles.card}>
         <h2>Connection</h2>

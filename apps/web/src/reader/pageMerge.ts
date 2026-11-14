@@ -112,16 +112,12 @@ export interface MergeResult {
  * Merge a fresh read into the current page. `occluded` is where hands are in the frame
  * (normalised), or null.
  */
-export function mergePages(
-  prev: Page,
-  next: Page,
-  occluded: Box | null,
-  demo = false,
-): MergeResult {
+export function mergePages(prev: Page, next: Page, occluded: Box | null): MergeResult {
   if (!next.lines.length) return { page: prev, newPage: false };
   const prevText = prev.lines.map((l) => l.text).join(" ");
   const nextText = next.lines.map((l) => l.text).join(" ");
-  const fresh = demo || !prev.lines.some((l) => l.box);
+  // Nothing boxed yet (no page, or a page that did not come from the camera): take the read.
+  const fresh = !prev.lines.some((l) => l.box);
   if (fresh || textSimilarity(prevText, nextText) < NEW_PAGE_BELOW_SIMILARITY) {
     return { page: next, newPage: true };
   }

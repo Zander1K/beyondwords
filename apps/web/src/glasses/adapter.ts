@@ -46,8 +46,20 @@ export type WordCardProblem = "not-found" | "load-failed";
 
 export interface WordCard {
   word: string;
+  /**
+   * How to say it: a respelling with the stressed syllable in capitals ("uh-LOOF"), or the
+   * syllables joined with dots when the brain gave none. Shown between the word and its
+   * definition. Optional: older cards and failures have none.
+   */
+  pronunciation?: string;
   /** Short definition, one or two lines. May be empty when `problem` is set. */
   short: string;
+  /** The brain says this word can be drawn, so an illustration may follow the definition. */
+  illustratable?: boolean;
+  /** An illustration of the word, shown under the definition once it has been made. */
+  imageUrl?: string;
+  /** A picture is being generated: the card shows a loading placeholder where it will appear. */
+  imageLoading?: boolean;
   /** The card shows what went wrong instead of a definition. */
   problem?: WordCardProblem;
   actions?: WordCardAction[];

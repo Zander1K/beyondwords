@@ -90,6 +90,20 @@ export const SHAKA_THRESHOLDS = {
   thumbAway: 0.85,
 } as const;
 
+/**
+ * The page gesture, the "rock sign": index and little finger out, middle and ring curled; the
+ * thumb is free (it usually rests over the curled fingers). Held for a moment it asks for the
+ * whole page's gist. It differs from the controls pose (SHAKA) by the index: out here, curled
+ * there. Needs the 3D world landmarks; without them it is never true.
+ * [ASSUMPTION] Thresholds are first values from MediaPipe's typical ranges; tune on real footage.
+ */
+export const HORNS_THRESHOLDS = {
+  /** Index and little finger bent no more than this (out; a straight finger is 10-30). */
+  out: 55,
+  /** Middle and ring bent at least this much (curled; a loose curl is 80-150, closed 170+). */
+  curled: 100,
+} as const;
+
 const dist = (a: Point | undefined, b: Point | undefined) =>
   a && b ? Math.hypot(a.x - b.x, a.y - b.y) : Number.POSITIVE_INFINITY;
 
@@ -183,7 +197,8 @@ export function pinchDistance(hand: Hand, fingerTip: number): number {
   return size > 0 ? dist(hand[LM.thumbTip], hand[fingerTip]) / size : Number.POSITIVE_INFINITY;
 }
 
-export type Pose = "pointing" | "pinch-index" | "pinch-middle" | "open-palm" | "shaka" | "other";
+export type Pose =
+  "pointing" | "pinch-index" | "pinch-middle" | "open-palm" | "shaka" | "horns" | "other";
 
 /**
  * Is this hand pointing (the reading cursor)? Forgiving on purpose: the index is clearly
@@ -233,6 +248,17 @@ export function isShaka(world?: Hand3): boolean {
 }
 
 /**
+ * The page gesture (see HORNS_THRESHOLDS): index and little finger out, middle and ring curled.
+ * Needs the 3D world landmarks; without them it is never true.
+ */
+export function isHorns(world?: Hand3): boolean {
+  if (!world || world.length < 21) return false;
+  const t = HORNS_THRESHOLDS;
+  const b = fingerBends(world);
+  return b.index <= t.out && b.pinky <= t.out && b.middle >= t.curled && b.ring >= t.curled;
+}
+
+/**
  * Classify one frame. Pinches are checked first (a pinching hand may still look "pointed").
  * `pinched` carries hysteresis: an ongoing pinch stays a pinch until the fingers clearly part.
  * `world` (3D landmarks) makes finger extension independent of how the hand faces the camera.
@@ -247,6 +273,10 @@ export function classifyPose(
   const indexGap = pinchDistance(hand, LM.indexTip);
   const middleGap = pinchDistance(hand, LM.middleTip);
   const { pinchOn, pinchOff } = POSE_THRESHOLDS;
+  // Before the pinches: in a rock sign the thumb rests on the curled middle finger and reads as
+  // a thumb-middle pinch ("back"). The index being straight and clear of the thumb is what
+  // separates it from a real pinch of the index.
+  if (isHorns(world) && indexGap >= pinchOn) return "horns";
   if (pinched === "index" && indexGap < pinchOff) return "pinch-index";
   if (pinched === "middle" && middleGap < pinchOff) return "pinch-middle";
   if (indexGap < pinchOn && indexGap <= middleGap) return "pinch-index";

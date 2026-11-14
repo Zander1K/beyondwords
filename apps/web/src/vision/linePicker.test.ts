@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { line, type Page, phrase } from "@/reader";
 
-import { initialPickerState, pickLine, type PickerState } from "./linePicker";
+import { initialPickerState, pickLine, PICK_THRESHOLDS, type PickerState } from "./linePicker";
 
 // Three lines, baselines at y = 0.20, 0.30, 0.40 from x 0.2 to 0.8, each 0.05 tall.
 function makePage(): Page {
@@ -120,7 +120,46 @@ describe("word under the fingertip", () => {
       start,
     );
     expect(state.position?.word).toBe(2);
-    expect(run(page, [{ x: 0.75, y: 0.22 }], state).state.position?.word).toBe(3);
+    // Moving clearly onto "stood" does move the focus, but only once it has held for a moment.
+    const onStood = Array.from({ length: PICK_THRESHOLDS.wordConfirmFrames }, () => ({
+      x: 0.77,
+      y: 0.22,
+    }));
+    expect(run(page, onStood, state).state.position?.word).toBe(3);
+  });
+
+  it("holds the focus on a word while the finger only passes over the next one", () => {
+    const page = wordPage();
+    const start = run(page, [{ x: 0.5, y: 0.22 }]).state; // on "lighthouse"
+    const pass = Array.from({ length: PICK_THRESHOLDS.wordConfirmFrames - 1 }, () => ({
+      x: 0.77,
+      y: 0.22,
+    }));
+    // Just under the confirmation time on "stood", then back: the focus never moved.
+    const { state } = run(page, [...pass, { x: 0.5, y: 0.22 }], start);
+    expect(state.position?.word).toBe(2);
+  });
+
+  it("does not hop between words when the fingertip jitters across a boundary", () => {
+    const page = wordPage();
+    const start = run(page, [{ x: 0.5, y: 0.22 }]).state; // on "lighthouse"
+    // Alternating in and out of "stood" every frame for a long time.
+    const jitter = Array.from({ length: 60 }, (_, i) => ({ x: i % 2 ? 0.77 : 0.6, y: 0.22 }));
+    const words = run(page, jitter, start).state.position?.word;
+    expect(words).toBe(2);
+  });
+
+  it("a word that has held keeps the focus until the finger really leaves it", () => {
+    const page = wordPage();
+    let { state } = run(
+      page,
+      Array.from({ length: PICK_THRESHOLDS.wordConfirmFrames }, () => ({ x: 0.77, y: 0.22 })),
+      run(page, [{ x: 0.5, y: 0.22 }]).state,
+    );
+    expect(state.position?.word).toBe(3);
+    // A slight drift back toward the neighbour's edge is inside the slack: still "stood".
+    state = run(page, [{ x: 0.655, y: 0.22 }], state).state;
+    expect(state.position?.word).toBe(3);
   });
 });
 

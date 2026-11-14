@@ -36,13 +36,23 @@ export const PICK_THRESHOLDS = {
   /** Stay on the current phrase until the tip is this far into the next one (fraction of line). */
   phraseSlack: 0.03,
   /** Stay on the current word until the tip is this far past its edge (fraction of its width). */
-  wordSlack: 0.2,
+  wordSlack: 0.4,
+  /**
+   * A different word must be the one under the tip this many frames in a row before the focus
+   * moves to it, so a jittery fingertip (or a quick pass over a word) does not flip the focus.
+   * [ASSUMPTION] ~6 frames is about 0.2 s at 30 fps; raise it if the focus still hops, lower it
+   * if following a steady finger feels laggy.
+   */
+  wordConfirmFrames: 6,
 } as const;
 
 export interface PickerState {
   position: ReaderPosition | null;
   candidate: number | null;
   candidateFrames: number;
+  /** A different word on the current line that is waiting to be confirmed, and its frame count. */
+  wordCandidate?: number | null;
+  wordFrames?: number;
 }
 
 export const initialPickerState: PickerState = {
@@ -163,11 +173,23 @@ export function pickLine(page: Page, tip: Point, prev: PickerState): PickerState
     (best.line === currentHit.line ||
       currentHit.miss - best.miss < PICK_THRESHOLDS.switchMargin * best.height)
   ) {
-    return {
-      position: positionAt(page, currentHit.line, tip.x, currentHit.along, current),
-      candidate: null,
-      candidateFrames: 0,
-    };
+    const proposed = positionAt(page, currentHit.line, tip.x, currentHit.along, current);
+    // Moving to another word on this line must hold for several frames; the first word on a
+    // line (nothing focused yet) is immediate.
+    const held = current?.word;
+    if (held !== undefined && proposed.word !== undefined && proposed.word !== held) {
+      const frames = prev.wordCandidate === proposed.word ? (prev.wordFrames ?? 0) + 1 : 1;
+      if (frames < PICK_THRESHOLDS.wordConfirmFrames) {
+        return {
+          position: current,
+          candidate: null,
+          candidateFrames: 0,
+          wordCandidate: proposed.word,
+          wordFrames: frames,
+        };
+      }
+    }
+    return { position: proposed, candidate: null, candidateFrames: 0 };
   }
 
   // A new line must win several frames in a row (first pick is immediate).

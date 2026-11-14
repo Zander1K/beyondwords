@@ -1,0 +1,104 @@
+.page {
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: var(--space-5) var(--space-4);
+}
+
+.lede {
+  color: var(--color-muted);
+}
+
+.group {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.group legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  font-weight: 700;
+}
+
+.option {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  cursor: pointer;
+}
+
+.option[data-checked="true"] {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 1px var(--color-accent);
+}
+
+.option:focus-within {
+  outline: 3px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.option input {
+  margin-top: 0.4em;
+}
+
+.hint {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.9em;
+}
+
+.sample {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3);
+  border-radius: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+}
+
+.slider {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.name {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-4);
+}
+
+.name input {
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font: inherit;
+}
+
+.error {
+  margin-top: var(--space-3);
+  color: var(--color-warn);
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+
+.actions button {
+  padding: var(--space-2) var(--space-4);
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.skip {
+  background: none;
+  border: 1px solid var(--color-border);
+}

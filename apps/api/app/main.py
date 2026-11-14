@@ -5,7 +5,7 @@ from fastapi.responses import RedirectResponse
 
 from app import middleware
 from app.config import get_settings
-from app.routers import ask, books, health, illustrations
+from app.routers import ask, books, health, illustrations, speech, users, words
 
 settings = get_settings()
 middleware.configure_logging(settings.log_level)
@@ -17,8 +17,11 @@ app.include_router(health.router)
 app.include_router(ask.router)
 app.include_router(books.router)
 app.include_router(illustrations.router)
+app.include_router(speech.router)
+app.include_router(users.router)
+app.include_router(words.router)
 
-# TODO(Matthew/Mick Ola): include pages, words and progress routers once the contracts
+# TODO(Matthew/Mick Ola): include pages and progress routers once the contracts
 # (build order step 2) are agreed.
 
 

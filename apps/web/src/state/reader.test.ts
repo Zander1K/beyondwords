@@ -1,12 +1,13 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { WebSimulatorAdapter } from "@/glasses/web-simulator/WebSimulatorAdapter";
-import { DEMO_PAGE, initialReaderState, line, type Page, phrase } from "@/reader";
+import { initialReaderState, line, type Page, phrase } from "@/reader";
+import { SAMPLE_PAGE } from "@/reader/samplePage";
 import { renderReader } from "@/screens/reader/useReaderController";
 
 import { useReaderStore } from "./reader";
 
-beforeEach(() => useReaderStore.setState({ page: DEMO_PAGE, reader: initialReaderState }));
+beforeEach(() => useReaderStore.setState({ page: SAMPLE_PAGE, reader: initialReaderState }));
 
 describe("SIM-SES-07 phone is the source of truth", () => {
   it("keeps the reading position when the adapter is torn down and recreated", async () => {

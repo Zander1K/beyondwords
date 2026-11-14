@@ -11,6 +11,11 @@ export const GESTURE_GUIDE = [
     does: "Left or right: previous or next phrase. Up or down: line",
   },
   {
+    icon: "🤘",
+    name: "Hold index and little finger out",
+    does: "Gives you the gist of the whole page (middle and ring curled, for a second)",
+  },
+  {
     icon: "🤙",
     name: "Hold thumb and little finger out",
     does: "Shows or hides these controls (other fingers curled, for a second)",

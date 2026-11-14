@@ -1,0 +1,171 @@
+/* The ebook fills the viewer. The glasses display floats top right (about a third of the width),
+   so on wide screens the page keeps clear of it; on narrow screens the page takes the full width
+   and the display overlaps its top corner. */
+.ebook {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  overflow-y: auto;
+  padding: 3.25rem 1rem 11rem;
+  background: radial-gradient(60% 50% at 30% 20%, rgb(56 72 150 / 0.35), transparent 70%), #0c0b1d;
+}
+
+@media (min-width: 900px) {
+  .ebook {
+    padding-right: calc(34% + 3.5rem);
+    padding-left: 2rem;
+  }
+}
+
+/* The page of the book: paper, ink, the app's reading spacing (set from Settings). */
+.page {
+  width: min(100%, 36rem);
+  padding: 2rem 2.25rem 2.25rem;
+  border-radius: 6px;
+  background: #fbf7ee;
+  color: #1d1f23;
+  box-shadow:
+    0 24px 50px rgb(0 0 0 / 0.45),
+    inset 0 0 0 1px rgb(0 0 0 / 0.06);
+  font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
+  font-size: calc(var(--reading-font-size) * 1.05);
+}
+
+.head {
+  margin-bottom: 1.25rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid rgb(0 0 0 / 0.12);
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
+.title {
+  margin: 0;
+  font-size: 1.6em;
+  line-height: 1.2;
+}
+
+.byline {
+  margin: 0.3rem 0 0;
+  color: #5d6470;
+  font-size: 0.8em;
+  font-style: italic;
+}
+
+.chapter {
+  margin: 0.9rem 0 0;
+  font-size: 0.85em;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.text {
+  display: grid;
+  gap: 0.15em;
+}
+
+.line {
+  margin: 0;
+}
+
+/* A word is a button, so it is reachable by keyboard as well as the mouse. It looks like text. */
+.word {
+  display: inline;
+  margin: 0;
+  padding: 0.05em 0;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  word-spacing: inherit;
+  cursor: pointer;
+}
+
+.word:hover {
+  background: rgb(34 87 197 / 0.1);
+}
+
+/* The phrase being read: one calm band across its words and the spaces between them
+   (phrase-level, never word-by-word flicker)... */
+.slot[data-phrase="true"] {
+  background: rgb(120 150 255 / 0.28);
+}
+
+/* ...and the word under the cursor inside it. */
+.word[data-pointed="true"] {
+  background: rgb(34 87 197 / 0.55);
+  color: #fff;
+}
+
+.word[data-open="true"] {
+  background: #2257c5;
+  color: #fff;
+  box-shadow: 0 0 0 2px rgb(34 87 197 / 0.35);
+}
+
+.word:focus-visible {
+  outline: 3px solid #2257c5;
+  outline-offset: 1px;
+}
+
+.end {
+  margin: 1.5rem 0 0;
+  text-align: center;
+  color: #5d6470;
+  font-size: 0.85em;
+  font-style: italic;
+}
+
+.pager {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  color: var(--glass-text-dim, #cfcfe6);
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
+.pager button {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid rgb(255 255 255 / 0.25);
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.08);
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.pager button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Reads the open card aloud. */
+.hear {
+  padding: 0.4rem 1.1rem;
+  border: 1px solid rgb(255 255 255 / 0.35);
+  border-radius: 999px;
+  background: rgb(120 150 255 / 0.3);
+  color: #fff;
+  font: inherit;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  word-spacing: 0;
+  cursor: pointer;
+}
+
+.hear:hover:not(:disabled) {
+  background: rgb(120 150 255 / 0.5);
+}
+
+.hear:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

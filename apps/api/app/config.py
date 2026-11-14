@@ -77,16 +77,20 @@ class Settings(BaseSettings):
     # Per-request timeout for book metadata lookups (SOP section 9: 8 s per external call).
     book_lookup_timeout_seconds: float = 8.0
 
+    # ElevenLabs: read-aloud (text-to-speech) and ask-by-voice (speech-to-text). Optional: without
+    # a key /speech/* answers 503 and the app falls back to the browser's own voices.
+    elevenlabs_api_key: str = ""
+    # Default read-aloud voice id; blank = the stock "George" (app/elevenlabs/client.py).
+    # The reader can pick another from GET /speech/voices.
+    elevenlabs_voice_id: str = ""
+    elevenlabs_tts_model: str = "eleven_multilingual_v2"
+    elevenlabs_stt_model: str = "scribe_v1"
+    # Per-request timeout for ElevenLabs calls (SOP section 9: 8 s per external call, but
+    # generating speech for a long phrase can take a little longer).
+    elevenlabs_timeout_seconds: float = 15.0
+
     # Browser origins allowed to call the API (CORS) and open the /live WebSocket.
     # Comma-separated. Default: the web app's Vite dev server. Same as Alex's ui-dat-development.
-    cors_origins: str = "http://localhost:5173"
-
-    @property
-    def cors_origin_list(self) -> list[str]:
-        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
-
-    # Browser origins allowed to call the API (CORS) and open the /live WebSocket.
-    # Comma-separated. Default: the web app's Vite dev server.
     cors_origins: str = "http://localhost:5173"
 
     @property

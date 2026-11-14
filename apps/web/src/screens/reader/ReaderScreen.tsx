@@ -3,16 +3,21 @@
 // over the camera: status pills (top left), issue messages where a problem is (top centre), a
 // dock of actions (bottom), and a Controls sheet that slides in from the right. The controls
 // show and hide with the Controls button, the C key, or by holding thumb and little finger out to the camera.
+// A second, streamlined mode (the Ebook switch in the dock) reads an embedded ebook with the mouse
+// cursor as the pointer: no camera, OCR or hand tracking; the same highlight, word card and glasses
+// display. The mode is remembered for the session.
 // The page is read continuously from the live camera: frame -> OCR -> page analysis (MOCK) ->
-// merged into the page; the fingertip picks the exact word every frame. A demo page is shown
-// until the first read (HACK, so the glasses have something before the camera starts).
+// merged into the page; the fingertip picks the exact word every frame. Until the camera has read
+// some text there is no page, and the display shows nothing.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GlassesHudLayer, useControlsShortcut } from "@/glasses";
-import { currentPhrase } from "@/reader";
+import { currentPhrase, EMPTY_PAGE } from "@/reader";
 import { useReaderStore } from "@/state";
 
 import { CameraView } from "./CameraView";
+import { EbookView } from "./EbookView";
+import { PageHint } from "./PageHint";
 import { ControlsHint } from "./ControlsHint";
 import { ControlsSheet } from "./ControlsSheet";
 import { deriveIssues, derivePills, type Issue } from "./health";
@@ -24,6 +29,17 @@ import { useHandTracking } from "./useHandTracking";
 import { useLiveScan } from "./useLiveScan";
 import { useReaderController } from "./useReaderController";
 import { type OverlayHand, VisionOverlay } from "./VisionOverlay";
+
+type ReaderMode = "camera" | "ebook";
+const MODE_KEY = "beyondwords.readerMode";
+
+function readMode(): ReaderMode {
+  try {
+    return sessionStorage.getItem(MODE_KEY) === "ebook" ? "ebook" : "camera";
+  } catch {
+    return "camera";
+  }
+}
 
 export function ReaderScreen() {
   const r = useReaderController();
@@ -38,9 +54,35 @@ export function ReaderScreen() {
   const scan = useReaderStore((s) => s.scan);
   const handLost = useReaderStore((s) => s.handLost);
   const live = cam.stream !== null;
+  const [mode, setMode] = useState<ReaderMode>(readMode);
+  const [ebookPageNo, setEbookPageNo] = useState(0);
+  const ebook = mode === "ebook";
+
+  const switchMode = (next: ReaderMode) => {
+    if (next === mode) return;
+    setMode(next);
+    try {
+      sessionStorage.setItem(MODE_KEY, next);
+    } catch {
+      // Not remembered; the choice still applies for this visit.
+    }
+    if (next === "ebook") {
+      cam.stop(); // the ebook needs no camera
+    } else {
+      // Back to the camera: there is no text until it reads some.
+      useReaderStore.getState().setPage(EMPTY_PAGE);
+    }
+  };
+
+  // The ebook needs the (simulated) glasses session for the display; start it for the reader.
+  const startSession = r.actions.startSession;
+  useEffect(() => {
+    if (ebook && r.session === "stopped" && !r.offline) void startSession();
+  }, [ebook, r.session, r.offline, startSession]);
 
   const toggleControls = useCallback(() => setControlsOpen((open) => !open), []);
-  const tracking = useHandTracking(videoRef, live, toggleControls);
+  const askAboutPage = r.actions.askAboutPage;
+  const tracking = useHandTracking(videoRef, live, toggleControls, () => void askAboutPage());
 
   // The C key does the same as the hand gesture.
   useControlsShortcut(toggleControls);
@@ -91,16 +133,20 @@ export function ReaderScreen() {
       data-fullscreen={fullscreen.mode}
       data-controls={controlsOpen ? "open" : "closed"}
     >
-      <CameraView camera={cam.camera} videoRef={videoRef} onStart={() => void cam.start()}>
-        <VisionOverlay
-          page={r.page}
-          position={r.reader.position}
-          hands={tracking.hands}
-          showSkeleton={skeleton}
-          showBoxes={boxes}
-          connections={tracking.connections}
-        />
-      </CameraView>
+      {ebook ? (
+        <EbookView pageNo={ebookPageNo} onPage={setEbookPageNo} onGesture={r.actions.phone} />
+      ) : (
+        <CameraView camera={cam.camera} videoRef={videoRef} onStart={() => void cam.start()}>
+          <VisionOverlay
+            page={r.page}
+            position={r.reader.position}
+            hands={tracking.hands}
+            showSkeleton={skeleton}
+            showBoxes={boxes}
+            connections={tracking.connections}
+          />
+        </CameraView>
+      )}
 
       <GlassesHudLayer />
 
@@ -163,14 +209,45 @@ export function ReaderScreen() {
           }}
         />
 
-        <ControlsHint
-          open={controlsOpen}
+        {!ebook && (
+          <ControlsHint
+            open={controlsOpen}
+            cameraOn={live}
+            progress={tracking.holdProgress}
+            onToggle={toggleControls}
+          />
+        )}
+        <PageHint
           cameraOn={live}
-          progress={tracking.holdProgress}
-          onToggle={toggleControls}
+          progress={tracking.pageHoldProgress}
+          onAsk={() => void askAboutPage()}
         />
 
+        {r.heyMeta.note && (
+          <p className={styles.wakeNote} role="status">
+            {r.heyMeta.note}
+          </p>
+        )}
+
         <div className={styles.dock} role="toolbar" aria-label="Reading actions">
+          <div className={styles.modeSwitch} role="group" aria-label="Reading mode">
+            <button
+              type="button"
+              className={styles.modeButton}
+              aria-pressed={!ebook}
+              onClick={() => switchMode("camera")}
+            >
+              Camera
+            </button>
+            <button
+              type="button"
+              className={styles.modeButton}
+              aria-pressed={ebook}
+              onClick={() => switchMode("ebook")}
+            >
+              Ebook
+            </button>
+          </div>
           {r.session === "stopped" ? (
             <button
               type="button"
@@ -190,7 +267,7 @@ export function ReaderScreen() {
               Stop reading
             </button>
           )}
-          {live ? (
+          {ebook ? null : live ? (
             <button type="button" className={styles.button} onClick={cam.stop}>
               Camera off
             </button>
@@ -204,6 +281,38 @@ export function ReaderScreen() {
               Camera on
             </button>
           )}
+          <button
+            type="button"
+            className={styles.button}
+            onClick={r.heyMeta.toggle}
+            aria-pressed={r.heyMeta.enabled}
+            data-on={r.heyMeta.enabled}
+            title="Listen for “Hey Meta” using your browser's speech recognition. Nothing goes to ElevenLabs until you have said it and are asking a question."
+          >
+            {!r.heyMeta.enabled
+              ? "👂 Hey Meta"
+              : r.session !== "started"
+                ? "👂 Hey Meta: on · start reading"
+                : r.heyMeta.state === "retrying"
+                  ? "👂 Hey Meta: reconnecting…"
+                  : "👂 Hey Meta: on"}
+          </button>
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => void r.actions.askByVoice()}
+            disabled={r.voice === "thinking" || r.voice === "starting"}
+            aria-pressed={r.voice === "listening"}
+            data-listening={r.voice === "listening"}
+          >
+            {r.voice === "listening"
+              ? "⏹ Stop"
+              : r.voice === "starting"
+                ? "Starting…"
+                : r.voice === "thinking"
+                  ? "Thinking…"
+                  : "🎤 Ask"}
+          </button>
           <button
             type="button"
             className={styles.button}

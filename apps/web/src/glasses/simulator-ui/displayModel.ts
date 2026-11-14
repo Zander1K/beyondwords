@@ -20,7 +20,13 @@ export type DisplayContent =
   | {
       kind: "word";
       word: string;
+      /** How to say the word ("uh-LOOF"); shown between the word and its definition. */
+      pronunciation?: string;
       short: string;
+      /** An illustration of the word, shown under the definition. */
+      imageUrl?: string;
+      /** The picture is being made: show a loading placeholder in its place. */
+      imageLoading?: boolean;
       actions: WordCardAction[];
       focused?: WordCardAction;
       /** No definition to show: the card says what went wrong instead. */
@@ -90,9 +96,18 @@ export function makeWordCard(card: WordCard, warn: Warn = () => {}): DisplayCont
   }
   const actions = [...new Set(card.actions ?? [])];
   const focused = card.focused && actions.includes(card.focused) ? card.focused : actions[0];
-  return focused
-    ? { kind: "word", word, short, actions, focused }
-    : { kind: "word", word, short, actions };
+  const pronunciation = normaliseText(card.pronunciation ?? "");
+  return {
+    kind: "word",
+    word,
+    ...(pronunciation ? { pronunciation } : {}),
+    short,
+    ...(card.imageUrl?.trim() ? { imageUrl: card.imageUrl.trim() } : {}),
+    // Loading only counts while there is no picture yet.
+    ...(card.imageLoading && !card.imageUrl?.trim() ? { imageLoading: true } : {}),
+    actions,
+    ...(focused ? { focused } : {}),
+  };
 }
 
 export function makeImage(url: string): DisplayContent | null {

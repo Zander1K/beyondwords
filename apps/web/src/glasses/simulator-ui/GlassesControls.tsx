@@ -17,11 +17,36 @@ function stressTest(adapter: WebSimulatorAdapter): void {
   }, 20);
 }
 
+/** A stand-in illustration for the preview card (an inline drawing, so no API call is needed). */
+const PREVIEW_PICTURE =
+  "data:image/svg+xml;utf8," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 200"><rect width="300" height="200" fill="#2a2f6b"/><circle cx="90" cy="100" r="34" fill="#f4c95d"/><path d="M150 130c30-50 60-50 90 0z" fill="#8fb4ff"/></svg>',
+  );
+
 /** Display states to look at without having to cause them (design QA). */
 const PREVIEW_CARDS: { label: string; card: WordCard }[] = [
   {
     label: "Word card",
-    card: { word: "aloof", short: "Distant and not friendly.", actions: ["hear"], focused: "hear" },
+    card: {
+      word: "aloof",
+      pronunciation: "uh-LOOF",
+      short: "Distant and not friendly.",
+      imageUrl: PREVIEW_PICTURE,
+      actions: ["hear"],
+      focused: "hear",
+    },
+  },
+  {
+    label: "Picture loading",
+    card: {
+      word: "aloof",
+      pronunciation: "uh-LOOF",
+      short: "Distant and not friendly.",
+      imageLoading: true,
+      actions: ["hear"],
+      focused: "hear",
+    },
   },
   { label: "No definition", card: { word: "qzx7", short: "", problem: "not-found" } },
   { label: "Failed to load", card: { word: "aloof", short: "", problem: "load-failed" } },

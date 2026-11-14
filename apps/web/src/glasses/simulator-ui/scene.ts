@@ -41,6 +41,8 @@ export type SceneNode =
     }
   | { type: "text"; preset: TextPreset; text: string; tone?: TextTone }
   | { type: "image"; url: string; width: number; height: number; radius: number }
+  /** A picture on its way: a shimmering block of the same size, with a short label. */
+  | { type: "placeholder"; width: number; height: number; radius: number; label: string }
   | { type: "button"; label: string; focused: boolean }
   | { type: "icon"; name: IconName };
 
@@ -165,7 +167,30 @@ function itemNode(item: DisplayContent): SceneNode {
         surface: "card",
         children: [
           { type: "text", preset: "heading", text: item.word },
+          ...(item.pronunciation
+            ? [
+                {
+                  type: "text" as const,
+                  preset: "meta" as const,
+                  tone: "accent" as const,
+                  text: item.pronunciation,
+                },
+              ]
+            : []),
           { type: "text", preset: "body", text: item.short },
+          ...(item.imageUrl
+            ? [{ type: "image" as const, url: item.imageUrl, width: 300, height: 200, radius: 20 }]
+            : item.imageLoading
+              ? [
+                  {
+                    type: "placeholder" as const,
+                    width: 300,
+                    height: 200,
+                    radius: 20,
+                    label: "Drawing a picture…",
+                  },
+                ]
+              : []),
           ...(item.actions.length
             ? [
                 {

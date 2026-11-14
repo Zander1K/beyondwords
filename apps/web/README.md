@@ -37,6 +37,47 @@ The API should be running for the Settings screen's connection check (`make api`
 | `src/state/`                 | Zustand stores (reading spacing)                                                                                                                                              |
 | `src/ui/`                    | Global styles and spacing CSS variables                                                                                                                                       |
 
+## Reading modes: Camera and Ebook
+
+The Reader has two modes, switched in the dock (remembered for the browser session):
+
+- **Camera**: the live camera, OCR and hand tracking (the glasses simulation).
+- **Ebook**: a streamlined mode with no camera. An embedded four-page story (`src/ebook/`, original
+  text written for this app) is read with the **mouse cursor** as the pointer: hover a word to
+  highlight its phrase (the glasses display shows it), click it to open its card (pronunciation,
+  definition, picture), click it again or press Esc to close. Arrow keys, Enter and Esc work as in
+  camera mode. Switching to Ebook starts the simulated glasses session for you.
+
+## Speech: ElevenLabs, with browser fallback
+
+Read-aloud and ask-by-voice use **ElevenLabs**, through the API (the key stays on the server; set
+`ELEVENLABS_API_KEY` in the root `.env`):
+
+- `POST /speech/tts` (text to MP3), `POST /speech/stt` (recorded WAV to text), `GET /speech/voices`.
+- **Read-aloud**: "Hear it" speaks with ElevenLabs. If it is not configured, slow or down, the browser's
+  own voice takes over for a minute, so reading never stops. Generated phrases are cached.
+- **Ask by voice**: the "🎤 Ask" button in the dock. Press to record, press again to stop. The recording is
+  transcribed, the brain answers from the page, and the answer shows on the display and is spoken.
+- **"Hey Meta"** (the "👂 Hey Meta" toggle, off until you switch it on): saying it starts a question, like on the
+  glasses. Listening for the phrase uses the **browser's own speech recognition**, so ElevenLabs hears
+  nothing until the phrase has been said: only the recording that follows is sent. After a chime the
+  question is recorded and **ends by itself** when you stop talking (about 1.2 s of quiet), or gives up
+  after about 6 s of silence (nothing is sent). The Ask button ends the same way.
+  Works in Chrome, Edge and Safari; Brave blocks the browser's speech service. In Chrome and Edge the browser's
+  recogniser sends its audio to the browser vendor to recognise the phrase.
+- Privacy: the text to speak and the recorded question go to ElevenLabs to be processed; nothing is stored here.
+
+## Voices
+
+Read-aloud uses the browser's own speech voices (`speechSynthesis`). The voice library
+(`src/glasses/web-simulator/voices.ts`) drops novelty voices and ranks the rest by how natural they
+tend to sound, judged from the name (neural, "Natural", Premium/Enhanced, Google, Siri...), so the
+default is the best one available, not the engine's often-robotic default. Settings > Voice lets you
+pick a voice, preview it, and set the speed; the choice is kept in this browser. Which voices exist
+depends on your browser and OS (Edge's online "Natural" voices and Chrome's Google voices are the
+most lifelike; on macOS, add Premium/Enhanced voices in System Settings > Accessibility > Spoken
+Content).
+
 ## Landing page and access
 
 `/` is a public landing page. Its one call to action, **Test this App**, asks for a **username**

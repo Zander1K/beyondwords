@@ -58,3 +58,6 @@ export function phrase(text: string, word?: string, short?: string): Phrase {
 export function line(...phrases: Phrase[]): PageLine {
   return { text: phrases.map((p) => p.text).join(" "), phrases };
 }
+
+/** No page yet: nothing is shown until the camera (or the ebook) gives the reader some text. */
+export const EMPTY_PAGE: Page = { id: "empty", lines: [] };

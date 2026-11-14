@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { classifyPose, fingerBends, isPointing, isShaka, thumbBend } from "./handPose";
+import { classifyPose, fingerBends, isHorns, isPointing, isShaka, thumbBend } from "./handPose";
 import { makeHand, makeHand3 } from "./testHands";
 
 describe("classifyPose", () => {
@@ -116,5 +116,50 @@ describe("shaka: thumb and little finger out (hold to show or hide the controls)
   it("is never true without 3D landmarks", () => {
     expect(isShaka(undefined)).toBe(false);
     expect(isShaka(makeHand3(SHAKA).slice(0, 10))).toBe(false);
+  });
+});
+
+describe("horns: index and little finger out (hold for the whole page)", () => {
+  const flat = makeHand({ index: true });
+  /** Index and little finger out, middle and ring curled, thumb resting across them. */
+  const HORNS = { index: 12, middle: 170, ring: 175, pinky: 10, thumb: "tucked" } as const;
+
+  it("is index and little finger out with middle and ring curled", () => {
+    expect(isHorns(makeHand3(HORNS))).toBe(true);
+    expect(classifyPose(flat, null, makeHand3(HORNS))).toBe("horns");
+    // The thumb is free: out works too. And a looser curl still counts.
+    expect(isHorns(makeHand3({ ...HORNS, thumb: "out" }))).toBe(true);
+    expect(isHorns(makeHand3({ ...HORNS, middle: 110, ring: 105, pinky: 40 }))).toBe(true);
+  });
+
+  it("is not the controls pose (thumb and little finger out, index curled)", () => {
+    const shaka = makeHand3({ index: 170, middle: 175, ring: 175, pinky: 10, thumb: "out" });
+    expect(isHorns(shaka)).toBe(false);
+    expect(classifyPose(flat, null, shaka)).toBe("shaka");
+  });
+
+  it("is not a point, an open palm, a fist or a resting hand", () => {
+    const point = makeHand3({ index: 15, middle: 170, ring: 175, pinky: 170, thumb: "out" });
+    expect(isHorns(point)).toBe(false);
+    expect(classifyPose(flat, null, point)).toBe("pointing");
+    const palm = makeHand3({ index: 10, middle: 12, ring: 15, pinky: 20, thumb: "out" });
+    expect(isHorns(palm)).toBe(false);
+    expect(isHorns(makeHand3({ index: 170, middle: 175, ring: 175, pinky: 170 }))).toBe(false);
+    expect(isHorns(makeHand3({ index: 90, middle: 100, ring: 100, pinky: 90 }))).toBe(false);
+    // Three fingers out is not it either.
+    expect(isHorns(makeHand3({ ...HORNS, middle: 20 }))).toBe(false);
+  });
+
+  it("needs the 3D landmarks", () => {
+    expect(isHorns(undefined)).toBe(false);
+  });
+
+  it("is not read as a thumb-middle pinch, but never steals a real index pinch", () => {
+    // The thumb resting on the curled middle finger (2D: thumb tip by the middle fingertip).
+    const thumbOnMiddle = makeHand({ index: true, pinch: "middle" });
+    expect(classifyPose(thumbOnMiddle, null, makeHand3(HORNS))).toBe("horns");
+    // A real index pinch with the same 3D shape still wins.
+    const indexPinch = makeHand({ index: true, pinch: "index" });
+    expect(classifyPose(indexPinch, null, makeHand3(HORNS))).toBe("pinch-index");
   });
 });

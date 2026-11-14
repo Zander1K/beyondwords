@@ -40,6 +40,10 @@ export interface SimulatorState {
   cameraGestures: boolean;
   /** Flip left/right camera swipes (camera facing the user). */
   cameraGesturesMirrored: boolean;
+  /** The reader's chosen speaking voice (a voiceURI), or null for the best available. */
+  voiceId: string | null;
+  /** Speaking speed, 1 = normal. */
+  speechRate: number;
 }
 
 export interface GestureLogEntry {
@@ -80,5 +84,7 @@ export function createSimulatorStore() {
     gestureLog: [],
     cameraGestures: true,
     cameraGesturesMirrored: false,
+    voiceId: null,
+    speechRate: 1,
   }));
 }

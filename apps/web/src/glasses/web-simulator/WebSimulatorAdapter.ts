@@ -38,6 +38,17 @@ import type { HandsFeed } from "@/vision/handTracking";
 import { CameraGestureRecognizer } from "./cameraGestures";
 import { keyToGesture } from "./gestures";
 import { MIC_WORKLET_SOURCE, floatToInt16 } from "./micWorklet";
+import { buildLibrary, chooseVoice, type VoiceInfo } from "./voices";
+import {
+  fetchSpeech,
+  fetchSpeechVoices,
+  REMOTE_PREFIX,
+  type RemoteVoice,
+  transcribeAudio,
+} from "./elevenLabs";
+import { durationSeconds, encodeWavBytes } from "./wav";
+import { EndpointDetector } from "./endpoint";
+import { WakeWordListener, type WakeProblem, type WakeState, wakeWordSupported } from "./wakeWord";
 
 type KeyTarget = Pick<EventTarget, "addEventListener" | "removeEventListener">;
 
@@ -117,6 +128,48 @@ const CAMERA_SOURCE: Record<GlassesGesture, string> = {
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+const VOICE_KEY = "beyondwords.voice";
+/** After ElevenLabs fails, use the browser's voice for this long before trying it again. */
+const REMOTE_RETRY_MS = 60_000;
+/** Generated phrases kept in memory. */
+const SPEECH_CACHE_SIZE = 40;
+/** A recording shorter than this is a bump of the button, not a question. */
+const MIN_RECORDING_S = 0.4;
+
+/** The page's language (for choosing a voice), e.g. "en-GB". */
+function preferredLang(): string {
+  return (typeof navigator !== "undefined" && navigator.language) || "en";
+}
+
+/** The saved voice and speed, if any (private mode or bad data: the defaults). */
+function readVoicePrefs(): { voiceId: string | null; speechRate: number } {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(VOICE_KEY) ?? "null");
+    if (typeof raw === "object" && raw !== null) {
+      const { voiceId, speechRate } = raw as Record<string, unknown>;
+      return {
+        voiceId: typeof voiceId === "string" ? voiceId : null,
+        speechRate:
+          typeof speechRate === "number" && speechRate >= 0.5 && speechRate <= 1.5 ? speechRate : 1,
+      };
+    }
+  } catch {
+    // Nothing saved, or storage is unavailable.
+  }
+  return { voiceId: null, speechRate: 1 };
+}
+
+function saveVoicePrefs(s: { voiceId: string | null; speechRate: number }): void {
+  try {
+    localStorage.setItem(
+      VOICE_KEY,
+      JSON.stringify({ voiceId: s.voiceId, speechRate: s.speechRate }),
+    );
+  } catch {
+    // Not remembered; the choice still applies for this visit.
+  }
+}
+
 export class WebSimulatorAdapter implements GlassesAdapter {
   readonly store: SimulatorStore = createSimulatorStore();
   readonly session: GlassesSession;
@@ -137,6 +190,17 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   private readonly streams = new Set<MediaStream>();
   private camera: MediaStream | null = null;
   private cueContext: AudioContext | null = null;
+  // ElevenLabs speech (through our API). "down" for a while after a failure, so every phrase
+  // does not wait on a service that is not answering; the browser's voices cover that time.
+  private remote: { voices: RemoteVoice[] | null; downUntil: number } = {
+    voices: null,
+    downUntil: 0,
+  };
+  private audio: HTMLAudioElement | null = null;
+  private speechSeq = 0;
+  /** Generated speech by voice and text (blob URLs): a repeated phrase is not generated again. */
+  private readonly speechCache = new Map<string, string>();
+  private recording: { chunks: Int16Array[]; sampleRate: number } | null = null;
   private mic: {
     stream: MediaStream;
     context: AudioContext;
@@ -154,6 +218,7 @@ export class WebSimulatorAdapter implements GlassesAdapter {
       const warnings = [{ message, at: Date.now() }, ...this.store.getState().warnings];
       this.store.setState({ warnings: warnings.slice(0, 8) });
     };
+    this.store.setState(readVoicePrefs());
     if (options.sleepTimeoutMs !== undefined) {
       this.store.setState({ sleepTimeoutMs: options.sleepTimeoutMs });
     }
@@ -570,12 +635,106 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   }
 
   speak(text: string): Promise<void> {
+    return this.speakWith(this.store.getState().voiceId, text);
+  }
+
+  // ---- Voices ----
+
+  /** The voices on offer, best first (see voices.ts). Empty until the browser has loaded them. */
+  listVoices(): VoiceInfo[] {
     const synth = typeof window !== "undefined" ? window.speechSynthesis : undefined;
-    if (!synth || !text.trim()) return Promise.resolve();
+    return synth ? buildLibrary(synth.getVoices(), preferredLang()) : [];
+  }
+
+  /** Called when the browser finishes loading (or changes) its voices; returns an unsubscribe. */
+  onVoicesChanged(handler: () => void): () => void {
+    const synth = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+    synth?.addEventListener("voiceschanged", handler);
+    return () => synth?.removeEventListener("voiceschanged", handler);
+  }
+
+  /** Choose the speaking voice (a voiceURI), or null for the best available. */
+  setVoice(voiceId: string | null): void {
+    this.store.setState({ voiceId });
+    saveVoicePrefs(this.store.getState());
+  }
+
+  /** Speaking speed, 1 = normal (clamped to what voices handle well). */
+  setSpeechRate(rate: number): void {
+    this.store.setState({ speechRate: Math.min(1.5, Math.max(0.5, rate)) });
+    saveVoicePrefs(this.store.getState());
+  }
+
+  /**
+   * Say `text`. `voiceId` null = the best available: ElevenLabs when it is answering, else the
+   * best browser voice. An "el:" id is an ElevenLabs voice; any other id is a browser voice.
+   * Whatever goes wrong with ElevenLabs, the browser's voice takes over: reading never stops.
+   * Used for previews too (it does not change the saved choice).
+   */
+  async speakWith(voiceId: string | null, text: string): Promise<void> {
+    if (!text.trim()) return;
+    const wantsRemote = voiceId === null || voiceId.startsWith(REMOTE_PREFIX);
+    if (wantsRemote && Date.now() >= this.remote.downUntil) {
+      try {
+        await this.speakRemote(voiceId ? voiceId.slice(REMOTE_PREFIX.length) : null, text);
+        return;
+      } catch {
+        this.remote.downUntil = Date.now() + REMOTE_RETRY_MS;
+      }
+    }
+    await this.speakBrowser(voiceId?.startsWith(REMOTE_PREFIX) ? null : voiceId, text);
+  }
+
+  /** ElevenLabs speech through our API. Rejects if it cannot be generated or played. */
+  private async speakRemote(remoteVoiceId: string | null, text: string): Promise<void> {
+    const seq = ++this.speechSeq; // newest request wins
+    this.stopSpeaking();
+    const key = `${remoteVoiceId ?? ""}|${text}`;
+    let url = this.speechCache.get(key);
+    if (!url) {
+      url = URL.createObjectURL(await fetchSpeech(text, remoteVoiceId));
+      this.speechCache.set(key, url);
+      if (this.speechCache.size > SPEECH_CACHE_SIZE) {
+        const oldest = this.speechCache.entries().next().value;
+        if (oldest) {
+          URL.revokeObjectURL(oldest[1]);
+          this.speechCache.delete(oldest[0]);
+        }
+      }
+    }
+    if (seq !== this.speechSeq) return; // a newer request arrived while this was being made
+    const audio = new Audio(url);
+    audio.playbackRate = this.store.getState().speechRate; // pitch is kept by default
+    this.audio = audio;
+    await new Promise<void>((resolve, reject) => {
+      audio.onended = () => resolve();
+      audio.onerror = () => reject(new Error("The speech could not be played."));
+      audio.play().catch(reject);
+    });
+  }
+
+  private speakBrowser(voiceId: string | null, text: string): Promise<void> {
+    const synth = typeof window !== "undefined" ? window.speechSynthesis : undefined;
+    if (!synth) return Promise.resolve();
     // Newest request wins: read-along should not queue up stale phrases.
-    synth.cancel();
+    this.speechSeq += 1;
+    this.stopSpeaking();
     return new Promise((resolve) => {
       const utterance = new SpeechSynthesisUtterance(text);
+      // The chosen voice, else the best natural one in the reader's language (not the engine's
+      // default, which is often a robotic one).
+      const picked = chooseVoice(this.listVoices(), voiceId, preferredLang());
+      const voice = picked ? synth.getVoices().find((v) => v.voiceURI === picked.id) : undefined;
+      if (voice) {
+        // A voice that cannot be set must never stop the reading: speak with the default instead.
+        try {
+          utterance.voice = voice;
+          utterance.lang = voice.lang;
+        } catch {
+          // Fall through to the engine's default voice.
+        }
+      }
+      utterance.rate = this.store.getState().speechRate;
       utterance.onend = () => resolve();
       // A failed or cancelled utterance must never break the reading session.
       utterance.onerror = () => resolve();
@@ -583,7 +742,93 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     });
   }
 
+  /** The ElevenLabs voices on offer (empty when the service is not configured or down). */
+  async loadRemoteVoices(): Promise<RemoteVoice[]> {
+    if (this.remote.voices) return this.remote.voices;
+    try {
+      this.remote.voices = await fetchSpeechVoices();
+      this.remote.downUntil = 0;
+    } catch {
+      this.remote.downUntil = Date.now() + REMOTE_RETRY_MS;
+      return [];
+    }
+    return this.remote.voices;
+  }
+
+  // ---- Asking by voice: record a question, then turn it into text ----
+
+  /** Start recording the reader's question from the microphone. */
+  async startRecording(onEndpoint?: (reason: "ended" | "no-speech") => void): Promise<void> {
+    const chunks: Int16Array[] = [];
+    // Listens to the loudness to tell when the question is finished (or never started), so the
+    // recording ends by itself. It fires once.
+    let detector: EndpointDetector | null = null;
+    let told = false;
+    await this.startMic((pcm) => {
+      chunks.push(pcm);
+      if (!onEndpoint || told) return;
+      detector ??= new EndpointDetector(this.mic?.context.sampleRate ?? 48000);
+      const status = detector.push(pcm);
+      if (status === "ended" || status === "no-speech") {
+        told = true;
+        setTimeout(() => onEndpoint(status), 0);
+      }
+    });
+    this.recording = { chunks, sampleRate: this.mic?.context.sampleRate ?? 48000 };
+  }
+
+  /** Throw away the recording without keeping or sending it. */
+  cancelRecording(): void {
+    this.recording = null;
+    this.stopMic();
+  }
+
+  // ---- "Hey Meta" ----
+
+  private wakeListener: WakeWordListener | null = null;
+
+  /** Whether this browser can listen for the wake phrase (see wakeWord.ts). */
+  wakeWordSupported(): boolean {
+    return wakeWordSupported();
+  }
+
+  /**
+   * Listen for "Hey Meta" with the browser's own speech recognition (nothing goes to ElevenLabs).
+   * `onWake` fires once when it is heard, and listening stops (the microphone is handed over to
+   * recording the question); call this again to resume. `onProblem` says why it cannot listen.
+   */
+  startWakeWord(
+    onWake: () => void,
+    onProblem: (problem: WakeProblem, detail: string) => void,
+    onState?: (state: WakeState) => void,
+  ): void {
+    this.stopWakeWord();
+    this.wakeListener = new WakeWordListener(onWake, onProblem, preferredLang, onState);
+    this.wakeListener.start();
+  }
+
+  stopWakeWord(): void {
+    this.wakeListener?.stop();
+    this.wakeListener = null;
+  }
+
+  /** Stop recording. The recording as a WAV, or null if it was too short to be speech. */
+  stopRecording(): Blob | null {
+    const rec = this.recording;
+    this.recording = null;
+    this.stopMic();
+    if (!rec || durationSeconds(rec.chunks, rec.sampleRate) < MIN_RECORDING_S) return null;
+    return new Blob([encodeWavBytes(rec.chunks, rec.sampleRate)], { type: "audio/wav" });
+  }
+
+  /** What was said in a recording (ElevenLabs speech-to-text through our API). */
+  transcribe(audio: Blob): Promise<string> {
+    return transcribeAudio(audio);
+  }
+
   stopSpeaking(): void {
+    this.audio?.pause();
+    this.audio = null;
     if (typeof window !== "undefined") window.speechSynthesis?.cancel();
   }
 
@@ -613,6 +858,7 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   }
 
   dispose(): void {
+    this.stopWakeWord();
     this.gestureHandlers.clear();
     this.sessionHandlers.clear();
     this.detachKeys();

@@ -32,9 +32,7 @@ describe("derivePills", () => {
     expect(off.map((p) => [p.id, p.tone])).toEqual([
       ["camera", "off"],
       ["glasses", "off"],
-      ["page", "off"],
     ]);
-    expect(off[2]?.label).toBe("Demo page");
   });
 
   it("marks what failed, in red, where it failed", () => {

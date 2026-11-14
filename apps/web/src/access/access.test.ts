@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+import type { Profile } from "@/api";
 
 import {
   ACCESS_PASSWORD_SHA256,
@@ -77,22 +79,19 @@ describe("usernames", () => {
     expect(normaliseUsername("a\u0000b\u001fc")).toBe("abc");
   });
 
-  it("accepts ordinary names in any language", () => {
-    for (const name of [
-      "ada",
-      "Ada Lovelace",
-      "Seán Ó Briain",
-      "o'brien",
-      "j.doe-2",
-      "李明",
-      "x7",
-    ]) {
-      expect(checkUsername(name)).toEqual({ ok: true, value: normaliseUsername(name) });
+  it("accepts names the API accepts, folding capitals to lower case", () => {
+    for (const [typed, stored] of [
+      ["ada", "ada"],
+      ["Ada_L", "ada_l"],
+      ["  J.Doe-2 ", "j.doe-2"],
+      ["x77", "x77"],
+    ] as const) {
+      expect(checkUsername(typed)).toEqual({ ok: true, value: stored });
     }
   });
 
   it("asks for one when it is missing or too short, and says how long it can be", () => {
-    for (const bad of ["", "   ", "a", " b "]) {
+    for (const bad of ["", "   ", "a", "ab", " b "]) {
       const r = checkUsername(bad);
       expect(r.ok).toBe(false);
       if (!r.ok) expect(r.message).toMatch(/username/i);
@@ -102,8 +101,19 @@ describe("usernames", () => {
     if (!long.ok) expect(long.message).toMatch(/32/);
   });
 
-  it("refuses markup and symbols", () => {
-    for (const bad of ["<script>", "ada<b>", "a&b", "ada@home", "'quoted", "-dash", "ada;drop"]) {
+  it("refuses what the API refuses: spaces, markup, symbols, other alphabets", () => {
+    for (const bad of [
+      "ada lovelace",
+      "<script>",
+      "ada<b>",
+      "a&b",
+      "ada@home",
+      "_lead",
+      "-dash",
+      "ada;drop",
+      "李明明",
+      "seán",
+    ]) {
       expect(checkUsername(bad).ok).toBe(false);
     }
   });
@@ -112,7 +122,7 @@ describe("usernames", () => {
 describe("parseSession", () => {
   it("reads back what was stored", () => {
     expect(parseSession(JSON.stringify({ username: "Ada", at: 5 }))).toEqual({
-      username: "Ada",
+      username: "ada",
       at: 5,
     });
   });
@@ -153,18 +163,18 @@ describe("the access store", () => {
   it("signs in with a username and the password, and remembers it for the tab", () => {
     const { storage, data } = fakeStorage();
     const store = createAccessStore(storage, TEST_DIGEST);
-    const result = store.getState().signIn("  Ada  Lovelace ", TEST_PASSWORD);
-    expect(result).toEqual({ ok: true, username: "Ada Lovelace" });
-    expect(store.getState().user).toBe("Ada Lovelace");
-    expect(JSON.parse(data.get(SESSION_KEY) ?? "{}")).toMatchObject({ username: "Ada Lovelace" });
+    const result = store.getState().signIn("  Ada_Lovelace ", TEST_PASSWORD);
+    expect(result).toEqual({ ok: true, username: "ada_lovelace" });
+    expect(store.getState().user).toBe("ada_lovelace");
+    expect(JSON.parse(data.get(SESSION_KEY) ?? "{}")).toMatchObject({ username: "ada_lovelace" });
     // A reload (a new store on the same storage) is still signed in.
-    expect(createAccessStore(storage, TEST_DIGEST).getState().user).toBe("Ada Lovelace");
+    expect(createAccessStore(storage, TEST_DIGEST).getState().user).toBe("ada_lovelace");
   });
 
   it("refuses a wrong password and stores nothing", () => {
     const { storage, data } = fakeStorage();
     const store = createAccessStore(storage, TEST_DIGEST);
-    const result = store.getState().signIn("Ada", "letmein");
+    const result = store.getState().signIn("ada", "letmein");
     expect(result).toMatchObject({ ok: false, field: "password" });
     expect(store.getState().user).toBeNull();
     expect(data.size).toBe(0);
@@ -182,7 +192,7 @@ describe("the access store", () => {
   it("signs out, forgetting the session", () => {
     const { storage, data } = fakeStorage();
     const store = createAccessStore(storage, TEST_DIGEST);
-    store.getState().signIn("Ada", TEST_PASSWORD);
+    store.getState().signIn("ada", TEST_PASSWORD);
     store.getState().signOut();
     expect(store.getState().user).toBeNull();
     expect(data.size).toBe(0);
@@ -196,8 +206,8 @@ describe("the access store", () => {
 
   it("still works when storage is missing or refuses to write", () => {
     const none = createAccessStore(null, TEST_DIGEST);
-    expect(none.getState().signIn("Ada", TEST_PASSWORD)).toMatchObject({ ok: true });
-    expect(none.getState().user).toBe("Ada");
+    expect(none.getState().signIn("ada", TEST_PASSWORD)).toMatchObject({ ok: true });
+    expect(none.getState().user).toBe("ada");
     const refusing = createAccessStore(
       {
         getItem: () => null,
@@ -210,8 +220,74 @@ describe("the access store", () => {
       },
       TEST_DIGEST,
     );
-    expect(refusing.getState().signIn("Ada", TEST_PASSWORD)).toMatchObject({ ok: true });
+    expect(refusing.getState().signIn("ada", TEST_PASSWORD)).toMatchObject({ ok: true });
     expect(() => refusing.getState().signOut()).not.toThrow();
     expect(refusing.getState().user).toBeNull();
+  });
+
+  const profile = (over: Partial<Profile> = {}): Profile => ({
+    id: 42,
+    username: "ada_l",
+    display_name: null,
+    support_level: "read_along",
+    glasses_type: null,
+    voice: null,
+    spacing: null,
+    onboarded: false,
+    ...over,
+  });
+
+  it("tells the server who signed in and keeps the profile it answers with", async () => {
+    const { storage, data } = fakeStorage();
+    const register = vi.fn().mockResolvedValue(profile());
+    const store = createAccessStore(storage, TEST_DIGEST, register);
+    store.getState().signIn("Ada_L", TEST_PASSWORD);
+    expect(register).toHaveBeenCalledWith("ada_l");
+    expect(store.getState().profile).toBeNull(); // not known until the server answers
+    await vi.waitFor(() => expect(store.getState().userId).toBe(42));
+    expect(store.getState().profile?.onboarded).toBe(false);
+    expect(JSON.parse(data.get(SESSION_KEY) ?? "{}")).toMatchObject({ userId: 42 });
+    expect(createAccessStore(storage, TEST_DIGEST).getState().userId).toBe(42);
+  });
+
+  it("asks the server for the profile again after a reload", async () => {
+    const { storage } = fakeStorage();
+    const first = createAccessStore(storage, TEST_DIGEST, vi.fn().mockResolvedValue(profile()));
+    first.getState().signIn("ada_l", TEST_PASSWORD);
+    await vi.waitFor(() => expect(first.getState().profile).not.toBeNull());
+    const register = vi.fn().mockResolvedValue(profile({ onboarded: true }));
+    const reloaded = createAccessStore(storage, TEST_DIGEST, register);
+    expect(register).toHaveBeenCalledWith("ada_l");
+    await vi.waitFor(() => expect(reloaded.getState().profile?.onboarded).toBe(true));
+  });
+
+  it("remembers a skipped setup for this session only", () => {
+    const store = createAccessStore(fakeStorage().storage, TEST_DIGEST);
+    store.getState().signIn("ada", TEST_PASSWORD);
+    store.getState().skipOnboarding();
+    expect(store.getState().onboardingSkipped).toBe(true);
+    store.getState().signOut();
+    expect(store.getState().onboardingSkipped).toBe(false);
+  });
+
+  it("stays signed in when the server cannot be reached", async () => {
+    const register = vi.fn().mockRejectedValue(new Error("offline"));
+    const store = createAccessStore(fakeStorage().storage, TEST_DIGEST, register);
+    expect(store.getState().signIn("ada", TEST_PASSWORD)).toMatchObject({ ok: true });
+    await Promise.resolve();
+    expect(store.getState().user).toBe("ada");
+    expect(store.getState().profile).toBeNull();
+  });
+
+  it("ignores a late answer after signing out", async () => {
+    let answer: (p: Profile) => void = () => undefined;
+    const register = vi.fn().mockReturnValue(new Promise<Profile>((r) => (answer = r)));
+    const store = createAccessStore(fakeStorage().storage, TEST_DIGEST, register);
+    store.getState().signIn("ada", TEST_PASSWORD);
+    store.getState().signOut();
+    answer(profile({ id: 7 }));
+    await Promise.resolve();
+    expect(store.getState().userId).toBeNull();
+    expect(store.getState().profile).toBeNull();
   });
 });

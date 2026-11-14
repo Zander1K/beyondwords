@@ -110,7 +110,8 @@ export function AccessDialog({ open, onClose, onSuccess }: Props) {
           Test Beyond Words
         </h2>
         <p id={`${ids}-lede`} className={styles.lede}>
-          Enter a username and the access password to continue.
+          Choose a username (3 to 32 letters, numbers, dots, dashes or underscores) and enter the
+          access password. A new username starts a new reader.
         </p>
 
         <form className={styles.form} onSubmit={submit} noValidate>
