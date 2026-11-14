@@ -1,0 +1,43 @@
+# Local dev stack: FastAPI + MariaDB. Mobile dev server runs separately (see README).
+services:
+  mariadb:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root}
+      MARIADB_DATABASE: ${MARIADB_DATABASE:-reading_companion}
+      MARIADB_USER: ${MARIADB_USER:-reading}
+      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-reading}
+    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+    ports:
+      - "3306:3306"
+    volumes:
+      - mariadb_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      # Inside compose the DB host is the service name, not localhost.
+      DATABASE_URL: mysql+aiomysql://${MARIADB_USER:-reading}:${MARIADB_PASSWORD:-reading}@mariadb:3306/${MARIADB_DATABASE:-reading_companion}
+    ports:
+      - "8000:8000"
+    depends_on:
+      mariadb:
+        condition: service_healthy
+    volumes:
+      # Live reload of API code and migrations during development.
+      - ./apps/api/app:/srv/apps/api/app
+      - ./db/migrations:/srv/db/migrations
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+volumes:
+  mariadb_data:

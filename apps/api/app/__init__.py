@@ -1,0 +1,1 @@
+"""Reading Companion API (FastAPI)."""
