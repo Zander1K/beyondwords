@@ -111,7 +111,7 @@ Tables: `users`, `books`, `user_books`, `pages`, `lines`, `word_bank`, `reading_
 
 Columns follow SOP section 5; `apps/api/app/db/models.py` documents each one.
 
-- `users`: display name, `support_level` (listen / read_along / solo), voice, `glasses_type`; no contact details.
+- `users`: unique `username` (the only sign-in: no password, decided 2026-11-14), display name, `support_level` (listen / read_along / solo), voice, `glasses_type`; no contact details.
 - `books`: **metadata only** (ISBN, title, author, publication year, language, genre, setting/era, spoiler-free description, metadata source). **Never store book text.** The library exists so the brain knows which book a word appears in and can give contextual help, and so progress can be tracked.
 - `user_books`: where each reader is in each book (current page and line, started / last read / finished).
 - `pages` / `lines`: pages a reader captured (image hash and page JSON, never the image) and the captured line text with boxes. Line text is used only to ground that reader's answers and is deleted when the book is finished or on request.

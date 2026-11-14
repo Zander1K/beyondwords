@@ -83,11 +83,20 @@ class ReadingEventType(StrEnum):
 
 
 class User(Base):
-    """Reader account and preferences. No contact details required (SOP section 10)."""
+    """Reader account and preferences. No contact details required (SOP section 10).
+
+    Identified by username only: no password, no email (team decision 2026-11-14).
+    HACK: anyone who types a username sees that reader's progress. Fine for the demo; add a
+    device token or PIN before real users.
+    """
 
     __tablename__ = "users"
+    __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    # Not in the SOP table. Stored lowercased (app.schemas.users.normalize_username), so the
+    # unique constraint makes "Mick" and "mick" the same reader. Every other table links to `id`.
+    username: Mapped[str] = mapped_column(String(32), nullable=False)
     display_name: Mapped[str | None] = mapped_column(String(255))
     support_level: Mapped[str] = mapped_column(
         String(16), nullable=False, server_default=SupportLevel.READ_ALONG.value
