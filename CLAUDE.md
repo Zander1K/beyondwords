@@ -109,10 +109,14 @@ Use a workspace tool for JS (pnpm workspaces) and keep Python deps in `apps/api`
 
 Tables: `users`, `books`, `user_books`, `pages`, `lines`, `word_bank`, `reading_events`.
 
-- `books`: **metadata only** (title, author, ISBN, edition, language, level). **Never store book text.** The library exists so the brain knows which book a word appears in and can give contextual help, and so progress can be tracked.
-- `pages` / `lines`: per-user captured page analysis (line boxes, phrase splits, hard-word flags), keyed to `user_books`.
-- `word_bank`: words the user struggled with or asked about, with the book and context sentence where they met it, plus review state.
-- `reading_events`: append-only log (line completed, word looked up, question asked, assist faded) used for progression and fading support.
+Columns follow SOP section 5; `apps/api/app/db/models.py` documents each one.
+
+- `users`: display name, `support_level` (listen / read_along / solo), voice, `glasses_type`; no contact details.
+- `books`: **metadata only** (ISBN, title, author, publication year, language, genre, setting/era, spoiler-free description, metadata source). **Never store book text.** The library exists so the brain knows which book a word appears in and can give contextual help, and so progress can be tracked.
+- `user_books`: where each reader is in each book (current page and line, started / last read / finished).
+- `pages` / `lines`: pages a reader captured (image hash and page JSON, never the image) and the captured line text with boxes. Line text is used only to ground that reader's answers and is deleted when the book is finished or on request.
+- `word_bank`: one row per reader per word: times rescued, solo reads, status (learning / owned), where it was last seen, context sentence.
+- `reading_events`: append-only log (page read, word rescued, question asked, mode changed) with mode and duration, used for progress metrics and fading support.
 - All schema changes go through Alembic migrations. Never edit the DB by hand. Seed data lives in `db/seed/`.
 
 ## 6. API surface (v1, keep stable; contracts live in `packages/contracts`)

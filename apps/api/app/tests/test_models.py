@@ -16,18 +16,31 @@ def test_all_section_5_tables_are_mapped() -> None:
 
 
 def test_books_has_no_text_column() -> None:
-    # CLAUDE.md: books hold metadata only, never book text.
+    # SOP section 5: the shared library holds metadata only, never book text.
     columns = set(Base.metadata.tables["books"].columns.keys())
     assert columns == {
         "id",
+        "isbn",
         "title",
         "author",
-        "isbn",
-        "edition",
+        "publication_year",
         "language",
-        "level",
+        "genre",
+        "setting_era",
+        "description_spoiler_free",
+        "metadata_source",
         "created_at",
     }
+
+
+def test_no_table_stores_raw_media() -> None:
+    # SOP section 10: page images and audio are never stored.
+    forbidden = ("image", "photo", "audio", "blob")
+    for table in Base.metadata.tables.values():
+        for column in table.columns:
+            if column.name == "image_hash":  # a SHA-256 hash, not the image
+                continue
+            assert not any(word in column.name for word in forbidden), (table.name, column.name)
 
 
 def test_initial_migration_matches_models() -> None:
@@ -37,7 +50,7 @@ def test_initial_migration_matches_models() -> None:
 
     from alembic.migration import MigrationContext
     from alembic.operations import Operations
-    from sqlalchemy import MetaData, create_engine, inspect
+    from sqlalchemy import MetaData, UniqueConstraint, create_engine, inspect
 
     path = Path(__file__).parents[4] / "db/migrations/versions/0001_initial_tables.py"
     spec = importlib.util.spec_from_file_location("migration_0001", path)
@@ -60,3 +73,8 @@ def test_initial_migration_matches_models() -> None:
             model_indexes = {i.name for i in table.indexes}
             db_indexes = {i["name"] for i in insp.get_indexes(name)}
             assert model_indexes <= db_indexes, (name, model_indexes - db_indexes)
+            model_uniques = {
+                c.name for c in table.constraints if isinstance(c, UniqueConstraint) and c.name
+            }
+            db_uniques = {u["name"] for u in insp.get_unique_constraints(name)}
+            assert model_uniques <= db_uniques, (name, model_uniques - db_uniques)
