@@ -1,49 +1,54 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { WebSimulatorAdapter } from "../web-simulator/WebSimulatorAdapter";
-import { DISPLAY_LIMITS, makePhrase, makeWordCard, normaliseText, truncate } from "./displayModel";
+import { DISPLAY_LIMITS, makePhrase, makeWordCard, normaliseText } from "./displayModel";
+import { buildScene, type SceneNode } from "./scene";
 
 const LONG =
   "The old lighthouse stood alone at the edge of the grey cliffs and every night its lamp swept slowly across the water";
 
-describe("display constraints", () => {
-  it("collapses newlines and repeated spaces so no paragraph reaches the display", () => {
+const ALLOWED = new Set(["flex", "text", "image", "button", "icon"]);
+
+function walk(node: SceneNode, visit: (n: SceneNode) => void): void {
+  visit(node);
+  if (node.type === "flex") for (const child of node.children) walk(child, visit);
+}
+
+describe("SIM-DSP-03 one thing at a time, length limits", () => {
+  it("collapses newlines so no paragraph reaches the display", () => {
     expect(normaliseText("one\n\ntwo   three\tfour ")).toBe("one two three four");
-    const phrase = makePhrase("first line\nsecond line");
-    expect(phrase).toEqual({ kind: "phrase", text: "first line second line" });
+    expect(makePhrase("first line\nsecond line")).toEqual({
+      kind: "phrase",
+      text: "first line second line",
+    });
   });
 
-  it("cuts long phrases at a word boundary with an ellipsis", () => {
-    const phrase = makePhrase(LONG);
-    expect(phrase?.kind).toBe("phrase");
-    if (phrase?.kind !== "phrase") return;
-    expect(phrase.text.length).toBeLessThanOrEqual(DISPLAY_LIMITS.phraseMaxChars);
+  it("truncates phrases over 12 words and logs a warning", () => {
+    const warn = vi.fn();
+    const phrase = makePhrase(LONG, undefined, warn);
+    if (phrase?.kind !== "phrase") throw new Error("expected a phrase");
+    expect(phrase.text.slice(0, -1).split(" ")).toHaveLength(DISPLAY_LIMITS.phraseMaxWords);
     expect(phrase.text.endsWith("…")).toBe(true);
-    expect(phrase.text).not.toMatch(/\s…$/);
-    expect(LONG.startsWith(phrase.text.slice(0, -1))).toBe(true);
+    expect(warn).toHaveBeenCalledOnce();
   });
 
-  it("leaves short text untouched", () => {
-    expect(truncate("short", 10)).toBe("short");
+  it("truncates definitions over 25 words and logs a warning", () => {
+    const warn = vi.fn();
+    const long = Array.from({ length: 40 }, (_, i) => `w${i}`).join(" ");
+    const card = makeWordCard({ word: "lighthouse", short: long }, warn);
+    if (card?.kind !== "word") throw new Error("expected a card");
+    expect(card.short.slice(0, -1).split(" ")).toHaveLength(DISPLAY_LIMITS.definitionMaxWords);
+    expect(warn).toHaveBeenCalledOnce();
   });
 
-  it("clamps emphasis to the visible text and drops it when it falls off the end", () => {
-    const kept = makePhrase("The old lighthouse stood alone", [8, 18]);
-    expect(kept).toEqual({
+  it("clamps emphasis to the visible text", () => {
+    expect(makePhrase("The old lighthouse stood alone", [8, 18])).toEqual({
       kind: "phrase",
       text: "The old lighthouse stood alone",
       emphasis: [8, 18],
     });
-
     const offscreen = makePhrase(LONG, [100, 110]);
     expect(offscreen && "emphasis" in offscreen).toBe(false);
-  });
-
-  it("limits word cards to a short word and a one-line definition", () => {
-    const card = makeWordCard({ word: "lighthouse", short: LONG });
-    expect(card?.kind).toBe("word");
-    if (card?.kind !== "word") return;
-    expect(card.short.length).toBeLessThanOrEqual(DISPLAY_LIMITS.shortMaxChars);
   });
 
   it("ignores empty content", () => {
@@ -52,22 +57,64 @@ describe("display constraints", () => {
   });
 });
 
-describe("simulated display shows one item at a time", () => {
-  it("replaces the previous item instead of stacking", async () => {
+describe("SIM-DSP-01 component-limited scenes", () => {
+  it("builds scenes only from FlexBox, Text, Image, Button and Icon", () => {
+    const scenes = [
+      buildScene({ kind: "phrase", text: "The old lighthouse", emphasis: [8, 18] }, "hand-lost"),
+      buildScene(
+        { kind: "word", word: "lamp", short: "A light.", actions: ["hear"], focused: "hear" },
+        null,
+      ),
+      buildScene({ kind: "image", url: "https://example.test/a.png" }, null),
+    ];
+    for (const scene of scenes) {
+      if (!scene) throw new Error("expected a scene");
+      walk(scene, (n) => expect(ALLOWED.has(n.type)).toBe(true));
+    }
+    expect(buildScene(null, null)).toBeNull();
+  });
+
+  it("SIM-DSP-04 marks exactly the emphasised words in the phrase", () => {
+    const scene = buildScene(
+      { kind: "phrase", text: "The old lighthouse", emphasis: [8, 18] },
+      null,
+    );
+    const texts: { text: string; tone?: string }[] = [];
+    if (scene) walk(scene, (n) => n.type === "text" && texts.push(n));
+    expect(texts.filter((t) => t.tone === "accent").map((t) => t.text)).toEqual(["lighthouse"]);
+    expect(texts.map((t) => t.text).join(" ")).toBe("The old lighthouse");
+  });
+
+  it("SIM-DSP-05 word card: heading word, body definition, focused button", () => {
+    const scene = buildScene(
+      { kind: "word", word: "lamp", short: "A light.", actions: ["hear"], focused: "hear" },
+      null,
+    );
+    const nodes: SceneNode[] = [];
+    if (scene) walk(scene, (n) => nodes.push(n));
+    expect(nodes).toContainEqual({ type: "text", preset: "heading", text: "lamp" });
+    expect(nodes).toContainEqual({ type: "text", preset: "body", text: "A light." });
+    expect(nodes).toContainEqual({ type: "button", label: "Hear it", focused: true });
+  });
+});
+
+describe("simulated display", () => {
+  it("replaces the previous item instead of stacking, with one optional status", async () => {
     const adapter = new WebSimulatorAdapter({ keyTarget: new EventTarget(), startDelayMs: 0 });
+    adapter.setMaxUpdatesPerSecond(20);
     await adapter.session.start();
     adapter.showPhrase("The old lighthouse");
+    adapter.showStatus("hand-lost");
     adapter.showWordCard({ word: "lighthouse", short: "A tower that guides ships." });
-    expect(adapter.store.getState().content).toEqual({
+    expect(adapter.store.getState().item).toEqual({
       kind: "word",
       word: "lighthouse",
       short: "A tower that guides ships.",
       actions: [],
     });
-    adapter.showImage("https://example.test/picture.png");
-    expect(adapter.store.getState().content?.kind).toBe("image");
+    expect(adapter.store.getState().status).toBe("hand-lost");
     adapter.clearDisplay();
-    expect(adapter.store.getState().content).toBeNull();
+    expect(adapter.store.getState().item).toBeNull();
     adapter.dispose();
   });
 

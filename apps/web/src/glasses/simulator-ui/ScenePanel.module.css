@@ -1,0 +1,70 @@
+/* The 600x600 display scene. Black is see-through on the real display; keep contrast high.
+   Sizes use container units of the 600x600 square (100cqw = 600 display px). */
+.scene {
+  container-type: size;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(48 / 600 * 100cqw);
+  color: #fff;
+  font-family: var(--font-sans);
+  overflow: hidden;
+  text-align: center;
+}
+
+.flex {
+  display: flex;
+  max-width: 100%;
+}
+
+/* Text presets. OPEN QUESTION: real preset sizes; these are legibility guesses. */
+.text {
+  line-height: 1.3;
+  letter-spacing: 0.02em;
+}
+
+.text[data-preset="heading"] {
+  font-size: calc(56 / 600 * 100cqw);
+  font-weight: 700;
+}
+
+.text[data-preset="body"] {
+  font-size: calc(40 / 600 * 100cqw);
+}
+
+.text[data-preset="meta"] {
+  font-size: calc(26 / 600 * 100cqw);
+  opacity: 0.8;
+}
+
+.text[data-tone="accent"] {
+  color: #ffd84d;
+  font-weight: 700;
+}
+
+.text[data-tone="muted"] {
+  opacity: 0.6;
+}
+
+.image {
+  object-fit: cover;
+}
+
+.button {
+  padding: calc(10 / 600 * 100cqw) calc(28 / 600 * 100cqw);
+  border: calc(3 / 600 * 100cqw) solid rgb(255 255 255 / 0.5);
+  border-radius: 999px;
+  font-size: calc(30 / 600 * 100cqw);
+}
+
+.button[data-focused="true"] {
+  border-color: #ffd84d;
+  background: rgb(255 216 77 / 0.2);
+}
+
+.icon {
+  width: calc(34 / 600 * 100cqw);
+  height: calc(34 / 600 * 100cqw);
+}

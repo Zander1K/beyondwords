@@ -24,7 +24,7 @@ describe("SIM-SES-07 phone is the source of truth", () => {
     const { page, reader } = useReaderStore.getState();
     renderReader(second, page, reader);
     expect(reader.position).toEqual(position);
-    expect(second.store.getState().content).toEqual({
+    expect(second.store.getState().item).toEqual({
       kind: "phrase",
       text: "of the grey cliffs,",
     });

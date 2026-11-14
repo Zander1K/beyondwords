@@ -5,13 +5,23 @@ import { createStore } from "zustand/vanilla";
 
 import type { Cue, SessionState, StatusKind } from "../adapter";
 import type { DisplayContent } from "./displayModel";
+import type { Scene } from "./scene";
 
 export interface SimulatorState {
   session: SessionState;
-  /** The ONE item on the display (or null). Replacing it is the only way to change it. */
-  content: DisplayContent | null;
-  /** Small status icon next to the item. */
+  /** The ONE item requested for the display (or null). */
+  item: DisplayContent | null;
+  /** Small status icon requested next to the item. */
   status: StatusKind | null;
+  /** What the display shows: the whole scene, replaced on every (throttled) update. */
+  scene: Scene;
+  /** SIM-DSP-02: number of whole-screen updates and when the last one happened. */
+  updateCount: number;
+  lastUpdateAt: number | null;
+  /** SIM-DSP-04: update rate limit (default 5/s, 1-20). */
+  maxUpdatesPerSecond: number;
+  /** Recent display warnings (ignored calls, truncated text), newest first. */
+  warnings: { message: string; at: number }[];
   /** Simulates Ray-Ban Meta Gen 2: no display, audio cues only. */
   audioOnly: boolean;
   /** Last cue, shown visually too so it can be checked with the sound off. */
@@ -26,6 +36,9 @@ export interface SimulatorState {
   interrupted: boolean;
 }
 
+/** SIM-DSP-04 default. [ASSUMPTION] our estimate. */
+export const DEFAULT_MAX_UPDATES_PER_SECOND = 5;
+
 /** SIM-SES-04 default. [ASSUMPTION] our estimate, not a Meta figure. */
 export const DEFAULT_SLEEP_TIMEOUT_MS = 30_000;
 
@@ -34,8 +47,13 @@ export type SimulatorStore = ReturnType<typeof createSimulatorStore>;
 export function createSimulatorStore() {
   return createStore<SimulatorState>(() => ({
     session: "stopped",
-    content: null,
+    item: null,
     status: null,
+    scene: null,
+    updateCount: 0,
+    lastUpdateAt: null,
+    maxUpdatesPerSecond: DEFAULT_MAX_UPDATES_PER_SECOND,
+    warnings: [],
     audioOnly: false,
     lastCue: null,
     connected: true,

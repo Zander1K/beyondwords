@@ -93,7 +93,7 @@ describe("WebSimulatorAdapter session", () => {
     const warn = vi.fn();
     const adapter = new WebSimulatorAdapter({ keyTarget: new EventTarget(), warn });
     adapter.showPhrase("hello");
-    expect(adapter.store.getState().content).toBeNull();
+    expect(adapter.store.getState().item).toBeNull();
     expect(warn).toHaveBeenCalledWith("showPhrase ignored: session is stopped");
     adapter.dispose();
   });

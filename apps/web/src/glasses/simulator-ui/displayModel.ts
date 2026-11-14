@@ -1,21 +1,18 @@
-// What the simulated Ray-Ban Display can show, and the rules that keep it honest.
+// What the simulated Ray-Ban Display can show, and the limits that keep it honest
+// (SIM-DSP-03, one thing at a time):
+//   - exactly ONE item: a short phrase, a word card or an image (plus an optional status icon);
+//   - no newlines or paragraphs;
+//   - anything too long is truncated at a word boundary with an ellipsis and a warning logged.
 //
-// The real display is 600x600 px with a ~20 degree field of view in the right lens. It can only
-// show a little at a time, so the simulator enforces the same limits itself:
-//   - exactly ONE item at a time: a short phrase, a word card, or an image (or nothing);
-//   - single line of normalised text, no newlines, no scrolling paragraphs;
-//   - long text is cut at a word boundary with an ellipsis, never wrapped into a paragraph.
-//
-// HACK: the character limits below are guesses for legibility at ~20 degree FOV.
-// OPEN QUESTION: real text limits for Ray-Ban Display (font size, lines per screen). Confirm
-// against the Meta DAT display docs / SOP section 9 and tune.
-
+// [ASSUMPTION] The limits are ours; Meta's docs give none. ~12 words per phrase and ~25 words
+// per definition (SIMULATION_FEATURES.md SIM-DSP-03).
+// OPEN QUESTION: real text limits for the 600x600 display (section 9, question 2).
 import type { WordCard, WordCardAction } from "../adapter";
 
 export const DISPLAY_LIMITS = {
-  phraseMaxChars: 60,
-  wordMaxChars: 24,
-  shortMaxChars: 60,
+  phraseMaxWords: 12,
+  wordMaxWords: 3,
+  definitionMaxWords: 25,
 } as const;
 
 export type DisplayContent =
@@ -29,20 +26,18 @@ export type DisplayContent =
     }
   | { kind: "image"; url: string };
 
+type Warn = (message: string) => void;
+
 /** Collapse all whitespace (including newlines) to single spaces: no paragraphs on the display. */
 export function normaliseText(text: string): string {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/** Cut to `max` characters at a word boundary where possible, ending with an ellipsis. */
-export function truncate(text: string, max: number): string {
-  if (text.length <= max) return text;
-  const room = max - 1; // leave space for the ellipsis
-  const cut = text.slice(0, room);
-  const lastSpace = cut.lastIndexOf(" ");
-  // Only back off to a word boundary if it keeps most of the text.
-  const end = lastSpace >= room * 0.6 ? lastSpace : room;
-  return `${cut.slice(0, end).trimEnd()}…`;
+/** Keep at most `max` words; longer text ends with an ellipsis. Returns [text, truncated]. */
+export function limitWords(text: string, max: number): [string, boolean] {
+  const words = text.split(" ").filter(Boolean);
+  if (words.length <= max) return [text, false];
+  return [`${words.slice(0, max).join(" ")}…`, true];
 }
 
 /** Clamp an emphasis range to the visible text; drop it if nothing is left to highlight. */
@@ -56,25 +51,37 @@ export function clampEmphasis(
   return end > start ? [start, end] : undefined;
 }
 
-export function makePhrase(text: string, emphasis?: [number, number]): DisplayContent | null {
+export function makePhrase(
+  text: string,
+  emphasis?: [number, number],
+  warn: Warn = () => {},
+): DisplayContent | null {
   const normalised = normaliseText(text);
   if (!normalised) return null;
+  const [visible, cut] = limitWords(normalised, DISPLAY_LIMITS.phraseMaxWords);
+  if (cut) warn(`phrase over ${DISPLAY_LIMITS.phraseMaxWords} words truncated: "${normalised}"`);
   // Emphasis offsets refer to the caller's text. If normalising changed the text, the offsets
   // no longer line up, so drop them rather than highlight the wrong words.
   const offsetsValid = normalised === text;
-  const visible = truncate(normalised, DISPLAY_LIMITS.phraseMaxChars);
   // Never highlight into the ellipsis.
-  const highlightable = visible.endsWith("…") ? visible.length - 1 : visible.length;
+  const highlightable = cut ? visible.length - 1 : visible.length;
   const clamped = offsetsValid ? clampEmphasis(emphasis, highlightable) : undefined;
   return clamped
     ? { kind: "phrase", text: visible, emphasis: clamped }
     : { kind: "phrase", text: visible };
 }
 
-export function makeWordCard(card: WordCard): DisplayContent | null {
-  const word = truncate(normaliseText(card.word), DISPLAY_LIMITS.wordMaxChars);
+export function makeWordCard(card: WordCard, warn: Warn = () => {}): DisplayContent | null {
+  const [word, wordCut] = limitWords(normaliseText(card.word), DISPLAY_LIMITS.wordMaxWords);
   if (!word) return null;
-  const short = truncate(normaliseText(card.short), DISPLAY_LIMITS.shortMaxChars);
+  if (wordCut) warn(`word card heading over ${DISPLAY_LIMITS.wordMaxWords} words truncated`);
+  const [short, shortCut] = limitWords(
+    normaliseText(card.short),
+    DISPLAY_LIMITS.definitionMaxWords,
+  );
+  if (shortCut) {
+    warn(`definition over ${DISPLAY_LIMITS.definitionMaxWords} words truncated: "${card.word}"`);
+  }
   const actions = [...new Set(card.actions ?? [])];
   const focused = card.focused && actions.includes(card.focused) ? card.focused : actions[0];
   return focused

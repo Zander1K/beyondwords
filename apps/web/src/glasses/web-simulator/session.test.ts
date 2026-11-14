@@ -34,7 +34,7 @@ describe("SIM-SES-03 interrupt and resume", () => {
     adapter.showPhrase("The old lighthouse");
 
     const interrupted = adapter.interrupt();
-    expect(adapter.store.getState().content).toBeNull();
+    expect(adapter.store.getState().scene).toBeNull();
     await vi.runOnlyPendingTimersAsync();
     await interrupted;
     expect(adapter.session.state).toBe("stopped");

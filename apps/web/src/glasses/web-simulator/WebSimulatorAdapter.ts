@@ -26,6 +26,7 @@ import {
   makePhrase,
   makeWordCard,
 } from "../simulator-ui/displayModel";
+import { buildScene } from "../simulator-ui/scene";
 import { createSimulatorStore, type SimulatorStore } from "../simulator-ui/simulatorStore";
 import { keyToGesture } from "./gestures";
 import { MIC_WORKLET_SOURCE, floatToInt16 } from "./micWorklet";
@@ -109,6 +110,8 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   private readonly stopDelayMs: number;
   private readonly gestureHandlers = new Set<(g: GlassesGesture) => void>();
   private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private flushTimer: ReturnType<typeof setTimeout> | null = null;
+  private lastFlushAt = Number.NEGATIVE_INFINITY;
   private sleepTimer: ReturnType<typeof setTimeout> | null = null;
   /** Session was running when the link dropped, so Reconnect restarts it. */
   private restartOnReconnect = false;
@@ -128,7 +131,12 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     this.keyTarget = options.keyTarget ?? (typeof window !== "undefined" ? window : null);
     this.startDelayMs = options.startDelayMs ?? 1200;
     this.stopDelayMs = options.stopDelayMs ?? 300;
-    this.warn = options.warn ?? ((m) => console.warn(`[glasses] ${m}`));
+    const log = options.warn ?? ((m: string) => console.warn(`[glasses] ${m}`));
+    this.warn = (message) => {
+      log(message);
+      const warnings = [{ message, at: Date.now() }, ...this.store.getState().warnings];
+      this.store.setState({ warnings: warnings.slice(0, 8) });
+    };
     if (options.sleepTimeoutMs !== undefined) {
       this.store.setState({ sleepTimeoutMs: options.sleepTimeoutMs });
     }
@@ -191,7 +199,8 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   /** Clear the display and its timers; the glasses keep no app state. */
   private endDisplay(): void {
     this.clearSleepTimers();
-    this.store.setState({ content: null, status: null, sleep: "awake" });
+    this.cancelFlush();
+    this.store.setState({ item: null, status: null, scene: null, sleep: "awake" });
     this.stopSpeaking();
   }
 
@@ -436,28 +445,69 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     return false;
   }
 
-  protected render(content: DisplayContent | null): void {
-    this.store.setState({ content });
+  /** Change the requested item (and/or status); the display updates on the next flush. */
+  private request(patch: { item?: DisplayContent | null; status?: StatusKind | null }): void {
+    this.store.setState(patch);
+    this.scheduleFlush();
   }
 
   showPhrase(text: string, opts?: { emphasis?: [number, number] }): void {
-    if (this.canDisplay("showPhrase")) this.render(makePhrase(text, opts?.emphasis));
+    if (this.canDisplay("showPhrase")) {
+      this.request({ item: makePhrase(text, opts?.emphasis, this.warn) });
+    }
   }
 
   showWordCard(card: WordCard): void {
-    if (this.canDisplay("showWordCard")) this.render(makeWordCard(card));
+    if (this.canDisplay("showWordCard")) this.request({ item: makeWordCard(card, this.warn) });
   }
 
   showImage(url: string): void {
-    if (this.canDisplay("showImage")) this.render(makeImage(url));
+    if (!this.canDisplay("showImage")) return;
+    if (!this.capabilities.display) {
+      this.warn("showImage ignored: no display (audio-only mode)");
+      return;
+    }
+    this.request({ item: makeImage(url) });
   }
 
   showStatus(kind: StatusKind | null): void {
-    if (this.canDisplay("showStatus")) this.store.setState({ status: kind });
+    if (this.canDisplay("showStatus")) this.request({ status: kind });
   }
 
   clearDisplay(): void {
-    if (this.canDisplay("clearDisplay")) this.store.setState({ content: null, status: null });
+    if (this.canDisplay("clearDisplay")) this.request({ item: null, status: null });
+  }
+
+  /** SIM-DSP-04: at most maxUpdatesPerSecond whole-screen updates; the latest request wins. */
+  setMaxUpdatesPerSecond(rate: number): void {
+    this.store.setState({ maxUpdatesPerSecond: Math.max(1, Math.min(20, rate)) });
+  }
+
+  private scheduleFlush(): void {
+    const interval = 1000 / this.store.getState().maxUpdatesPerSecond;
+    const wait = this.lastFlushAt + interval - Date.now();
+    if (wait <= 0 && !this.flushTimer) {
+      this.flush();
+    } else if (!this.flushTimer) {
+      this.flushTimer = setTimeout(() => this.flush(), Math.max(0, wait));
+    }
+  }
+
+  /** SIM-DSP-02: build and replace the WHOLE scene; count the update. */
+  private flush(): void {
+    this.flushTimer = null;
+    this.lastFlushAt = Date.now();
+    const { item, status, updateCount } = this.store.getState();
+    this.store.setState({
+      scene: buildScene(item, status),
+      updateCount: updateCount + 1,
+      lastUpdateAt: this.lastFlushAt,
+    });
+  }
+
+  private cancelFlush(): void {
+    if (this.flushTimer) clearTimeout(this.flushTimer);
+    this.flushTimer = null;
   }
 
   speak(text: string): Promise<void> {
@@ -517,7 +567,14 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     }
     this.stopSpeaking();
     this.clearSleepTimers();
-    this.store.setState({ session: "stopped", content: null, status: null, sleep: "awake" });
+    this.cancelFlush();
+    this.store.setState({
+      session: "stopped",
+      item: null,
+      status: null,
+      scene: null,
+      sleep: "awake",
+    });
   }
 
   // ---- Internals ----

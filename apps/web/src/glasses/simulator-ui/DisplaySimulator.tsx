@@ -6,34 +6,29 @@ import { useStore } from "zustand";
 import type { GlassesGesture } from "../adapter";
 import { GESTURE_KEYS } from "../web-simulator/gestures";
 import type { WebSimulatorAdapter } from "../web-simulator/WebSimulatorAdapter";
-import type { DisplayContent } from "./displayModel";
 import styles from "./DisplaySimulator.module.css";
+import { ScenePanel } from "./ScenePanel";
 
 const PAD: readonly GlassesGesture[] = ["left", "select", "right", "up", "back", "down"];
 
-function Content({ content }: { content: DisplayContent }) {
-  switch (content.kind) {
-    case "phrase": {
-      if (!content.emphasis) return <p className={styles.phrase}>{content.text}</p>;
-      const [start, end] = content.emphasis;
-      return (
-        <p className={styles.phrase}>
-          {content.text.slice(0, start)}
-          <mark className={styles.emphasis}>{content.text.slice(start, end)}</mark>
-          {content.text.slice(end)}
-        </p>
-      );
-    }
-    case "word":
-      return (
-        <div className={styles.wordCard}>
-          <p className={styles.word}>{content.word}</p>
-          <p className={styles.short}>{content.short}</p>
-        </div>
-      );
-    case "image":
-      return <img className={styles.image} src={content.url} alt="" />;
-  }
+/** SIM-DSP-04 stress test: 50 phrase updates per second for 2 s. */
+function stressTest(adapter: WebSimulatorAdapter): void {
+  let n = 0;
+  const timer = setInterval(() => {
+    adapter.showPhrase(`Stress update ${++n}`);
+    if (n >= 100) clearInterval(timer);
+  }, 20);
+}
+
+function UpdateInfo({ adapter }: { adapter: WebSimulatorAdapter }) {
+  const count = useStore(adapter.store, (s) => s.updateCount);
+  const at = useStore(adapter.store, (s) => s.lastUpdateAt);
+  return (
+    <span className={styles.frameText} data-testid="display-updates">
+      Updates: {count}
+      {at !== null && ` · last ${new Date(at).toLocaleTimeString()}`}
+    </span>
+  );
 }
 
 interface Props {
@@ -44,7 +39,9 @@ interface Props {
 
 export function DisplaySimulator({ adapter, onRecreate }: Props) {
   const session = useStore(adapter.store, (s) => s.session);
-  const content = useStore(adapter.store, (s) => s.content);
+  const scene = useStore(adapter.store, (s) => s.scene);
+  const maxRate = useStore(adapter.store, (s) => s.maxUpdatesPerSecond);
+  const warnings = useStore(adapter.store, (s) => s.warnings);
   const audioOnly = useStore(adapter.store, (s) => s.audioOnly);
   const lastCue = useStore(adapter.store, (s) => s.lastCue);
   const connected = useStore(adapter.store, (s) => s.connected);
@@ -62,6 +59,7 @@ export function DisplaySimulator({ adapter, onRecreate }: Props) {
           {reconnecting ? "Reconnecting…" : connected ? "Connected" : "Disconnected"}
         </span>
         <span className={styles.frameText}>Display: {sleep}</span>
+        <UpdateInfo adapter={adapter} />
       </div>
 
       <div className={styles.lens}>
@@ -72,7 +70,7 @@ export function DisplaySimulator({ adapter, onRecreate }: Props) {
           data-sleep={sleep}
           aria-live="polite"
         >
-          {!audioOnly && sleep !== "asleep" && content && <Content content={content} />}
+          {!audioOnly && sleep !== "asleep" && <ScenePanel scene={scene} />}
         </div>
         {lastCue && (
           <span key={lastCue.at} className={styles.cue} role="status">
@@ -146,6 +144,29 @@ export function DisplaySimulator({ adapter, onRecreate }: Props) {
           <button type="button" onClick={onRecreate}>
             Recreate adapter (test)
           </button>
+        </fieldset>
+        <fieldset className={styles.group}>
+          <legend>Display</legend>
+          <label className={styles.slider}>
+            Max {maxRate} updates per second
+            <input
+              type="range"
+              min={1}
+              max={20}
+              value={maxRate}
+              onChange={(e) => adapter.setMaxUpdatesPerSecond(Number(e.target.value))}
+            />
+          </label>
+          <button type="button" onClick={() => stressTest(adapter)} disabled={!started}>
+            Stress test (50 updates/s for 2 s)
+          </button>
+          {warnings.length > 0 && (
+            <ul className={styles.warnings} aria-label="Display warnings">
+              {warnings.slice(0, 4).map((w) => (
+                <li key={`${w.at}-${w.message}`}>{w.message}</li>
+              ))}
+            </ul>
+          )}
         </fieldset>
         <fieldset className={styles.group}>
           <legend>Mode</legend>
