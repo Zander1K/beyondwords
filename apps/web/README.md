@@ -38,7 +38,11 @@ The API should be running for the Settings screen's connection check (`make api`
 ## Trying the glasses simulator
 
 The camera view is the glasses' eyes: what is read, where you are and your gestures all come
-from it. Open **Reader**:
+from it. **Reader** is a single view: the live camera fills it (**Fullscreen** in the bottom
+bar; on iPhone it fills the screen instead), the simulated glasses display floats on top in the
+right-lens position, status runs along the top, and **Controls** opens a sheet with the page
+text, overlay options and the glasses simulator (gesture pad and log, system events, display
+stats, audio-only mode). Open **Reader**:
 
 1. **Start camera** and aim it down at an open book so the page fills most of the frame. A page
    still is taken after ~1.5 s (or press **Scan page**): Tesseract.js reads the lines (boxes are
@@ -57,11 +61,12 @@ from it. Open **Reader**:
    | Open-palm swipe left / right | previous / next phrase |
    | Open-palm swipe up / down    | previous / next line   |
 
-   The fallback keys are `Enter`, `Esc` and the arrow keys, plus the on-screen pad. Every gesture
-   shows in the gesture log with its source. If swipes go the wrong way (camera facing you),
+   The fallback keys are `Enter`, `Esc` and the arrow keys, plus the on-screen pad (in
+   **Controls**). Every gesture shows in the gesture log with its source. In native fullscreen
+   the browser uses `Esc` to exit fullscreen, so use a middle pinch for back there. If swipes go the wrong way (camera facing you),
    tick **Mirror swipes**.
 
-5. **System events** in the panel: Interrupt/Resume, Sleep/Wake, Disconnect/Reconnect,
+5. **System events** in **Controls**: Interrupt/Resume, Sleep/Wake, Disconnect/Reconnect,
    Recreate adapter. **Stress test** checks the 5 updates/s display limit.
 
 The first camera start downloads the hand model (~7.8 MB) and the OCR model; this needs an

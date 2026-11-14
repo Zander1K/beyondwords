@@ -13,5 +13,5 @@ export {
   useGlasses,
   useRecreateGlasses,
 } from "./context";
-export { GlassesPanel } from "./GlassesPanel";
+export { GlassesControlsPanel, GlassesHudLayer } from "./GlassesPanel";
 export { GlassesProvider } from "./GlassesProvider";

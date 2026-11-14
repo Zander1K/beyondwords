@@ -1,20 +1,29 @@
-// Shows the simulated glasses when running on the web simulator; nothing on real glasses (the
-// real display is on the user's face, not in the page).
+// Simulator-only views. On real glasses the display is on the user's face and the controls do
+// not exist, so both render nothing for any adapter other than the web simulator.
 import { useEffect } from "react";
 
 import { handsFeed } from "@/vision/handTracking";
 
 import { useGlasses, useRecreateGlasses } from "./context";
-import { DisplaySimulator } from "./simulator-ui/DisplaySimulator";
+import { GlassesControls } from "./simulator-ui/GlassesControls";
+import { GlassesHud } from "./simulator-ui/GlassesHud";
 import { WebSimulatorAdapter } from "./web-simulator/WebSimulatorAdapter";
 
-export function GlassesPanel() {
+/** The simulated glasses display, drawn over the camera view. */
+export function GlassesHudLayer() {
   const adapter = useGlasses();
-  const recreate = useRecreateGlasses();
   // The simulated band watches the camera's hands (a real MetaDatAdapter gets band events).
   useEffect(() => {
     if (adapter instanceof WebSimulatorAdapter) return adapter.attachCameraGestures(handsFeed);
   }, [adapter]);
   if (!(adapter instanceof WebSimulatorAdapter)) return null;
-  return <DisplaySimulator adapter={adapter} onRecreate={recreate} />;
+  return <GlassesHud adapter={adapter} />;
+}
+
+/** Simulator controls: gestures, system events, display stats, audio-only mode. */
+export function GlassesControlsPanel() {
+  const adapter = useGlasses();
+  const recreate = useRecreateGlasses();
+  if (!(adapter instanceof WebSimulatorAdapter)) return null;
+  return <GlassesControls adapter={adapter} onRecreate={recreate} />;
 }

@@ -6,69 +6,6 @@
   max-width: 840px;
 }
 
-/* The wearer's view through the right lens. The display sits right of centre in it. */
-.lens {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 840 / 680;
-  border-radius: 42% 42% 46% 46% / 38% 38% 52% 52%;
-  background: radial-gradient(ellipse at 40% 45%, #3a4250 0%, #1c2028 70%);
-  border: 6px solid #0b0d11;
-  overflow: hidden;
-}
-
-.lensLabel {
-  position: absolute;
-  top: 6%;
-  left: 9%;
-  font-size: 0.75rem;
-  letter-spacing: 0.04em;
-  color: rgb(255 255 255 / 0.55);
-}
-
-/* 600x600 display: 600/840 of the frame width, offset towards the right. */
-.display {
-  container-type: size;
-  position: absolute;
-  top: 50%;
-  right: 6%;
-  width: calc(600 / 840 * 100%);
-  aspect-ratio: 1;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  /* Additive display: black is see-through. A faint edge shows where it is. */
-  background: rgb(0 0 0 / 0.35);
-  outline: 1px dashed rgb(255 255 255 / 0.18);
-  color: #fff;
-  overflow: hidden;
-  text-align: center;
-}
-
-.cue {
-  position: absolute;
-  bottom: 7%;
-  left: 9%;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  background: rgb(255 255 255 / 0.15);
-  color: #fff;
-  font-size: 0.8rem;
-  animation: fade 1.6s ease-out forwards;
-}
-
-@keyframes fade {
-  0%,
-  60% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-  }
-}
-
 /* Glasses frame bar: privacy LED and status */
 .frameBar {
   display: flex;
@@ -89,7 +26,7 @@
 
 .controls {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
@@ -179,17 +116,6 @@
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
-}
-
-/* SIM-SES-04: the display dims, then blanks. */
-.display[data-sleep="dimmed"] {
-  opacity: 0.35;
-  transition: opacity 0.6s ease;
-}
-
-.display[data-sleep="asleep"] {
-  opacity: 0;
-  transition: opacity 0.6s ease;
 }
 
 .warnings {

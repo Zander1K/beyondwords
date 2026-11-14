@@ -1,12 +1,11 @@
-// Glasses simulator panel: the Ray-Ban Display (600x600 in a right-lens frame), session controls,
-// the six-action gesture pad with its log, display stats and audio-only mode.
-// HACK: the lens frame proportions and the display's offset inside it are illustrative only.
+// Glasses simulator controls (the display itself is GlassesHud, over the camera view): device
+// status, camera gestures and the six-action gesture pad with its log, system events, display
+// stats and audio-only mode.
 import { useStore } from "zustand";
 
 import type { WebSimulatorAdapter } from "../web-simulator/WebSimulatorAdapter";
-import styles from "./DisplaySimulator.module.css";
+import styles from "./GlassesControls.module.css";
 import { GesturePad } from "./GesturePad";
-import { ScenePanel } from "./ScenePanel";
 
 /** SIM-DSP-04 stress test: 50 phrase updates per second for 2 s. */
 function stressTest(adapter: WebSimulatorAdapter): void {
@@ -65,13 +64,11 @@ function CameraGestureToggles({ adapter }: { adapter: WebSimulatorAdapter }) {
   );
 }
 
-export function DisplaySimulator({ adapter, onRecreate }: Props) {
+export function GlassesControls({ adapter, onRecreate }: Props) {
   const session = useStore(adapter.store, (s) => s.session);
-  const scene = useStore(adapter.store, (s) => s.scene);
   const maxRate = useStore(adapter.store, (s) => s.maxUpdatesPerSecond);
   const warnings = useStore(adapter.store, (s) => s.warnings);
   const audioOnly = useStore(adapter.store, (s) => s.audioOnly);
-  const lastCue = useStore(adapter.store, (s) => s.lastCue);
   const connected = useStore(adapter.store, (s) => s.connected);
   const reconnecting = useStore(adapter.store, (s) => s.reconnecting);
   const sleep = useStore(adapter.store, (s) => s.sleep);
@@ -88,23 +85,6 @@ export function DisplaySimulator({ adapter, onRecreate }: Props) {
         </span>
         <span className={styles.frameText}>Display: {sleep}</span>
         <UpdateInfo adapter={adapter} />
-      </div>
-
-      <div className={styles.lens}>
-        <span className={styles.lensLabel}>Right lens · 600×600</span>
-        <div
-          className={styles.display}
-          data-testid="glasses-display"
-          data-sleep={sleep}
-          aria-live="polite"
-        >
-          {!audioOnly && sleep !== "asleep" && <ScenePanel scene={scene} />}
-        </div>
-        {lastCue && (
-          <span key={lastCue.at} className={styles.cue} role="status">
-            ♪ {lastCue.kind}
-          </span>
-        )}
       </div>
 
       <div className={styles.controls}>
