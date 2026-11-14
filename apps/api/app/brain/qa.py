@@ -10,9 +10,15 @@
     reply.answer       # two or three short sentences for the phone's text-to-speech
     reply.cited_lines  # ["L2"]: lines the answer is based on
 
-The phone does speech-to-text, sends the question here and speaks `answer`. Every answer comes
-from the reading-coach agent (agent.ask): misheard page words fixed in code, tool steps, a
-citation for every claim, uncited claims removed before the reader hears them.
+The phone does speech-to-text, sends the question here and speaks `answer`. Misheard page words
+are fixed in code first. Then:
+
+- "What does X mean?" (or "what does this mean?" while pointing) about a word on the page goes
+  straight to define_word: Nemotron's meaning in this sentence and this book, citing the line.
+  Live tests showed the agent sometimes refusing plain word meanings in a famous book ("the
+  pages don't define it"), so word meanings no longer depend on the agent's judgement.
+- Everything else goes to the reading-coach agent (agent.ask): tool steps, a citation for every
+  claim, uncited or spoiler claims removed before the reader hears them.
 
 Sessions keep the last few question/answer turns in memory so "and why did he do that?" works;
 they are forgotten after `ttl_seconds` idle and never stored.
@@ -23,6 +29,7 @@ the word bank (no user id yet).
 """
 
 import asyncio
+import re
 import time
 import uuid
 from collections import OrderedDict
@@ -30,7 +37,9 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 
 from app.brain import agent
-from app.brain.llm import LLMClient, Message
+from app.brain.llm import LLMClient, LLMError, Message
+from app.brain.text_utils import correct_to_page_words, letters
+from app.brain.tools.define import define_word
 from app.brain.tools.store import Illustrator, InMemoryStore
 from app.config import get_settings
 from app.schemas.brain import BookContext, CapturedPage, PointedWord, TraceEvent
@@ -40,6 +49,63 @@ from app.schemas.page import Line
 CURRENT_PAGE_ID = "page"
 TURNS_KEPT = 4  # earlier question/answer pairs sent back for follow-ups
 _NO_BOX = [0.0, 0.0, 0.0, 0.0]  # the phone sends line text only; boxes are not needed here
+
+
+_FILLER = re.compile(
+    r"^(?:(?:um+|uh+|so|ok(?:ay)?|hey|sorry|and|please|(?:can|could) you(?: tell me| explain)?"
+    r"|tell me|i (?:don'?t|do not) (?:know|understand|get))\s+)+"
+    r"|\s+(?:here|please|again|in this sentence|on this page|in this book)$"
+)
+_WORD = r"(?P<w>[\w'’-]+)"
+_MEANING_QUESTIONS = [
+    re.compile(p)
+    for p in (
+        rf"what (?:does|do|did) (?:the word )?{_WORD}(?: word)? mean",
+        rf"what(?:'s|s| s| is)? (?:the word )?{_WORD}(?: word)? means?",
+        rf"what(?: is|'s|s| s) (?:the )?(?:meaning of )?(?:the word )?(?:an? )?{_WORD}(?: word)?",
+        rf"(?:the )?meaning of (?:the word )?{_WORD}",
+        rf"(?:define|explain|meaning) (?:the word )?{_WORD}",
+        rf"{_WORD} mean(?:s|ing)?",
+    )
+]
+# Just the word, e.g. what is left of "I don't understand aloof".
+_BARE_WORD = re.compile(rf"(?:the word )?{_WORD}")
+_MEANING_QUESTIONS.append(_BARE_WORD)
+_THIS = {"this", "that", "it"}
+_NOT_WORDS = {"he", "she", "they", "him", "her", "them", "his", "going", "happening", "happened"}
+
+
+def meaning_target(
+    question: str,
+    page_lines: list[tuple[str, str]],
+    pointed_word: str | None = None,
+    current_line_id: str | None = None,
+) -> tuple[str, str, str] | None:
+    """(word as printed, line id, line text) when the question just asks what a word on the
+    page means; None for anything else (story questions go to the agent)."""
+    q = re.sub(r"[^\w\s'’-]", " ", question.lower())
+    q = " ".join(q.split())
+    q = _FILLER.sub("", q).strip()
+    match = next((m for p in _MEANING_QUESTIONS if (m := p.fullmatch(q))), None)
+    if match is None:
+        return None
+    word = match.group("w")
+    if word in _THIS:
+        if not pointed_word:
+            return None
+        word = pointed_word
+    if len(letters(word)) < 3 or word in _NOT_WORDS:
+        return None
+    ordered = sorted(page_lines, key=lambda line: line[0] != current_line_id)
+    for line_id, text in ordered:
+        for token in re.findall(r"[\w'’-]+", text):
+            if letters(token) == letters(word):
+                if match.re is _BARE_WORD and token[:1].isupper():
+                    return None  # a name on its own ("Darcy") is a story question, not a word
+                return token.strip("'’-"), line_id, text
+    if pointed_word and word == pointed_word and current_line_id:
+        return pointed_word, current_line_id, dict(page_lines).get(current_line_id, "")
+    return None
 
 
 class QuestionUnavailableError(Exception):
@@ -111,6 +177,28 @@ class QuestionService:
                 sentence=by_id.get(current_line_id or ""),
             )
         steps: list[str] = []
+        asked, _ = correct_to_page_words(question, [text for _, text in page_lines or []])
+        target = meaning_target(asked, page_lines or [], pointed_word, current_line_id)
+        if target is not None:
+            word, line_id, sentence = target
+            try:
+                breakdown = await asyncio.wait_for(
+                    define_word(word, sentence, book, llm=self._llm), timeout=self._timeout
+                )
+            except (TimeoutError, LLMError) as exc:
+                raise QuestionUnavailableError("Nemotron could not define the word") from exc
+            await store.add_to_word_bank(user_id, book_id, word, sentence, CURRENT_PAGE_ID)
+            meaning = breakdown.meaning.strip().rstrip(".")
+            answer = f"{word[:1].upper()}{word[1:]} means {meaning[:1].lower()}{meaning[1:]}."
+            self._remember(session, question, answer)
+            return QuestionReply(
+                session_id=session_id,
+                answer=answer,
+                cited_lines=[line_id],
+                image_url=None,
+                tool_steps=["define"],
+                grounded=True,
+            )
 
         async def trace(event: TraceEvent) -> None:
             if event.kind == "tool_call":
@@ -137,12 +225,7 @@ class QuestionService:
         if result.answer == agent.UNAVAILABLE:
             raise QuestionUnavailableError("Nemotron unavailable")
 
-        session.history += [
-            Message(role="user", content=question),
-            Message(role="assistant", content=result.answer),
-        ]
-        del session.history[: -2 * TURNS_KEPT]
-        session.updated_at = time.monotonic()
+        self._remember(session, question, result.answer)
         cited: list[str] = []
         for c in result.citations:
             if c.page_id == CURRENT_PAGE_ID and c.line_id not in cited:
@@ -155,6 +238,14 @@ class QuestionService:
             tool_steps=steps,
             grounded=result.grounded,
         )
+
+    def _remember(self, session: _Session, question: str, answer: str) -> None:
+        session.history += [
+            Message(role="user", content=question),
+            Message(role="assistant", content=answer),
+        ]
+        del session.history[: -2 * TURNS_KEPT]
+        session.updated_at = time.monotonic()
 
     def _session(self, session_id: str | None) -> tuple[str, _Session]:
         now = time.monotonic()
