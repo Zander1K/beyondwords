@@ -1,5 +1,6 @@
 // Reader logic: page model, highlight state machine (phrase-level), demo page.
 export { DEMO_PAGE } from "./demoPhrases";
+export { mapPosition, mergePages, type MergeResult, textSimilarity } from "./pageMerge";
 export { phraseAtOffset, phraseSpan, phraseStart, pointedWordInPhrase } from "./geometry";
 export {
   type Box,

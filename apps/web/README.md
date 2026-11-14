@@ -44,12 +44,14 @@ right-lens position, status runs along the top, and **Controls** opens a sheet w
 text, overlay options and the glasses simulator (gesture pad and log, system events, display
 stats, audio-only mode). Open **Reader**:
 
-1. **Start camera** and aim it down at an open book so the page fills most of the frame. A page
-   still is taken once the camera settles and your hand is out of view (or press **Scan
-   page**): PaddleOCR reads the lines and words in a Web Worker (boxes are drawn over the view)
-   and a **mock** page analysis splits them into phrases and hard words. Tilted or curled pages
-   are flattened first when the quick read is unsure (slower, ~2 s or more). No camera?
-   **Upload a page photo** instead. Nothing is saved or uploaded.
+1. **Start camera** and aim it down at an open book so the page fills most of the frame. The
+   page is read **continuously**, with no scan button: PaddleOCR reads frame after frame in a
+   Web Worker (about once a second, slower on phones), and each read is merged into the page,
+   so lines your hand covers keep their last reading and a turned page starts over. Boxes are
+   drawn over the view; a **mock** page analysis splits lines into phrases and hard words.
+   Tilted or curled pages are flattened when the quick read is unsure (at most every 10 s, as it
+   takes ~2 s or more). No camera? **Upload a page photo** instead. Nothing is saved or
+   uploaded.
 2. **Start reading** (the glasses display session needs your go-ahead).
 3. **Point** just under a word: the exact word above your fingertip is highlighted on the
    glasses (inside its phrase) and outlined on the camera view; a pinch (`select`) opens that
@@ -72,7 +74,7 @@ stats, audio-only mode). Open **Reader**:
 5. **System events** in **Controls**: Interrupt/Resume, Sleep/Wake, Disconnect/Reconnect,
    Recreate adapter. **Stress test** checks the 5 updates/s display limit.
 
-The first camera start downloads the hand model (~7.8 MB); the first scan downloads the OCR
+The first camera start downloads the hand model (~7.8 MB); the first read downloads the OCR
 models (~6 MB) and ONNX Runtime (~7 MB compressed), plus ~30 MB more the first time a page
 needs flattening. This needs an internet connection (HACK: vendor them for an offline demo). Word help definitions are mock.
 

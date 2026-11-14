@@ -117,11 +117,12 @@ export function useHandTracking(videoRef: RefObject<HTMLVideoElement | null>, ac
     };
   }, [active, videoRef, glasses]);
 
-  // A new page invalidates the picker's line.
-  const page = useReaderStore((s) => s.page);
+  // A new page (page turned) invalidates the picker's line. Continuous reads of the same page
+  // keep the id, so the picker's hysteresis survives them.
+  const pageId = useReaderStore((s) => s.page.id);
   useEffect(() => {
     picker.current = initialPickerState;
-  }, [page]);
+  }, [pageId]);
 
   // Until the first frame arrives, an active tracker is still loading its model.
   const shown: TrackingStats =

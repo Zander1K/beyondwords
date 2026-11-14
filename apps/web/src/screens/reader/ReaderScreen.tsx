@@ -2,8 +2,9 @@
 // simulated glasses display floats on top in the right-lens position. Status sits in a slim top
 // bar, actions in a bottom bar, and everything else in a Controls sheet inside the view (so it
 // also works in fullscreen).
-// The page comes from the camera: still -> OCR -> page analysis (MOCK). A demo page is shown
-// until the first scan (HACK, so the glasses have something before the camera starts).
+// The page is read continuously from the live camera: frame -> OCR -> page analysis (MOCK) ->
+// merged into the page; the fingertip picks the exact word every frame. A demo page is shown
+// until the first read (HACK, so the glasses have something before the camera starts).
 import { useEffect, useRef, useState } from "react";
 
 import { GlassesControlsPanel, GlassesHudLayer } from "@/glasses";
@@ -15,9 +16,10 @@ import styles from "./ReaderScreen.module.css";
 import { useCamera } from "./useCamera";
 import { useFullscreen } from "./useFullscreen";
 import { type TrackingStats, useHandTracking } from "./useHandTracking";
+import { useLiveScan } from "./useLiveScan";
 import { usePageScan } from "./usePageScan";
 import { useReaderController } from "./useReaderController";
-import { VisionOverlay } from "./VisionOverlay";
+import { type OverlayHand, VisionOverlay } from "./VisionOverlay";
 
 const SESSION_LABEL = {
   stopped: "Glasses off",
@@ -25,11 +27,6 @@ const SESSION_LABEL = {
   started: "Reading",
   stopping: "Stopping…",
 } as const;
-
-/** Wait for the camera to settle (exposure, focus) before the first page still. [ASSUMPTION] */
-const FIRST_SCAN_DELAY_MS = 1500;
-/** Wait up to this long for a hand-free view, so fingers do not hide words in the still. */
-const HAND_FREE_WAIT_MS = 4000;
 
 function TrackingReadout({ stats, handLost }: { stats: TrackingStats; handLost: boolean }) {
   if (stats.status === "off") return null;
@@ -54,8 +51,15 @@ function ScanReadout({ scan }: { scan: ScanState }) {
           {scan.lines} lines · OCR {scan.ocrMs} ms
         </span>
       );
+    case "live":
+      return (
+        <span>
+          Live text: {scan.lines} lines · {scan.ocrMs} ms/read
+          {scan.unwarped && " · flattened"}
+        </span>
+      );
     case "empty":
-      return <span data-alert="true">No text found · scan again</span>;
+      return <span data-alert="true">No text in view · aim at the page</span>;
     case "error":
       return <span data-alert="true">{scan.message}</span>;
   }
@@ -77,28 +81,13 @@ export function ReaderScreen() {
   const tracking = useHandTracking(videoRef, live);
   const { line, phrase } = r.reader.position;
 
-  // SIM-CAM-02: take a page still automatically once the camera is running, preferably while
-  // no hand is in view. TODO(alex): also on page change (SIM-VIS-05, P1).
-  const handsInView = useRef(0);
+  // The page is read continuously from the live view (no Scan button); lines under the hand
+  // keep their last reading, so the scanner needs to know where the hands are.
+  const handsRef = useRef<readonly OverlayHand[]>([]);
   useEffect(() => {
-    handsInView.current = tracking.hands.length;
+    handsRef.current = tracking.hands;
   }, [tracking.hands]);
-  const { stream, capture } = cam;
-  useEffect(() => {
-    if (!stream) return;
-    const started = Date.now();
-    let timer: ReturnType<typeof setTimeout>;
-    const attempt = () => {
-      const waited = Date.now() - started;
-      if (handsInView.current > 0 && waited < FIRST_SCAN_DELAY_MS + HAND_FREE_WAIT_MS) {
-        timer = setTimeout(attempt, 250);
-        return;
-      }
-      void capture();
-    };
-    timer = setTimeout(attempt, FIRST_SCAN_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [stream, capture]);
+  useLiveScan(videoRef, live, handsRef);
 
   const notice = cam.captureError ? { text: cam.captureError, tone: "warn" as const } : r.notice;
   const phoneCaption = r.offline ? currentPhrase(r.page, r.reader.position)?.text : undefined;
@@ -193,9 +182,6 @@ export function ReaderScreen() {
         )}
         {live ? (
           <>
-            <button type="button" onClick={() => void cam.capture()}>
-              Scan page
-            </button>
             <button type="button" onClick={cam.stop}>
               Camera off
             </button>

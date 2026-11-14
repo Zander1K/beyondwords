@@ -17,7 +17,10 @@ const UNWARP_BELOW_CONFIDENCE = 0.85;
 
 export interface WorkerRequest {
   id: number;
-  image: ArrayBuffer;
+  /** A live video frame (continuous scanning) or encoded image bytes (an uploaded photo). */
+  image: ImageBitmap | ArrayBuffer;
+  /** Allow the slow flattening pass if the quick read is unsure. */
+  allowUnwarp: boolean;
 }
 
 export interface WorkerItem {
@@ -33,6 +36,8 @@ export type WorkerResponse =
       lines: WorkerItem[][];
       confidence: number;
       unwarped: boolean;
+      /** The flattening pass ran (whether or not its read was kept). */
+      unwarpTried: boolean;
       ms: number;
     }
   | { id: number; ok: false; error: string };
@@ -57,33 +62,46 @@ function service(kind: "fast" | "unwarp"): Promise<PaddleOcrService> {
   return (unwarp ??= make(true));
 }
 
+/** The library reads canvases directly; a frame is drawn once and reused for both passes. */
+function toInput(image: ImageBitmap | ArrayBuffer): () => OffscreenCanvas | ArrayBuffer {
+  if (image instanceof ArrayBuffer) {
+    // Encoded bytes may be consumed by a pass; give each pass its own copy.
+    return () => image.slice(0);
+  }
+  const canvas = new OffscreenCanvas(image.width, image.height);
+  canvas.getContext("2d")?.drawImage(image, 0, 0);
+  image.close();
+  return () => canvas;
+}
+
 async function recognize(
-  image: ArrayBuffer,
-): Promise<{ result: PaddleOcrResult; unwarped: boolean }> {
-  // The library may transfer or consume the buffer; keep a copy for the second pass.
-  const copy = image.slice(0);
+  image: ImageBitmap | ArrayBuffer,
+  allowUnwarp: boolean,
+): Promise<{ result: PaddleOcrResult; unwarped: boolean; unwarpTried: boolean }> {
+  const input = toInput(image);
   const first = (await (
     await service("fast")
-  ).recognize(image, { noCache: true })) as PaddleOcrResult;
-  if (first.lines.length > 0 && first.confidence >= UNWARP_BELOW_CONFIDENCE) {
-    return { result: first, unwarped: false };
-  }
+  ).recognize(input(), {
+    noCache: true,
+  })) as PaddleOcrResult;
+  const sure = first.lines.length > 0 && first.confidence >= UNWARP_BELOW_CONFIDENCE;
+  if (sure || !allowUnwarp) return { result: first, unwarped: false, unwarpTried: false };
   const second = (await (
     await service("unwarp")
-  ).recognize(copy, {
+  ).recognize(input(), {
     noCache: true,
   })) as PaddleOcrResult;
   // Keep whichever read is more confident.
   return second.confidence > first.confidence
-    ? { result: second, unwarped: true }
-    : { result: first, unwarped: false };
+    ? { result: second, unwarped: true, unwarpTried: true }
+    : { result: first, unwarped: false, unwarpTried: true };
 }
 
 self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
-  const { id, image } = event.data;
+  const { id, image, allowUnwarp } = event.data;
   const started = performance.now();
   try {
-    const { result, unwarped } = await recognize(image);
+    const { result, unwarped, unwarpTried } = await recognize(image, allowUnwarp);
     const response: WorkerResponse = {
       id,
       ok: true,
@@ -92,6 +110,7 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       ),
       confidence: result.confidence,
       unwarped,
+      unwarpTried,
       ms: Math.round(performance.now() - started),
     };
     self.postMessage(response);

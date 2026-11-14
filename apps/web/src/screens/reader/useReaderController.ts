@@ -25,6 +25,18 @@ export interface Notice {
   tone: "info" | "warn";
 }
 
+/** What the glasses would show for this reader state, as a comparable key. */
+export function readerViewKey(page: Page, reader: ReaderState): string {
+  const phrase = currentPhrase(page, reader.position);
+  if (!phrase) return "empty";
+  if (reader.view === "card") {
+    const card = reader.card ?? phrase.hardWord?.card;
+    return `card|${card?.word ?? ""}|${card?.short ?? ""}|${reader.cardFocus}`;
+  }
+  const emphasis = pointedWordInPhrase(page, reader.position) ?? phrase.hardWord?.range;
+  return `phrase|${phrase.text}|${emphasis?.join(",") ?? ""}`;
+}
+
 /** Send the whole current reader view to the glasses (each call replaces the display). */
 export function renderReader(glasses: GlassesAdapter, page: Page, reader: ReaderState): void {
   const phrase = currentPhrase(page, reader.position);
@@ -142,13 +154,26 @@ export function useReaderController() {
     [glasses, store],
   );
 
-  // Send the current view whenever it changes or the display comes back (start, resume, wake,
-  // reconnect). The glasses keep no app state, so this is always the whole scene.
+  // Send the current view whenever what the glasses show changes, or the display comes back
+  // (start, resume, wake, reconnect: the glasses keep no app state). Continuous page reads
+  // re-create the page about once a second; unchanged content is not re-sent (SIM-DSP-04: once
+  // per phrase change, never per read).
+  const lastSent = useRef<string | null>(null);
   useEffect(() => {
-    if (session !== "started" || asleep) return;
+    if (session !== "started" || asleep) {
+      lastSent.current = null; // force a full re-send when the display comes back
+      return;
+    }
+    const status = statusFor(scan, handLost);
+    const key = `${readerViewKey(page, reader)}|${status ?? ""}`;
+    if (key === lastSent.current) return;
+    lastSent.current = key;
     renderReader(glasses, page, reader);
-    glasses.showStatus(statusFor(scan, handLost));
+    glasses.showStatus(status);
   }, [glasses, page, reader, session, asleep, scan, handLost]);
+  useEffect(() => {
+    lastSent.current = null; // a new adapter shows nothing yet
+  }, [glasses]);
 
   // ---- gestures ----
 

@@ -44,6 +44,8 @@ export interface OcrResult {
   ms: number;
   /** The page had to be flattened first (tilted or curled). */
   unwarped: boolean;
+  /** The flattening pass ran this time. */
+  unwarpTried: boolean;
 }
 
 export interface OcrEngine {
@@ -165,14 +167,16 @@ export class PaddleOcr implements OcrEngine {
     return this.worker;
   }
 
-  async recognize(image: Blob): Promise<OcrResult> {
-    const [{ width, height }, buffer] = await Promise.all([imageSize(image), image.arrayBuffer()]);
+  private request(image: ImageBitmap | ArrayBuffer, allowUnwarp: boolean): Promise<WorkerResponse> {
     const id = this.nextId++;
-    const response = await new Promise<WorkerResponse>((resolve) => {
+    return new Promise<WorkerResponse>((resolve) => {
       this.pending.set(id, resolve);
-      const request: WorkerRequest = { id, image: buffer };
-      this.getWorker().postMessage(request, [buffer]);
+      const request: WorkerRequest = { id, image, allowUnwarp };
+      this.getWorker().postMessage(request, [image]);
     });
+  }
+
+  private toResult(response: WorkerResponse, width: number, height: number): OcrResult {
     if (!response.ok) throw new Error(`OCR failed: ${response.error}`);
     return {
       lines: toOcrLines(response.lines, width, height),
@@ -180,7 +184,23 @@ export class PaddleOcr implements OcrEngine {
       height,
       ms: response.ms,
       unwarped: response.unwarped,
+      unwarpTried: response.unwarpTried,
     };
+  }
+
+  /** An uploaded photo (or any encoded image). Always allowed to flatten the page. */
+  async recognize(image: Blob): Promise<OcrResult> {
+    const [{ width, height }, buffer] = await Promise.all([imageSize(image), image.arrayBuffer()]);
+    return this.toResult(await this.request(buffer, true), width, height);
+  }
+
+  /**
+   * A live frame (continuous scanning). The bitmap is transferred to the worker (no copy, no
+   * JPEG round trip). `allowUnwarp` gates the slow flattening pass.
+   */
+  async recognizeFrame(frame: ImageBitmap, allowUnwarp: boolean): Promise<OcrResult> {
+    const { width, height } = frame;
+    return this.toResult(await this.request(frame, allowUnwarp), width, height);
   }
 
   dispose(): void {

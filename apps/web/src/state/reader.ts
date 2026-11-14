@@ -6,8 +6,11 @@ import { create } from "zustand";
 import type { GlassesGesture, SessionState } from "@/glasses";
 import { defineWord } from "@/api";
 import {
+  type Box,
   currentPhrase,
   DEMO_PAGE,
+  mapPosition,
+  mergePages,
   initialReaderState,
   moveToLine,
   type Page,
@@ -22,6 +25,8 @@ export type ScanState =
   | { status: "idle" }
   | { status: "scanning"; source: "camera" | "upload" }
   | { status: "ready"; source: "camera" | "upload"; lines: number; ocrMs: number }
+  /** Continuous scanning of the live camera. */
+  | { status: "live"; lines: number; ocrMs: number; scans: number; unwarped: boolean }
   | { status: "empty"; source: "camera" | "upload"; ocrMs: number }
   | { status: "error"; message: string };
 
@@ -44,6 +49,11 @@ export interface ReaderStore {
   setPosition: (position: ReaderPosition) => void;
   setHandLost: (lost: boolean) => void;
   setPage: (page: Page) => void;
+  /**
+   * A continuous-scan read. Merged into the current page (lines under the hand are kept); a
+   * page turn starts over at the top. Returns whether it counted as a new page.
+   */
+  mergeScan: (next: Page, occluded: Box | null) => boolean;
   setSession: (session: SessionState) => void;
   setOffline: (offline: boolean) => void;
   setAsleep: (asleep: boolean) => void;
@@ -74,6 +84,24 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   },
   goToLine: (line) => set((s) => ({ reader: moveToLine(s.page, s.reader, line) })),
   setPage: (page) => set({ page, reader: initialReaderState }),
+  mergeScan: (next, occluded) => {
+    const { page, reader } = get();
+    const merged = mergePages(page, next, occluded, page.id === DEMO_PAGE.id);
+    if (merged.newPage) {
+      set({ page: merged.page, reader: initialReaderState });
+      return true;
+    }
+    const position = mapPosition(page, merged.page, reader.position);
+    const moved = position.line !== reader.position.line;
+    set({
+      page: merged.page,
+      // Keep an open card unless its line disappeared; the next fingertip frame refines this.
+      reader: moved
+        ? { ...reader, position, view: "phrase", cardFocus: 0, card: undefined }
+        : { ...reader, position: { ...position, word: reader.position.word } },
+    });
+    return false;
+  },
   setSession: (session) => set({ session }),
   setOffline: (offline) => set({ offline }),
   setAsleep: (asleep) => set({ asleep }),

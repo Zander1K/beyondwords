@@ -1,16 +1,12 @@
-// Page scan pipeline (SIM-CAM-02, SIM-VIS-02): a camera still or uploaded photo -> OCR line
-// boxes -> page analysis (MOCK) -> the reader's page. The camera view is the only source of
-// what is being read.
+// Single-image scan (SIM-CAM-03 fallback): an uploaded page photo -> OCR -> page analysis
+// (MOCK) -> the reader's page. The live camera is scanned continuously by useLiveScan instead.
 import { useEffect } from "react";
 
 import { analyzePage } from "@/api";
 import { useReaderStore } from "@/state";
-import { PaddleOcr } from "@/vision";
 
+import { ocr } from "./ocrEngine";
 import type { PageImage } from "./useCamera";
-
-// One OCR worker for the app; it loads its model on first use.
-const ocr = new PaddleOcr();
 
 export function usePageScan(image: PageImage | null): void {
   useEffect(() => {

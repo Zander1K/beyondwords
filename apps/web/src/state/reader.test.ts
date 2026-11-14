@@ -132,3 +132,49 @@ describe("pointing at a word", () => {
     adapter.dispose();
   });
 });
+
+describe("continuous scanning in the store", () => {
+  it("keeps the reader on its line across reads and starts over on a page turn", async () => {
+    const { mockAnalyzePage } = await import("@/api/mock");
+    const mk = (texts: string[], top = 0) =>
+      mockAnalyzePage(
+        texts.map((text, i) => ({
+          text,
+          box: { x: 0.2, y: 0.1 + (i + top) * 0.1, w: 0.6, h: 0.05 },
+          baseline: { x0: 0.2, y0: 0.14 + (i + top) * 0.1, x1: 0.8, y1: 0.14 + (i + top) * 0.1 },
+        })),
+      );
+    const lines = ["the old lighthouse stood", "at the edge of cliffs", "and every night its lamp"];
+    const s = useReaderStore.getState;
+    expect(s().mergeScan(await mk(lines), null)).toBe(true); // replaces the demo page
+    s().setPosition({ line: 2, phrase: 0 });
+    const id = s().page.id;
+
+    // Next read misses the first line (hand over it): the reader stays on "and every night".
+    expect(s().mergeScan(await mk(lines.slice(1), 1), { x: 0, y: 0, w: 1, h: 0.18 })).toBe(false);
+    expect(s().page.id).toBe(id);
+    expect(s().page.lines[s().reader.position.line]?.text).toBe("and every night its lamp");
+
+    // Page turned.
+    expect(s().mergeScan(await mk(["chapter two begins here", "with a storm at sea"]), null)).toBe(
+      true,
+    );
+    expect(s().reader.position).toEqual({ line: 0, phrase: 0 });
+  });
+
+  it("does not change the glasses key when a read finds the same text", async () => {
+    const { readerViewKey } = await import("@/screens/reader/useReaderController");
+    const { mockAnalyzePage } = await import("@/api/mock");
+    const read = () =>
+      mockAnalyzePage([
+        {
+          text: "swept slowly across",
+          box: { x: 0.2, y: 0.1, w: 0.4, h: 0.05 },
+          baseline: { x0: 0.2, y0: 0.14, x1: 0.6, y1: 0.14 },
+        },
+      ]);
+    const a = readerViewKey(await read(), initialReaderState);
+    const b = readerViewKey(await read(), initialReaderState);
+    expect(a).toBe(b);
+  });
+});
