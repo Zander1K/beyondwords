@@ -24,6 +24,26 @@ export function HeroVideo() {
   const video = useRef<HTMLVideoElement>(null);
   const [play, setPlay] = useState(wantsVideo);
   const [ready, setReady] = useState(false);
+  const [src, setSrc] = useState<string>();
+
+  // Load the clip whole and play it from memory. The static server does not answer Range requests,
+  // and without them a browser cannot seek, so `loop` (a seek back to 0) would stall on the last frame.
+  useEffect(() => {
+    if (!play) return;
+    const abort = new AbortController();
+    let url: string | undefined;
+    fetch(SRC, { signal: abort.signal })
+      .then((r) => (r.ok ? r.blob() : Promise.reject(new Error(String(r.status)))))
+      .then((blob) => {
+        url = URL.createObjectURL(blob);
+        setSrc(url);
+      })
+      .catch(() => undefined); // the poster stays
+    return () => {
+      abort.abort();
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [play]);
 
   // Follow a change of the reduced-motion setting while the page is open.
   useEffect(() => {
@@ -59,15 +79,15 @@ export function HeroVideo() {
       io.disconnect();
       document.removeEventListener("visibilitychange", update);
     };
-  }, [play]);
+  }, [play, src]);
 
   return (
     <div ref={stage} className={styles.stage} aria-hidden="true" data-ready={ready}>
-      {play && (
+      {play && src && (
         <video
           ref={video}
           className={styles.video}
-          src={SRC}
+          src={src}
           poster={POSTER}
           autoPlay
           muted
