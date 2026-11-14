@@ -53,7 +53,12 @@ the unusual words readers ask about, so before the model sees the question,
 `text_utils.correct_to_page_words` replaces near-matches of page words ("port cullis" ->
 portcullis, "century" -> sentry, "sir coat" -> surcoat); only words printed on the injected
 pages are used. Pass `pointed=` (`PointedWord`: the word, line id and sentence the phone picked) so
-"what does this mean?" is about the word under the finger. For follow-ups the phone sends back `session_id`; `QuestionService` keeps the last 4 turns
+"what does this mean?" is about the word under the finger. Plain word-meaning questions ("what does aloof mean", "whats universally mean", "what does
+this word mean" while pointing, "I don't understand aloof") about a word on the page skip the
+agent and go to `define_word` (`qa.meaning_target`): the meaning in this sentence and book,
+citing the line. Story questions, and a name said on its own, still go to the agent.
+
+For follow-ups the phone sends back `session_id`; `QuestionService` keeps the last 4 turns
 and passes them to the agent as `history`. The
 `heard_as` fix shows on the trace screen.
 
@@ -99,6 +104,7 @@ and sends them back with the question.
 | `LLM_PROVIDER` is `nemotron` (Verda, NVIDIA Build fallback if `NVIDIA_BUILD_API_KEY` is set) or `nvidia_build` (OPEN QUESTION 7) | Gemini is the voice, not a reasoning provider (SOP 8.4) |
 | Line text in the page JSON comes from phone OCR; Nemotron's different readings go in `ocr_disagreements` | the phone highlights OCR boxes; SOP 9 asks to re-capture on disagreement |
 | Citations look like `[p12:L2]` or `[book]`; uncited sentences are removed; one re-ask if nothing survives **or a sentence was removed**, keeping the better-grounded answer; if the re-ask fails, the grounded part of the first answer is kept | SOP 8.2; models sometimes give a correct word meaning without its citation, and the re-ask recovers it (~1 s extra, only then) |
+| Word-meaning questions in `/ask` go to `define_word`, not the agent | live HTTP test: the agent sometimes answered "the pages don't define universally" for a word in *Pride and Prejudice*; a prompt rule (v3) did not clearly fix it over 3 runs, routing does |
 | `OcrLine.quad` (optional line corners) added to the contract | tilt-aware fallback reading order; upright boxes overlap neighbouring lines when the page slants |
 | No backend pointing endpoint: the phone picks the word and sends it | agreed design (CLAUDE.md 7, SOP 6): instant, offline, no round trip. A server-side pointing check with a Nemotron crop was built and dropped on 2026-11-14 |
 | Misheard page words are corrected in code before the model sees the question (prompt `reading_coach.v2`) | prompting the model about mishearings made it comment on them ("the word is sentry, not century") and hurt unrelated answers; fixing the text first gave 9/9 on misheard and normal questions |

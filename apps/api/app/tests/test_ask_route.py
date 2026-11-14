@@ -37,11 +37,47 @@ class NoPictures:
 # --- QuestionService -------------------------------------------------------------------------
 
 
-async def test_answer_is_grounded_and_cites_page_lines() -> None:
-    service = _service(FakeLLM("A portcullis is a heavy castle gate [page:L2]."))
-    reply = await service.ask("what is a portcullis", page_lines=LINES)
-    assert reply.answer == "A portcullis is a heavy castle gate."
+async def test_story_question_is_grounded_and_cites_page_lines() -> None:
+    service = _service(FakeLLM("The portcullis rose as the knight arrived [page:L2]."))
+    reply = await service.ask("what happened to the gate", page_lines=LINES)
+    assert reply.answer == "The portcullis rose as the knight arrived."
     assert reply.cited_lines == ["L2"] and reply.grounded
+
+
+DEFINITION = {"word": "portcullis", "say_as": "port-CULL-iss", "meaning": "A heavy castle gate."}
+
+
+@pytest.mark.parametrize(
+    ("question", "pointed"),
+    [
+        ("what does port cullis mean", None),  # misheard, fixed first
+        ("Whats a portcullis?", None),
+        ("what does this word mean", "portcullis"),
+        ("I don't understand portcullis", None),
+    ],
+)
+async def test_word_meaning_goes_to_define_word(question: str, pointed: str | None) -> None:
+    llm = FakeLLM(DEFINITION)
+    reply = await _service(llm).ask(
+        question, page_lines=LINES, current_line_id="L2", pointed_word=pointed
+    )
+    assert reply.answer == "Portcullis means a heavy castle gate."
+    assert reply.cited_lines == ["L2"] and reply.tool_steps == ["define"]
+    assert '"sentence": "The portcullis rose."' in llm.calls[0]["messages"][1].content
+
+
+def test_story_questions_and_names_are_not_word_questions() -> None:
+    from app.brain.qa import meaning_target
+
+    page = [("L1", "Mr. Darcy was aloof and proud.")]
+    for question in ["why is Darcy aloof", "Darcy", "what is happening", "what does he mean"]:
+        assert meaning_target(question, page) is None, question
+    assert meaning_target("whats aloof mean", page) == ("aloof", "L1", page[0][1])
+
+
+async def test_define_down_is_unavailable() -> None:
+    with pytest.raises(QuestionUnavailableError):
+        await _service(FakeLLM(LLMError("down"))).ask("what does portcullis mean", page_lines=LINES)
 
 
 async def test_follow_up_sends_earlier_turns_in_same_session() -> None:
@@ -63,15 +99,15 @@ async def test_new_or_ended_session_starts_without_history() -> None:
 
 
 async def test_misheard_word_and_pointed_word_reach_the_agent() -> None:
-    llm = FakeLLM("It is a heavy castle gate [page:L2].")
+    llm = FakeLLM("It rose to let the knight in [page:L2].")
     await _service(llm).ask(
-        "what does port cullis mean",
+        "why did the port cullis rise",
         page_lines=LINES,
         current_line_id="L2",
         pointed_word="portcullis",
     )
     messages = llm.calls[0]["messages"]
-    assert messages[-1].content == "what does portcullis mean"
+    assert messages[-1].content == "why did the portcullis rise"
     assert '"word": "portcullis"' in messages[1].content and '"page:L2"' in messages[1].content
 
 
@@ -138,7 +174,7 @@ def _http() -> AsyncClient:
 
 
 async def test_post_ask_answers_from_the_book_and_page(overrides: Any) -> None:
-    llm = FakeLLM("Aloof means cold and distant [page:L4].")
+    llm = FakeLLM({"word": "aloof", "say_as": "uh-LOOF", "meaning": "Cold and distant."})
     overrides(llm)
     async with _http() as client:
         response = await client.post(
@@ -155,8 +191,8 @@ async def test_post_ask_answers_from_the_book_and_page(overrides: Any) -> None:
     body = response.json()
     assert body["answer"] == "Aloof means cold and distant."
     assert body["cited_lines"] == ["L4"] and body["used_brain"] and body["session_id"]
-    context = llm.calls[0]["messages"][1].content
-    assert "Pride and Prejudice" in context and "Mr. Darcy was aloof." in context
+    sent = llm.calls[0]["messages"][1].content
+    assert "Pride and Prejudice" in sent and "Mr. Darcy was aloof." in sent
 
 
 async def test_unknown_book_still_answers(overrides: Any) -> None:
