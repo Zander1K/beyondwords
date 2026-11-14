@@ -80,6 +80,28 @@ Until `POST /page` stores pages, `/ask` builds a one-page in-memory store from t
 phone sends, with no user id: answers can only use the current page, and `add_to_word_bank`
 writes go nowhere. A `BrainStore` on the real tables (plus a user id on `/ask`) fixes both.
 
+## Word bank: struggled words and owned words (`brain/word_bank.py`)
+
+Rules live in the brain; `app/db/repositories/word_bank.py` only loads and saves `word_bank`
+rows (`WordBankStore`).
+
+| Event | Effect |
+|---|---|
+| Rescue: Word Breakdown pinch, or "what does X mean?" in `/ask` | word -> `learning` (new, or back from `owned`), `times_rescued` +1, `solo_reads` = 0 |
+| Page finished, word on it, no help with it on that page, not Listen mode | `solo_reads` +1, at most once a day per word |
+| `solo_reads` reaches 3 (`BRAIN_OWNED_AFTER_SOLO_READS`) | `owned`; `PageReadResult.newly_owned` for a "you now own it" moment |
+| Hard word flagged but never asked about | nothing (we cannot tell whether they read it) |
+
+Uses: `reader_profile(store, user_id, page_lines)` -> `ReaderProfile` for `analyze_page`, with
+the reader's `learning` words on this page (always flagged) and `owned` ones (never flagged), so
+support fades. `summary(entries)` gives learning/owned counts for `GET /progress`; struggles are
+counted, never listed, and nothing is scored.
+
+Wired now: `/ask` records rescues when the request has `user_id`. Still to wire (routes, Mick +
+Alex): `record_rescue` from `POST /words/define`; `record_page_read` when the phone reports a
+finished page (`POST /progress` or `/feedback`: page lines, support level, words asked about,
+lines read aloud); `reader_profile` in `POST /page`; a `word_rescued` reading event.
+
 ## What the brain expects from Alex (phone)
 
 `POST /page` and `POST /document` send the photo plus OCR lines as `OcrLine`:
@@ -104,6 +126,7 @@ and sends them back with the question.
 | `LLM_PROVIDER` is `nemotron` (Verda, NVIDIA Build fallback if `NVIDIA_BUILD_API_KEY` is set) or `nvidia_build` (OPEN QUESTION 7) | Gemini is the voice, not a reasoning provider (SOP 8.4) |
 | Line text in the page JSON comes from phone OCR; Nemotron's different readings go in `ocr_disagreements` | the phone highlights OCR boxes; SOP 9 asks to re-capture on disagreement |
 | Citations look like `[p12:L2]` or `[book]`; uncited sentences are removed; one re-ask if nothing survives **or a sentence was removed**, keeping the better-grounded answer; if the re-ask fails, the grounded part of the first answer is kept | SOP 8.2; models sometimes give a correct word meaning without its citation, and the re-ask recovers it (~1 s extra, only then) |
+| Word bank rules in `brain/word_bank.py`: owned after 3 solo reads on different days; Listen mode and help on the page earn nothing; flagged-but-untapped words are neutral | "owned" should mean the reader decodes it unaided, repeatedly, on separate days; re-reading one page five times is not that |
 | Word-meaning questions in `/ask` go to `define_word`, not the agent | live HTTP test: the agent sometimes answered "the pages don't define universally" for a word in *Pride and Prejudice*; a prompt rule (v3) did not clearly fix it over 3 runs, routing does |
 | `OcrLine.quad` (optional line corners) added to the contract | tilt-aware fallback reading order; upright boxes overlap neighbouring lines when the page slants |
 | No backend pointing endpoint: the phone picks the word and sends it | agreed design (CLAUDE.md 7, SOP 6): instant, offline, no round trip. A server-side pointing check with a Nemotron crop was built and dropped on 2026-11-14 |

@@ -29,6 +29,7 @@ the word bank (no user id yet).
 """
 
 import asyncio
+import logging
 import re
 import time
 import uuid
@@ -41,9 +42,12 @@ from app.brain.llm import LLMClient, LLMError, Message
 from app.brain.text_utils import correct_to_page_words, letters
 from app.brain.tools.define import define_word
 from app.brain.tools.store import Illustrator, InMemoryStore
+from app.brain.word_bank import WordBankStore
 from app.config import get_settings
 from app.schemas.brain import BookContext, CapturedPage, PointedWord, TraceEvent
 from app.schemas.page import Line
+
+logger = logging.getLogger(__name__)
 
 # Page id used in citations for the page the phone sent ("[page:L2]").
 CURRENT_PAGE_ID = "page"
@@ -157,16 +161,23 @@ class QuestionService:
         pointed_word: str | None = None,
         session_id: str | None = None,
         illustrator: Illustrator | None = None,
-        user_id: int = 0,
+        user_id: int | None = None,
+        words: WordBankStore | None = None,
     ) -> QuestionReply:
-        """Raises QuestionUnavailableError when Nemotron cannot answer in time."""
+        """Raises QuestionUnavailableError when Nemotron cannot answer in time.
+
+        With `user_id` and `words`, words the reader asks about go into their word bank
+        (brain/word_bank.py). Without them nothing is recorded.
+        """
+        reader = user_id if user_id is not None else 0
         session_id, session = self._session(session_id)
         lines = [Line(id=line_id, text=text, bbox=_NO_BOX) for line_id, text in page_lines or []]
         page = CapturedPage(page_id=CURRENT_PAGE_ID, lines=lines)
         book_id = book.id if book and book.id is not None else (0 if book else None)
         store = InMemoryStore(
+            words=words if user_id is not None else None,
             books={book_id: book} if book and book_id is not None else {},
-            pages={(user_id, book_id): [page]} if book_id is not None else {},
+            pages={(reader, book_id): [page]} if book_id is not None else {},
         )
         pointed = None
         if current_line_id or pointed_word:
@@ -187,7 +198,10 @@ class QuestionService:
                 )
             except (TimeoutError, LLMError) as exc:
                 raise QuestionUnavailableError("Nemotron could not define the word") from exc
-            await store.add_to_word_bank(user_id, book_id, word, sentence, CURRENT_PAGE_ID)
+            try:
+                await store.add_to_word_bank(reader, book_id, word, sentence, CURRENT_PAGE_ID)
+            except Exception:  # the word bank must never cost the reader their answer
+                logger.warning("Word bank not updated for %r", word, exc_info=True)
             meaning = breakdown.meaning.strip().rstrip(".")
             answer = f"{word[:1].upper()}{word[1:]} means {meaning[:1].lower()}{meaning[1:]}."
             self._remember(session, question, answer)
@@ -208,7 +222,7 @@ class QuestionService:
             result = await asyncio.wait_for(
                 agent.ask(
                     question=question,
-                    user_id=user_id,
+                    user_id=reader,
                     book_id=book_id,
                     store=store,
                     current_page=page if lines else None,

@@ -164,6 +164,11 @@ export interface components {
              * @description Send back the session_id from the previous answer to keep the conversation going (follow-up questions). Omit to start a new conversation.
              */
             session_id?: string | null;
+            /**
+             * User Id
+             * @description The reader (users.id). When set, words they ask the meaning of go into their word bank. Optional until the phone has a sign-in step.
+             */
+            user_id?: number | null;
         };
         /** AskResponse */
         AskResponse: {

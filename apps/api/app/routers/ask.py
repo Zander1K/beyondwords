@@ -2,16 +2,20 @@
 
 Thin layer over app.brain.qa: Nemotron's reading-coach agent answers every question (SOP 5,
 8.2), grounded in the page with a citation for every claim. The phone does speech-to-text and
-text-to-speech. Gemini draws a picture when the agent calls its illustrate tool.
+text-to-speech. Gemini draws a picture when the agent calls its illustrate tool. With a
+`user_id`, words the reader asks about go into their word bank (brain/word_bank.py).
 """
 
 import logging
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.books.library import Library, LibraryError
 from app.brain.qa import QuestionService, QuestionUnavailableError, get_question_service
+from app.db.repositories.word_bank import WordBankRepository
+from app.db.session import get_session
 from app.gemini.context import BookContext as IllustrationBook
 from app.gemini.illustrator import GeminiIllustrator
 from app.gemini.images import IllustrationService, get_illustration_service
@@ -48,6 +52,7 @@ async def ask(
     questions: Questions,
     illustrations: Illustrations,
     library: Annotated[Library, Depends(get_library)],
+    session: Annotated[AsyncSession, Depends(get_session)],
 ) -> AskResponse:
     book = await _book(library, body.book_id)
     illustration_book = (
@@ -64,6 +69,8 @@ async def ask(
             pointed_word=body.pointed_word,
             session_id=body.session_id,
             illustrator=GeminiIllustrator(illustrations, illustration_book),
+            user_id=body.user_id,
+            words=WordBankRepository(session) if body.user_id is not None else None,
         )
     except QuestionUnavailableError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, PAUSED_MESSAGE) from exc

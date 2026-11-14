@@ -39,6 +39,11 @@ class BrainSettings(BaseSettings):
     # Agent: SOP section 8.2 loop limit.
     agent_max_tool_steps: int = 4
 
+    # Word bank (brain/word_bank.py): a learning word becomes owned after this many solo reads,
+    # at most one per day (so on that many different days). Lower both for a live demo.
+    owned_after_solo_reads: int = 3
+    one_solo_read_per_day: bool = True
+
     # Hard words below this model confidence are dropped rather than shown to the reader.
     min_hard_word_confidence: float = 0.6
 

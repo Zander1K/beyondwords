@@ -7,6 +7,7 @@ with the MariaDB repositories and the Gemini image client, and passes them in. U
 
 from typing import Protocol
 
+from app.brain.word_bank import WordBankStore, record_rescue
 from app.schemas.brain import BookContext, CapturedPage
 
 
@@ -34,7 +35,9 @@ class BrainStore(Protocol):
         context_sentence: str | None,
         page_id: str | None,
     ) -> None:
-        """Insert into `word_bank`, or bump `times_rescued` if the word is already there."""
+        """The reader needed help with `word` (a rescue): add it to their word bank, or send it
+        back to learning. Implementations call brain.word_bank.record_rescue, which holds the
+        rules; storage is a WordBankStore."""
         ...
 
 
@@ -45,15 +48,18 @@ class Illustrator(Protocol):
 
 
 class InMemoryStore:
-    """Dev/test stand-in for the MariaDB repositories."""
+    """Dev/test stand-in for the database. Books and pages live in memory; word bank writes go
+    to `words` when given (e.g. the real `word_bank` table), otherwise they are only listed."""
 
     def __init__(
         self,
         books: dict[int, BookContext] | None = None,
         pages: dict[tuple[int, int], list[CapturedPage]] | None = None,
+        words: WordBankStore | None = None,
     ) -> None:
         self.books = books or {}
         self.pages = pages or {}  # (user_id, book_id) -> captured pages
+        self.words = words
         self.word_bank: list[dict] = []
 
     async def get_book_context(self, book_id: int) -> BookContext | None:
@@ -85,6 +91,15 @@ class InMemoryStore:
                 "page_id": page_id,
             }
         )
+        if self.words is not None:
+            await record_rescue(
+                self.words,
+                user_id,
+                word,
+                sentence=context_sentence,
+                book_id=book_id,
+                page_id=page_id,
+            )
 
 
 class NoIllustrator:

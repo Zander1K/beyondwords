@@ -37,6 +37,12 @@ class AskRequest(BaseModel):
     current_line_id: str | None = Field(
         default=None, max_length=32, description="The line the reader's finger is on."
     )
+    user_id: int | None = Field(
+        default=None,
+        ge=1,
+        description="The reader (users.id). When set, words they ask the meaning of go into "
+        "their word bank. Optional until the phone has a sign-in step.",
+    )
     pointed_word: str | None = Field(
         default=None,
         max_length=64,

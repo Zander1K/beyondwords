@@ -96,6 +96,8 @@ Request:
   for follow-ups ("why did he do that?"). Conversations are forgotten after 30 minutes idle.
 - `book_id`: from `POST /books/identify`. Optional; an unknown id is ignored, not an error.
 - `page_lines`: HACK, the current page's lines until the backend stores pages (`POST /page`).
+- `user_id`: optional (`users.id`). When set, words the reader asks the meaning of go into their
+  word bank. Unknown ids are ignored; the answer still comes back.
 - `current_line_id`, `pointed_word`: optional; where the reader's finger is and the word the
   phone picked, so "what does this mean?" is about that word.
 
