@@ -9,6 +9,7 @@ from app.brain.nemotron import NemotronClient
 
 def _client(handler: httpx.MockTransport) -> NemotronClient:
     client = NemotronClient.__new__(NemotronClient)
+    client.name = "nemotron"
     client._model = "nemotron-3.5-super-vl"
     client._client = httpx.AsyncClient(base_url="http://verda.test/v1", transport=handler)
     return client
