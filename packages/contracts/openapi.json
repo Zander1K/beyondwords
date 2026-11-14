@@ -1,1 +1,859 @@
-{}
+{
+  "components": {
+    "schemas": {
+      "AskRequest": {
+        "properties": {
+          "book_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From POST /books/identify, so answers fit the book.",
+            "title": "Book Id"
+          },
+          "current_line_id": {
+            "anyOf": [
+              {
+                "maxLength": 32,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The line the reader's finger is on.",
+            "title": "Current Line Id"
+          },
+          "page_lines": {
+            "description": "HACK: the current page's lines (id + text) until pages are stored server-side by POST /page.",
+            "items": {
+              "$ref": "#/components/schemas/PageLineIn"
+            },
+            "maxItems": 80,
+            "title": "Page Lines",
+            "type": "array"
+          },
+          "question": {
+            "description": "What the reader asked, as text (speech-to-text happens on the phone).",
+            "examples": [
+              "What does portcullis mean here?"
+            ],
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Question",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Send back the session_id from the previous answer to keep the conversation going (follow-up questions). Omit to start a new conversation.",
+            "title": "Session Id"
+          }
+        },
+        "required": [
+          "question"
+        ],
+        "title": "AskRequest",
+        "type": "object"
+      },
+      "AskResponse": {
+        "properties": {
+          "answer": {
+            "description": "Two or three short sentences, written to be spoken aloud.",
+            "title": "Answer",
+            "type": "string"
+          },
+          "cited_lines": {
+            "description": "Line ids the book expert based its answer on.",
+            "items": {
+              "type": "string"
+            },
+            "title": "Cited Lines",
+            "type": "array"
+          },
+          "image_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Set when an illustration was made; GET it to show on the display.",
+            "title": "Image Url"
+          },
+          "session_id": {
+            "title": "Session Id",
+            "type": "string"
+          },
+          "tool_steps": {
+            "description": "Tools called, in order (for the trace screen).",
+            "items": {
+              "type": "string"
+            },
+            "title": "Tool Steps",
+            "type": "array"
+          },
+          "used_brain": {
+            "description": "True if the book expert (Nemotron) was consulted.",
+            "title": "Used Brain",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "session_id",
+          "answer",
+          "cited_lines",
+          "image_url",
+          "used_brain",
+          "tool_steps"
+        ],
+        "title": "AskResponse",
+        "type": "object"
+      },
+      "BookResponse": {
+        "description": "Book metadata only, never book text.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "description_spoiler_free": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Spoiler Free"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "isbn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isbn"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "BCP 47 tag, e.g. 'en'.",
+            "title": "Language"
+          },
+          "metadata_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "'google_books' or 'open_library'.",
+            "title": "Metadata Source"
+          },
+          "publication_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication Year"
+          },
+          "setting_era": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setting Era"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "isbn",
+          "title",
+          "author",
+          "publication_year",
+          "language",
+          "genre",
+          "setting_era",
+          "description_spoiler_free",
+          "metadata_source"
+        ],
+        "title": "BookResponse",
+        "type": "object"
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "title": "Detail",
+            "type": "array"
+          }
+        },
+        "title": "HTTPValidationError",
+        "type": "object"
+      },
+      "HealthResponse": {
+        "properties": {
+          "app": {
+            "title": "App",
+            "type": "string"
+          },
+          "database": {
+            "enum": [
+              "ok",
+              "unavailable"
+            ],
+            "title": "Database",
+            "type": "string"
+          },
+          "status": {
+            "const": "ok",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "app",
+          "database"
+        ],
+        "title": "HealthResponse",
+        "type": "object"
+      },
+      "IdentifyBookRequest": {
+        "properties": {
+          "isbn": {
+            "description": "The value read from the book's barcode (EAN-13 starting 978/979), or a typed ISBN-10 or ISBN-13. Hyphens, spaces and a price add-on after the barcode are accepted.",
+            "examples": [
+              "9780141439518",
+              "0-14-143951-3"
+            ],
+            "maxLength": 32,
+            "minLength": 10,
+            "title": "Isbn",
+            "type": "string"
+          }
+        },
+        "required": [
+          "isbn"
+        ],
+        "title": "IdentifyBookRequest",
+        "type": "object"
+      },
+      "IdentifyBookResponse": {
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "cached": {
+            "description": "True if the book was already in our library (no external lookup made).",
+            "title": "Cached",
+            "type": "boolean"
+          },
+          "description_spoiler_free": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description Spoiler Free"
+          },
+          "genre": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Genre"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "isbn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isbn"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "BCP 47 tag, e.g. 'en'.",
+            "title": "Language"
+          },
+          "metadata_source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "'google_books' or 'open_library'.",
+            "title": "Metadata Source"
+          },
+          "publication_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publication Year"
+          },
+          "setting_era": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Setting Era"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "isbn",
+          "title",
+          "author",
+          "publication_year",
+          "language",
+          "genre",
+          "setting_era",
+          "description_spoiler_free",
+          "metadata_source",
+          "cached"
+        ],
+        "title": "IdentifyBookResponse",
+        "type": "object"
+      },
+      "IllustrateRequest": {
+        "properties": {
+          "book_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "From POST /books/identify. The book's title, author and era help decide what to draw (a 'Penang lawyer' in a Conan Doyle novel is a walking stick).",
+            "title": "Book Id"
+          },
+          "setting_era": {
+            "anyOf": [
+              {
+                "maxLength": 255,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Overrides the book's setting/era, or gives one when there is no book_id.",
+            "examples": [
+              "medieval England"
+            ],
+            "title": "Setting Era"
+          },
+          "text": {
+            "description": "A word, a short phrase, or one sentence (max 30 words, 200 characters).",
+            "examples": [
+              "portcullis",
+              "hansom cab",
+              "The portcullis groaned upward."
+            ],
+            "maxLength": 400,
+            "minLength": 1,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "IllustrateRequest",
+        "type": "object"
+      },
+      "IllustrateResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "word",
+              "phrase",
+              "sentence"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "mime_type": {
+            "title": "Mime Type",
+            "type": "string"
+          },
+          "planned": {
+            "description": "True when the scene planner shaped the picture.",
+            "title": "Planned",
+            "type": "boolean"
+          },
+          "scene": {
+            "description": "What the picture shows: the planner's literal description of the text (metaphors resolved, period details), or the text itself when no planning ran.",
+            "title": "Scene",
+            "type": "string"
+          },
+          "text": {
+            "description": "The text as illustrated, after whitespace clean-up.",
+            "title": "Text",
+            "type": "string"
+          },
+          "url": {
+            "description": "Relative URL that serves the image bytes.",
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text",
+          "kind",
+          "scene",
+          "planned",
+          "mime_type",
+          "url"
+        ],
+        "title": "IllustrateResponse",
+        "type": "object"
+      },
+      "PageLineIn": {
+        "properties": {
+          "id": {
+            "examples": [
+              "L2"
+            ],
+            "maxLength": 32,
+            "title": "Id",
+            "type": "string"
+          },
+          "text": {
+            "examples": [
+              "The portcullis groaned upward."
+            ],
+            "maxLength": 1000,
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "PageLineIn",
+        "type": "object"
+      },
+      "ValidationError": {
+        "properties": {
+          "ctx": {
+            "title": "Context",
+            "type": "object"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "title": "Location",
+            "type": "array"
+          },
+          "msg": {
+            "title": "Message",
+            "type": "string"
+          },
+          "type": {
+            "title": "Error Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError",
+        "type": "object"
+      }
+    }
+  },
+  "info": {
+    "title": "Reading Companion",
+    "version": "0.1.0"
+  },
+  "openapi": "3.1.0",
+  "paths": {
+    "/ask": {
+      "post": {
+        "operationId": "ask_ask_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AskRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AskResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Ask",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
+    "/ask/sessions/{session_id}": {
+      "delete": {
+        "description": "Forget a conversation now (e.g. the reader closes the book).",
+        "operationId": "end_session_ask_sessions__session_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "title": "Session Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "End Session",
+        "tags": [
+          "conversation"
+        ]
+      }
+    },
+    "/books/identify": {
+      "post": {
+        "operationId": "identify_book_books_identify_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IdentifyBookRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IdentifyBookResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Identify Book",
+        "tags": [
+          "books"
+        ]
+      }
+    },
+    "/books/{book_id}": {
+      "get": {
+        "operationId": "get_book_books__book_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "book_id",
+            "required": true,
+            "schema": {
+              "title": "Book Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BookResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Book",
+        "tags": [
+          "books"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "health_health_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Health",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/illustrate": {
+      "post": {
+        "operationId": "illustrate_illustrate_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IllustrateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/IllustrateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "description": "Not one word/phrase/sentence, or better explained than pictured. `detail` is a short reason the app can speak."
+          },
+          "503": {
+            "description": "Illustrations are paused. Reading continues."
+          }
+        },
+        "summary": "Illustrate",
+        "tags": [
+          "illustrations"
+        ]
+      }
+    },
+    "/illustrations/{image_id}": {
+      "get": {
+        "operationId": "get_illustration_illustrations__image_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "image_id",
+            "required": true,
+            "schema": {
+              "title": "Image Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "image/jpeg": {},
+              "image/png": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Illustration",
+        "tags": [
+          "illustrations"
+        ]
+      }
+    }
+  }
+}

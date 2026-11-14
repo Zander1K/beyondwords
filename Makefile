@@ -34,9 +34,10 @@ lint-mobile:
 	pnpm --filter mobile lint
 
 contracts:          ## Regenerate openapi.json and TS types
-	# TODO(Mick Ola): build order step 2. Export FastAPI OpenAPI to packages/contracts/openapi.json
-	# and generate packages/contracts/ts from it. Generator tool not chosen yet (OPEN QUESTION).
-	@echo "make contracts: not implemented yet (build order step 2)" && exit 1
+	# FastAPI -> packages/contracts/openapi.json -> packages/contracts/ts/schema.ts
+	# (openapi-typescript). Commit both files; the app imports from @reading-companion/contracts.
+	cd $(API_DIR) && uv run python -m scripts.export_openapi
+	pnpm --filter @reading-companion/contracts generate
 
 eval:               ## Page-analysis + grounding evaluation
 	cd $(API_DIR) && uv run python ../../eval/run_eval.py
