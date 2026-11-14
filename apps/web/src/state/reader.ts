@@ -14,6 +14,14 @@ import {
   type ReaderStep,
 } from "@/reader";
 
+/** State of the page scan (camera still or upload -> OCR -> page analysis). */
+export type ScanState =
+  | { status: "idle" }
+  | { status: "scanning"; source: "camera" | "upload" }
+  | { status: "ready"; source: "camera" | "upload"; lines: number; ocrMs: number }
+  | { status: "empty"; source: "camera" | "upload"; ocrMs: number }
+  | { status: "error"; message: string };
+
 export interface ReaderStore {
   page: Page;
   reader: ReaderState;
@@ -23,6 +31,7 @@ export interface ReaderStore {
   offline: boolean;
   /** The display is asleep: nothing to send until it wakes. */
   asleep: boolean;
+  scan: ScanState;
   /** Apply a glasses gesture; returns what happened so the caller can give feedback. */
   applyGesture: (gesture: GlassesGesture) => ReaderStep;
   goToLine: (line: number) => void;
@@ -30,6 +39,7 @@ export interface ReaderStore {
   setSession: (session: SessionState) => void;
   setOffline: (offline: boolean) => void;
   setAsleep: (asleep: boolean) => void;
+  setScan: (scan: ScanState) => void;
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
@@ -39,6 +49,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   session: "stopped",
   offline: false,
   asleep: false,
+  scan: { status: "idle" },
   applyGesture: (gesture) => {
     const step = readerStep(get().page, get().reader, gesture);
     if (step.state !== get().reader) set({ reader: step.state });
@@ -49,4 +60,5 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   setSession: (session) => set({ session }),
   setOffline: (offline) => set({ offline }),
   setAsleep: (asleep) => set({ asleep }),
+  setScan: (scan) => set({ scan }),
 }));

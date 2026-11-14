@@ -1,6 +1,13 @@
-// Vision runs in the browser: hand tracking, OCR and nearest-line picking.
-// Placeholders only (build order steps 3-4). Frames come from GlassesAdapter.startCamera(),
-// never from the browser camera directly.
+// Vision runs in the browser on frames from GlassesAdapter.startCamera() (never the browser
+// camera directly): OCR line boxes, hand tracking and nearest-line picking.
 export type { HandTracker, Fingertip } from "./handTracking";
-export type { OcrEngine, OcrLine } from "./ocr";
+export {
+  type Baseline,
+  type Box,
+  normaliseLines,
+  type OcrEngine,
+  type OcrLine,
+  type OcrResult,
+  TesseractOcr,
+} from "./ocr";
 export type { LinePicker } from "./linePicker";

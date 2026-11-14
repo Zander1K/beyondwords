@@ -1,12 +1,18 @@
 // Reader controller: glasses input -> reader store -> what the glasses show and say.
 // Talks to the glasses only through GlassesAdapter; reader state lives in the app store
 // (SIM-SES-07), so the glasses keep no app state and everything is re-sent when they come back.
-// HACK: demo page until page capture -> /pages/analyze exists.
+// The page comes from the camera scan; a demo page is shown until the first scan.
 import { useEffect, useRef, useState } from "react";
 
-import { type GlassesAdapter, type GlassesGesture, type SessionEvent, useGlasses } from "@/glasses";
+import {
+  type GlassesAdapter,
+  type GlassesGesture,
+  type SessionEvent,
+  type StatusKind,
+  useGlasses,
+} from "@/glasses";
 import { CARD_ACTIONS, currentPhrase, type Page, type ReaderState } from "@/reader";
-import { useReaderStore } from "@/state";
+import { type ScanState, useReaderStore } from "@/state";
 
 export interface Notice {
   text: string;
@@ -29,6 +35,13 @@ export function renderReader(glasses: GlassesAdapter, page: Page, reader: Reader
   }
 }
 
+/** The small status icon on the glasses for the current reading state. */
+export function statusFor(scan: ScanState): StatusKind | null {
+  if (scan.status === "scanning") return "thinking";
+  if (scan.status === "empty" || scan.status === "error") return "no-page";
+  return null;
+}
+
 const SESSION_NOTICES: Partial<Record<SessionEvent, Notice>> = {
   interrupted: {
     text: "The glasses display was interrupted (call or notification). Your place is saved.",
@@ -49,6 +62,7 @@ export function useReaderController() {
   const session = useReaderStore((s) => s.session);
   const offline = useReaderStore((s) => s.offline);
   const asleep = useReaderStore((s) => s.asleep);
+  const scan = useReaderStore((s) => s.scan);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const store = useReaderStore.getState;
@@ -120,7 +134,8 @@ export function useReaderController() {
   useEffect(() => {
     if (session !== "started" || asleep) return;
     renderReader(glasses, page, reader);
-  }, [glasses, page, reader, session, asleep]);
+    glasses.showStatus(statusFor(scan));
+  }, [glasses, page, reader, session, asleep, scan]);
 
   // ---- gestures ----
 

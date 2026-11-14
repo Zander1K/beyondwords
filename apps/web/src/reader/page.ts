@@ -21,7 +21,10 @@ export interface Phrase {
 export interface PageLine {
   text: string;
   phrases: Phrase[];
+  /** Where the line is in the camera image (normalised), from OCR. */
   box?: Box;
+  /** The line's baseline (normalised), used to pick the line under the fingertip. */
+  baseline?: { x0: number; y0: number; x1: number; y1: number };
 }
 
 export interface Page {

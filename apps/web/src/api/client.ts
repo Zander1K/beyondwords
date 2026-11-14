@@ -5,6 +5,9 @@
 // HACK: response types are hand-mirrored from apps/api/app/schemas until then.
 // TODO(alex): import types from packages/contracts/ts once `make contracts` generates them.
 import { API_BASE_URL } from "@/config";
+import type { Page } from "@/reader";
+
+import { type AnalyzeLine, mockAnalyzePage } from "./mock";
 
 /** Mirrors apps/api/app/schemas/health.py:HealthResponse. */
 export interface HealthResponse {
@@ -43,4 +46,13 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
 
 export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
   return getJson<HealthResponse>("/health", signal);
+}
+
+/**
+ * Page analysis: OCR lines -> page JSON (reading order, phrases, hard words).
+ * MOCK: TODO(alex, with Matthew) replace with the real POST /pages/analyze (with the still
+ * image) once it exists. The mock never leaves the browser.
+ */
+export async function analyzePage(lines: AnalyzeLine[]): Promise<Page> {
+  return mockAnalyzePage(lines);
 }
