@@ -37,6 +37,9 @@ class Settings(BaseSettings):
     gemini_image_timeout_seconds: float = 12.0
     # In-memory illustration cache size (images, not user data). Lost on restart.
     illustration_cache_size: int = 256
+    # Scene planning before each new picture (app/gemini/scene_planner.py). On timeout the text is
+    # drawn as given.
+    illustration_plan_timeout_seconds: float = 8.0
 
     # Google Books API key for barcode/ISBN lookups. Optional: lookups work without a key at a
     # lower shared quota, and Open Library is the keyless fallback.

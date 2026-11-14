@@ -2,7 +2,10 @@
 
 Owner: Mick Ola. One picture per request, 1:1 at 1K for the 600x600 Ray-Ban Display. The input is
 what a reader points at or asks about: a word, a short phrase, or at most one sentence.
-Results are cached by (text, setting_era, model, prompt version): same text, same picture.
+Before drawing, a scene planner (app/gemini/scene_planner.py) decides whether the text should be
+illustrated at all and turns it into a literal, period-accurate description, so metaphors and
+historical objects come out right. Results (and refusals) are cached by (text, book, era, model,
+prompt version, planner version): same text in the same book, same picture.
 
 OPEN QUESTION: SOP 8.4 says illustrations are for concrete words only, never whole scenes.
 A sentence is closer to a scene; the team must confirm and update the SOP (OPEN_QUESTIONS.md).
@@ -31,6 +34,8 @@ from google.genai import errors as genai_errors
 from google.genai import types
 
 from app.config import get_settings
+from app.gemini.context import BookContext
+from app.gemini.scene_planner import GeminiScenePlanner, PassthroughPlanner, ScenePlanner
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +77,7 @@ class IllustrationErrorReason(StrEnum):
     TIMEOUT = "timeout"
     UPSTREAM = "upstream"  # Gemini returned an error (auth, quota, server)
     NO_IMAGE = "no_image"  # Gemini answered without an image (e.g. safety block)
+    NOT_SUITABLE = "not_suitable"  # the planner decided a picture would not help (or not be kind)
 
 
 class IllustrationError(Exception):
@@ -88,6 +94,8 @@ class Illustration:
     kind: TextKind
     mime_type: str
     data: bytes
+    scene: str = ""  # what was actually drawn (the planner's description, or the text itself)
+    planned: bool = False  # True when the scene planner shaped the picture
 
 
 def _not_allowed(detail: str) -> IllustrationError:
@@ -117,8 +125,13 @@ def classify_text(text: str) -> tuple[str, TextKind]:
     return cleaned, TextKind.SENTENCE
 
 
-def build_prompt(text: str, kind: TextKind, setting_era: str | None) -> str:
-    if kind is TextKind.SENTENCE:
+def build_prompt(
+    text: str, kind: TextKind, setting_era: str | None, scene: str | None = None
+) -> str:
+    """Image prompt. With a planned `scene`, draw that description; otherwise draw the text."""
+    if scene:
+        subject = f"A single, simple illustration showing {scene.rstrip('.')}."
+    elif kind is TextKind.SENTENCE:
         subject = (
             "A single, simple illustration of the moment described in this sentence: "
             f'"{text}" Show only the main thing happening, in one picture.'
@@ -130,8 +143,17 @@ def build_prompt(text: str, kind: TextKind, setting_era: str | None) -> str:
     return template.format(subject=subject, era_clause=era_clause)
 
 
-def illustration_id(text: str, setting_era: str | None, model: str) -> str:
-    key = "|".join([text.lower(), (setting_era or "").lower(), model, PROMPT_VERSION])
+def illustration_id(
+    text: str,
+    setting_era: str | None,
+    model: str,
+    book_title: str | None = None,
+    planner_version: str = "passthrough",
+) -> str:
+    key = "|".join(
+        [text.lower(), (setting_era or "").lower(), (book_title or "").lower(), model,
+         PROMPT_VERSION, planner_version]
+    )  # fmt: skip
     return hashlib.sha256(key.encode("utf-8")).hexdigest()[:24]
 
 
@@ -154,13 +176,16 @@ class IllustrationService:
         model: str,
         timeout_seconds: float,
         cache_size: int,
+        planner: ScenePlanner | None = None,
     ) -> None:
         self._client = client  # a google.genai.Client, or a test double; None = not configured
         self._model = model
+        self._planner = planner or PassthroughPlanner()
         self._timeout = timeout_seconds
         self._cache_size = cache_size
         # HACK: in-process LRU cache; move to Redis or object storage if we run >1 API instance.
         self._cache: OrderedDict[str, Illustration] = OrderedDict()
+        self._refusals: OrderedDict[str, str] = OrderedDict()  # id -> spoken reason
         self._locks: dict[str, asyncio.Lock] = {}
 
     def get(self, image_id: str) -> Illustration | None:
@@ -169,14 +194,25 @@ class IllustrationService:
             self._cache.move_to_end(image_id)
         return found
 
-    async def illustrate(self, text: str, setting_era: str | None = None) -> Illustration:
-        """Return a cached or newly generated picture of a word, phrase or one sentence."""
+    async def illustrate(
+        self, text: str, setting_era: str | None = None, book: BookContext | None = None
+    ) -> Illustration:
+        """Return a cached or newly generated picture of a word, phrase or one sentence.
+
+        Raises NOT_SUITABLE (with a spoken reason) when the planner decides not to draw it.
+        """
         text, kind = classify_text(text)
         setting_era = " ".join(setting_era.split()) if setting_era else None
-        image_id = illustration_id(text, setting_era, self._model)
+        if setting_era is None and book is not None:
+            setting_era = book.setting_era
+        image_id = illustration_id(
+            text, setting_era, self._model, book.title if book else None, self._planner.version
+        )
 
         if (cached := self.get(image_id)) is not None:
             return cached
+        if image_id in self._refusals:
+            raise IllustrationError(IllustrationErrorReason.NOT_SUITABLE, self._refusals[image_id])
         if self._client is None:
             raise IllustrationError(IllustrationErrorReason.NOT_CONFIGURED, "GEMINI_API_KEY unset")
 
@@ -186,8 +222,16 @@ class IllustrationService:
             async with lock:
                 if (cached := self.get(image_id)) is not None:
                     return cached
-                data, mime_type = await self._generate(build_prompt(text, kind, setting_era))
-                illustration = Illustration(image_id, text, kind, mime_type, data)
+                plan = await self._planner.plan(text, kind.value, book)
+                if not plan.illustratable:
+                    reason = plan.reason or "This part is better explained than pictured."
+                    self._refuse(image_id, reason)
+                    raise IllustrationError(IllustrationErrorReason.NOT_SUITABLE, reason)
+                scene = plan.scene if plan.planned else None
+                data, mime_type = await self._generate(build_prompt(text, kind, setting_era, scene))
+                illustration = Illustration(
+                    image_id, text, kind, mime_type, data, scene=plan.scene, planned=plan.planned
+                )
                 self._store(illustration)
                 return illustration
         finally:
@@ -223,6 +267,11 @@ class IllustrationService:
             raise IllustrationError(IllustrationErrorReason.NO_IMAGE)
         return image
 
+    def _refuse(self, image_id: str, reason: str) -> None:
+        self._refusals[image_id] = reason
+        while len(self._refusals) > self._cache_size:
+            self._refusals.popitem(last=False)
+
     def _store(self, illustration: Illustration) -> None:
         self._cache[illustration.id] = illustration
         self._cache.move_to_end(illustration.id)
@@ -235,9 +284,17 @@ def get_illustration_service() -> IllustrationService:
     """FastAPI dependency. Override in tests via app.dependency_overrides."""
     settings = get_settings()
     client = genai.Client(api_key=settings.gemini_api_key) if settings.gemini_api_key else None
+    planner: ScenePlanner = (
+        GeminiScenePlanner(
+            client, settings.gemini_chat_model, settings.illustration_plan_timeout_seconds
+        )
+        if client is not None
+        else PassthroughPlanner()
+    )
     return IllustrationService(
         client=client,
         model=settings.gemini_image_model,
         timeout_seconds=settings.gemini_image_timeout_seconds,
         cache_size=settings.illustration_cache_size,
+        planner=planner,
     )

@@ -118,7 +118,9 @@ class ConversationService:
             tools=[types.Tool(function_declarations=DECLARATIONS)],
             automatic_function_calling=types.AutomaticFunctionCallingConfig(disable=True),
             thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.LOW),
-            max_output_tokens=400,
+            # Thinking tokens count toward this limit, so keep headroom; answer length is set by
+            # the prompt (two or three sentences), not by this cap.
+            max_output_tokens=2048,
         )
         history = [content for turn in session.turns for content in turn]
         turn: list[types.Content] = [

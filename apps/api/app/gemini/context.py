@@ -8,7 +8,12 @@ HACK: the phone sends the current page's lines with each question. Once POST /pa
 and lines (Matthew), look them up server-side from a page id instead.
 """
 
+import logging
 from dataclasses import dataclass, field
+
+from app.books.library import Library, LibraryError
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -60,3 +65,23 @@ def render_context(context: ReadingContext) -> str:
     if context.current_line_id:
         parts.append(f"The reader's finger is on line {context.current_line_id}.")
     return "\n\n".join(parts)
+
+
+async def load_book_context(library: Library, book_id: int | None) -> BookContext | None:
+    """Book details for a request. A missing or unreachable book never blocks the request."""
+    if book_id is None:
+        return None
+    try:
+        book = await library.get(book_id)
+    except LibraryError:
+        logger.warning("Book %s unavailable for context; continuing without it", book_id)
+        return None
+    if book is None:
+        return None
+    return BookContext(
+        title=book.title,
+        author=book.author,
+        publication_year=book.publication_year,
+        genre=book.genre,
+        setting_era=book.setting_era,
+    )

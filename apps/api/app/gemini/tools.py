@@ -16,7 +16,7 @@ from typing import Any, Protocol
 from google.genai import types
 
 from app.gemini.context import ReadingContext
-from app.gemini.images import IllustrationError, IllustrationService
+from app.gemini.images import IllustrationError, IllustrationErrorReason, IllustrationService
 
 logger = logging.getLogger(__name__)
 
@@ -132,11 +132,13 @@ class ToolRunner:
         return {"answer": answer.text, "cited_lines": answer.cited_lines}
 
     async def _illustrate(self, text: str) -> dict[str, Any]:
-        book = self._context.book
         try:
-            result = await self._illustrations.illustrate(text, book.setting_era if book else None)
+            result = await self._illustrations.illustrate(text, book=self._context.book)
         except IllustrationError as exc:
             logger.info("illustrate tool failed: %s", exc.reason)
+            if exc.reason is IllustrationErrorReason.NOT_SUITABLE:
+                return {"error": "No picture for this; explain it in words instead. "
+                        "Do not mention a picture."}  # fmt: skip
             return {"error": "Pictures are unavailable right now. Do not mention a picture."}
         self.outcome.image_url = f"/illustrations/{result.id}"
-        return {"shown": True}
+        return {"shown": True, "picture_shows": result.scene}

@@ -84,10 +84,25 @@ unknown or unreachable `book_id` never fails the question; it is answered withou
   characters are rejected with a 422. A sentence is drawn as the single main moment it describes,
   never a comic strip. OPEN QUESTION: SOP 8.4 allows concrete words only, never whole scenes; the
   sentence input needs team sign-off and an SOP update (`docs/OPEN_QUESTIONS.md`).
-- **Request and response**: `POST /illustrate` with `{"text": "...", "setting_era": "..."}`
-  returns `{"id", "text", "kind": "word" | "phrase" | "sentence", "mime_type", "url"}`;
-  `GET /illustrations/{id}` serves the image bytes. On any Gemini failure the endpoint returns a
-  503 with "Illustrations are paused. Reading continues."
+- **Scene planning first** (`app/gemini/scene_planner.py`, prompt
+  `brain/prompts/illustration_plan_v1.txt`). The real-book test run showed the image model alone
+  draws metaphors literally ("the day's wine" became wine barrels), gets period objects wrong (a
+  four-wheeled hansom cab) and draws sensitive scenes awkwardly. So before each new picture a
+  planner, given the text and the book (title, author, era), decides:
+  - `illustratable`: no for violence, injury, death, cruelty, sexual content or abstract ideas.
+    The endpoint then returns `422` with a short reason the app can speak ("This part is better
+    explained than pictured."); in a conversation Gemini explains in words instead.
+  - `scene`: a literal, period-accurate description (metaphors resolved, the parts that make an
+    object recognisable), which is what the image model draws.
+  If planning fails or is slow (8 s), the text is drawn as given; the image prompt's own safety
+  rules still apply. Refusals are cached like pictures. OPEN QUESTION (Mick + Matthew): this is
+  the brain's job; HACK: it runs on the Gemini text model until Nemotron is connected
+  (`ScenePlanner` interface; hard words can use the page JSON's `illustratable` and `meaning`).
+- **Request and response**: `POST /illustrate` with
+  `{"text": "...", "book_id": 1, "setting_era": "..."}` (both optional; `book_id` gives the
+  planner the title and author) returns `{"id", "text", "kind": "word" | "phrase" | "sentence",
+  "scene", "planned", "mime_type", "url"}`. `GET /illustrations/{id}` serves the image bytes. On
+  any Gemini failure the endpoint returns a 503 with "Illustrations are paused. Reading continues."
 - **Model and size**: `GEMINI_IMAGE_MODEL`, 1K resolution, 1:1 aspect ratio. The Ray-Ban Display
   is 600x600, so speed matters more than resolution.
 - **Style**: clean editorial illustration for readers aged 16 and over (SOP section 2), like the

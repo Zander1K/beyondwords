@@ -10,8 +10,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.books.library import Library, LibraryError
-from app.gemini.context import BookContext, PageLine, ReadingContext
+from app.books.library import Library
+from app.gemini.context import PageLine, ReadingContext, load_book_context
 from app.gemini.conversation import (
     ConversationError,
     ConversationService,
@@ -30,26 +30,6 @@ Conversation = Annotated[ConversationService, Depends(get_conversation_service)]
 PAUSED_MESSAGE = "Explanations are paused. Reading continues."
 
 
-async def _book_context(library: Library, book_id: int | None) -> BookContext | None:
-    """Book details for the answer. A missing or unreachable book never blocks the question."""
-    if book_id is None:
-        return None
-    try:
-        book = await library.get(book_id)
-    except LibraryError:
-        logger.warning("Book %s unavailable for /ask context; answering without it", book_id)
-        return None
-    if book is None:
-        return None
-    return BookContext(
-        title=book.title,
-        author=book.author,
-        publication_year=book.publication_year,
-        genre=book.genre,
-        setting_era=book.setting_era,
-    )
-
-
 @router.post("/ask", response_model=AskResponse)
 async def ask(
     body: AskRequest,
@@ -57,7 +37,7 @@ async def ask(
     library: Annotated[Library, Depends(get_library)],
 ) -> AskResponse:
     context = ReadingContext(
-        book=await _book_context(library, body.book_id),
+        book=await load_book_context(library, body.book_id),
         page_lines=[PageLine(id=line.id, text=line.text) for line in body.page_lines],
         current_line_id=body.current_line_id,
     )
