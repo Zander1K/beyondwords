@@ -1,4 +1,4 @@
-.PHONY: help nemotron-check dev down db api web migrate test test-api test-web lint lint-api lint-web format contracts eval install env
+.PHONY: help nemotron-check dev down db api web web-lan migrate test test-api test-web lint lint-api lint-web format contracts eval install env
 .DEFAULT_GOAL := help
 
 API_DIR := apps/api
@@ -25,6 +25,10 @@ api: env            ## Run the API on the host with auto-reload (no Docker neede
 
 web:                ## Run the web app dev server on http://localhost:5173 (Vite)
 	pnpm --filter web dev
+
+web-lan:            ## Web app over HTTPS on your network, for phones (self-signed cert)
+	@echo "Open https://$$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | cut -d' ' -f1):5173 on your phone (same Wi-Fi) and accept the certificate warning."
+	pnpm --filter web dev:lan
 
 down:               ## Stop the docker compose stack
 	docker compose down

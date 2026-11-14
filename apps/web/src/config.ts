@@ -2,7 +2,12 @@
 // APP_NAME in the root .env at build time (see vite.config.ts).
 export const APP_NAME: string = __APP_NAME__;
 
-/** FastAPI base URL. Only VITE_* vars reach the browser; never put API keys here. */
-export const API_BASE_URL: string = (
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:8000"
-).replace(/\/+$/, "");
+/**
+ * FastAPI base URL. Default "/api": the Vite dev server proxies it to FastAPI, which works on
+ * localhost and from phones on the network. Set VITE_API_BASE_URL only for a different setup.
+ * Only VITE_* vars reach the browser; never put API keys here.
+ */
+export const API_BASE_URL: string = (import.meta.env.VITE_API_BASE_URL || "/api").replace(
+  /\/+$/,
+  "",
+);

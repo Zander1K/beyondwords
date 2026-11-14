@@ -72,12 +72,34 @@ internet connection (HACK: vendor them for an offline demo). Word help definitio
 The app reads the root `.env` (see `.env.example`). Only `VITE_*` variables reach the browser,
 and they are public: never put an API key in one.
 
-- `VITE_API_BASE_URL`: API base URL as seen from the browser (default `http://localhost:8000`).
+- `VITE_API_BASE_URL`: API base URL as seen from the browser. Default `/api`, which the dev
+  server forwards to FastAPI (`API_PROXY_TARGET`, default `http://localhost:8000`).
 - `APP_NAME`: injected at build time as the app's display name.
 
-The API must allow the web app's origin: `CORS_ORIGINS` (default `http://localhost:5173`).
+Through the `/api` proxy the browser sees one origin, so CORS is not involved. If you point
+`VITE_API_BASE_URL` straight at the API, it must allow the web app's origin: `CORS_ORIGINS`
+(default `http://localhost:5173`).
 
-## Testing on a phone (HTTPS tunnel)
+## Testing on a phone (same Wi-Fi)
+
+Phones only allow the camera and mic over HTTPS, so LAN mode serves a self-signed certificate:
+
+```sh
+make api        # FastAPI on this machine (or make dev)
+make web-lan    # prints https://<your-ip>:5173
+```
+
+1. Connect the phone to the **same Wi-Fi** as this computer.
+2. Open the printed `https://<your-ip>:5173` address. The browser warns that the certificate is
+   not trusted (it is self-signed): choose _Advanced_ → _Proceed_ (Chrome) or _Show Details_ →
+   _visit this website_ (Safari). This is needed once per browser.
+3. Start the camera and allow access. The rear camera is used.
+
+API calls go to `/api` on the same address and the dev server forwards them to FastAPI, so the
+phone never needs to reach port 8000. If the page does not load, check the computer's firewall
+allows incoming connections on port 5173.
+
+## Testing from outside your network (HTTPS tunnel)
 
 Browsers only allow the camera and mic in a secure context: `localhost` or HTTPS. A phone on
 your network reaching `http://<laptop-ip>:5173` is **not** secure, so the camera will be blocked.
