@@ -20,14 +20,13 @@ import {
   type ReaderStep,
 } from "@/reader";
 
-/** State of the page scan (camera still or upload -> OCR -> page analysis). */
+/** State of the live page reading (camera frames -> OCR -> page analysis). */
 export type ScanState =
   | { status: "idle" }
-  | { status: "scanning"; source: "camera" | "upload" }
-  | { status: "ready"; source: "camera" | "upload"; lines: number; ocrMs: number }
+  | { status: "scanning" }
   /** Continuous scanning of the live camera. */
   | { status: "live"; lines: number; ocrMs: number; scans: number; unwarped: boolean }
-  | { status: "empty"; source: "camera" | "upload"; ocrMs: number }
+  | { status: "empty"; ocrMs: number }
   | { status: "error"; message: string };
 
 export interface ReaderStore {
@@ -61,7 +60,7 @@ export interface ReaderStore {
 }
 
 export const useReaderStore = create<ReaderStore>((set, get) => ({
-  // HACK: demo page until page capture -> /pages/analyze exists.
+  // HACK: demo page until the camera's first read replaces it.
   page: DEMO_PAGE,
   reader: initialReaderState,
   session: "stopped",

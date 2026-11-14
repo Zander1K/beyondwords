@@ -1,4 +1,4 @@
-// OCR: text lines and words with positions from a page still (SIM-VIS-02).
+// OCR: text lines and words with positions from live camera frames (SIM-VIS-02).
 // PaddleOCR runs in a Web Worker (paddleOcr.worker.ts); this file is the main-thread client and
 // the conversion to our line/word model.
 // OPEN QUESTION: browser OCR vs Nemotron VL OCR; compare in eval/ (SIMULATION_FEATURES.md).
@@ -49,7 +49,8 @@ export interface OcrResult {
 }
 
 export interface OcrEngine {
-  recognize(image: Blob): Promise<OcrResult>;
+  /** Read one live camera frame. */
+  recognizeFrame(frame: ImageBitmap, allowUnwarp: boolean): Promise<OcrResult>;
   dispose(): void;
 }
 
@@ -141,13 +142,6 @@ export function toOcrLines(lines: WorkerItem[][], width: number, height: number)
   return out.sort((a, b) => a.box.y - b.box.y);
 }
 
-async function imageSize(image: Blob): Promise<{ width: number; height: number }> {
-  const bitmap = await createImageBitmap(image);
-  const size = { width: bitmap.width, height: bitmap.height };
-  bitmap.close();
-  return size;
-}
-
 /** PaddleOCR in a Web Worker. The worker and its models load on the first scan. */
 export class PaddleOcr implements OcrEngine {
   private worker: Worker | null = null;
@@ -167,7 +161,7 @@ export class PaddleOcr implements OcrEngine {
     return this.worker;
   }
 
-  private request(image: ImageBitmap | ArrayBuffer, allowUnwarp: boolean): Promise<WorkerResponse> {
+  private request(image: ImageBitmap, allowUnwarp: boolean): Promise<WorkerResponse> {
     const id = this.nextId++;
     return new Promise<WorkerResponse>((resolve) => {
       this.pending.set(id, resolve);
@@ -186,12 +180,6 @@ export class PaddleOcr implements OcrEngine {
       unwarped: response.unwarped,
       unwarpTried: response.unwarpTried,
     };
-  }
-
-  /** An uploaded photo (or any encoded image). Always allowed to flatten the page. */
-  async recognize(image: Blob): Promise<OcrResult> {
-    const [{ width, height }, buffer] = await Promise.all([imageSize(image), image.arrayBuffer()]);
-    return this.toResult(await this.request(buffer, true), width, height);
   }
 
   /**

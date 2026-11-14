@@ -76,9 +76,9 @@ describe("SIM-VIS-04 hand lost", () => {
   it("shows the hand-lost status ahead of other statuses", async () => {
     const { statusFor } = await import("@/screens/reader/useReaderController");
     expect(statusFor({ status: "idle" }, true)).toBe("hand-lost");
-    expect(statusFor({ status: "scanning", source: "camera" }, false)).toBe("thinking");
+    expect(statusFor({ status: "scanning" }, false)).toBe("thinking");
     expect(
-      statusFor({ status: "ready", source: "camera", lines: 3, ocrMs: 200 }, false),
+      statusFor({ status: "live", lines: 3, ocrMs: 200, scans: 1, unwarped: false }, false),
     ).toBeNull();
   });
 

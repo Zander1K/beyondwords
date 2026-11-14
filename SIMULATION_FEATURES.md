@@ -44,12 +44,12 @@ Each requirement has an ID, what the real device does, what the simulation must 
 |---|---|---|
 | SIM-CAM-01 | P0 | **Live stream.** Real: head-mounted first-person camera streamed to the paired phone app. Sim: `getUserMedia` video rendered full-stage with a visible "camera on" indicator. Frames reach vision only through `GlassesAdapter.startCamera()`. |
 | SIM-CAM-02 | P0 | **Still capture.** Grab a high-quality still on demand (and automatically on page change) for `/pages/analyze`. Show a brief capture flash and thumbnail in the camera view. |
-| SIM-CAM-03 | P0 | **Camera permission handling.** Denied or no camera: friendly explanation, retry button, and an "upload a page photo" fallback that feeds the same pipeline. |
+| SIM-CAM-03 | P0 | **Camera permission handling.** Denied or no camera: friendly explanation and a retry button. (Decision 2026-11-14: no "upload a page photo" fallback; the simulation reads only the live camera.) |
 | SIM-CAM-04 | P1 | **Quality and latency knobs.** Configurable added latency (0-500 ms), resolution cap (e.g. 480p / 720p / 1080p) and frame-rate cap (e.g. 10 / 15 / 30 fps). Real glasses stream through a phone and will be worse than a webcam; the default profile should be a "glasses-like" preset, with a "best case" preset for debugging. |
 | SIM-CAM-05 | P1 | **Camera POV guidance.** On-screen setup hint: aim the camera down at the open book from a reading-distance; page must fill most of the frame. A toggle shows a guide rectangle. |
 | SIM-CAM-06 | P2 | **Camera source switch.** Choose between webcams, or open the same app on a phone browser (HTTPS) as the camera while the laptop shows the glasses panel. |
 
-Acceptance: with a book under the camera, the live view shows the page, a still capture produces a page-analysis request, and unplugging or denying the camera shows the fallback instead of a blank screen.
+Acceptance: with a book under the camera, the live view shows the page and its text is read continuously, and unplugging or denying the camera shows an explanation with a retry button instead of a blank screen.
 
 ### 2.2 Finger tracking and line picking (vision, on the camera view)
 

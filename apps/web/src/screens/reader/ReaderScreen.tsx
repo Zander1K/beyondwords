@@ -17,7 +17,6 @@ import { useCamera } from "./useCamera";
 import { useFullscreen } from "./useFullscreen";
 import { type TrackingStats, useHandTracking } from "./useHandTracking";
 import { useLiveScan } from "./useLiveScan";
-import { usePageScan } from "./usePageScan";
 import { useReaderController } from "./useReaderController";
 import { type OverlayHand, VisionOverlay } from "./VisionOverlay";
 
@@ -45,12 +44,6 @@ function ScanReadout({ scan }: { scan: ScanState }) {
       return <span>Page: demo text</span>;
     case "scanning":
       return <span>Reading page…</span>;
-    case "ready":
-      return (
-        <span>
-          {scan.lines} lines · OCR {scan.ocrMs} ms
-        </span>
-      );
     case "live":
       return (
         <span>
@@ -70,13 +63,11 @@ export function ReaderScreen() {
   const cam = useCamera();
   const videoRef = useRef<HTMLVideoElement>(null);
   const viewerRef = useRef<HTMLDivElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
   const fullscreen = useFullscreen(viewerRef);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [skeleton, setSkeleton] = useState(false);
   const scan = useReaderStore((s) => s.scan);
   const handLost = useReaderStore((s) => s.handLost);
-  usePageScan(cam.still);
   const live = cam.stream !== null;
   const tracking = useHandTracking(videoRef, live);
   const { line, phrase } = r.reader.position;
@@ -89,19 +80,12 @@ export function ReaderScreen() {
   }, [tracking.hands]);
   useLiveScan(videoRef, live, handsRef);
 
-  const notice = cam.captureError ? { text: cam.captureError, tone: "warn" as const } : r.notice;
+  const notice = r.notice;
   const phoneCaption = r.offline ? currentPhrase(r.page, r.reader.position)?.text : undefined;
 
   return (
     <div ref={viewerRef} className={styles.viewer} data-fullscreen={fullscreen.mode}>
-      <CameraView
-        camera={cam.camera}
-        still={cam.still}
-        flashAt={cam.flashAt}
-        videoRef={videoRef}
-        onStart={() => void cam.start()}
-        onUpload={() => fileRef.current?.click()}
-      >
+      <CameraView camera={cam.camera} videoRef={videoRef} onStart={() => void cam.start()}>
         <VisionOverlay
           page={r.page}
           position={r.reader.position}
@@ -195,9 +179,6 @@ export function ReaderScreen() {
             Camera on
           </button>
         )}
-        <button type="button" onClick={() => fileRef.current?.click()}>
-          Upload page
-        </button>
         <span className={styles.spacer} />
         <button
           type="button"
@@ -211,22 +192,6 @@ export function ReaderScreen() {
           {fullscreen.mode === "off" ? "Fullscreen" : "Exit fullscreen"}
         </button>
       </div>
-
-      <input
-        ref={fileRef}
-        type="file"
-        accept="image/*"
-        hidden
-        aria-label="Upload a page photo"
-        onChange={(e) => {
-          const file = e.target.files?.[0];
-          if (file) {
-            cam.stop();
-            cam.upload(file);
-          }
-          e.target.value = "";
-        }}
-      />
 
       {controlsOpen && (
         <aside id="reader-controls" className={styles.sheet} aria-label="Controls">
@@ -271,7 +236,7 @@ export function ReaderScreen() {
               Show hand skeleton
             </label>
             <p className={styles.hint}>
-              Frames and photos stay in this browser tab: nothing is saved or uploaded.
+              Camera frames stay in this browser tab: nothing is saved or uploaded.
             </p>
           </section>
 

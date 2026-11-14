@@ -1,5 +1,5 @@
-// The live camera view (SIM-CAM-01..03): what the glasses camera sees, filling the reader view.
-// The media sits in a box with the camera's aspect ratio, centred, so the vision overlays
+// The live camera view (SIM-CAM-01, 03): what the glasses camera sees, filling the reader view.
+// The video sits in a box with the camera's aspect ratio, centred, so the vision overlays
 // (children) line up with the image at any screen size. The stream comes from
 // GlassesAdapter.startCamera(), never from navigator.mediaDevices directly.
 import { type CSSProperties, type ReactNode, type RefObject, useEffect, useState } from "react";
@@ -7,7 +7,7 @@ import { type CSSProperties, type ReactNode, type RefObject, useEffect, useState
 import type { GlassesErrorCode } from "@/glasses";
 
 import styles from "./CameraView.module.css";
-import type { CameraStatus, PageImage } from "./useCamera";
+import type { CameraStatus } from "./useCamera";
 
 const MESSAGES: Record<GlassesErrorCode, string> = {
   "permission-denied":
@@ -24,30 +24,18 @@ const MESSAGES: Record<GlassesErrorCode, string> = {
 
 interface Props {
   camera: CameraStatus;
-  still: PageImage | null;
-  flashAt: number | null;
   videoRef: RefObject<HTMLVideoElement | null>;
-  /** Vision overlays drawn over the image (fingertip, line boxes). */
+  /** Vision overlays drawn over the image (fingertip, line and word boxes). */
   children?: ReactNode;
   onStart: () => void;
-  onUpload: () => void;
 }
 
-/** 4:3 until the camera or photo reports its real size. */
+/** 4:3 until the camera reports its real size. */
 const DEFAULT_RATIO = 4 / 3;
 
-export function CameraView({
-  camera,
-  still,
-  flashAt,
-  videoRef,
-  children,
-  onStart,
-  onUpload,
-}: Props) {
+export function CameraView({ camera, videoRef, children, onStart }: Props) {
   const stream = camera.kind === "on" ? camera.stream : null;
   const live = stream !== null;
-  const showUploaded = !live && still?.source === "upload";
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
 
   useEffect(() => {
@@ -69,12 +57,11 @@ export function CameraView({
 
   return (
     <div className={styles.view}>
-      <div className={styles.media} style={media} hidden={!live && !showUploaded}>
+      <div className={styles.media} style={media} hidden={!live}>
         {/* The video stays mounted so vision can read frames from it. */}
         <video
           ref={videoRef}
           className={styles.fill}
-          hidden={!live}
           autoPlay
           playsInline
           muted
@@ -82,31 +69,17 @@ export function CameraView({
           onResize={onVideoSize}
           aria-label="Glasses camera view"
         />
-        {showUploaded && (
-          <img
-            className={styles.fill}
-            src={still.url}
-            alt="Uploaded page photo"
-            onLoad={(e) => {
-              const img = e.currentTarget;
-              if (img.naturalWidth && img.naturalHeight) {
-                setRatio(img.naturalWidth / img.naturalHeight);
-              }
-            }}
-          />
-        )}
         <div className={styles.overlay}>{children}</div>
-        {flashAt !== null && <span key={flashAt} className={styles.flash} aria-hidden="true" />}
       </div>
 
-      {!live && !showUploaded && (
+      {!live && (
         <div className={styles.placeholder}>
           {camera.kind === "error" ? (
             <p role="alert">{MESSAGES[camera.code]}</p>
           ) : (
             <p>
               The camera is the glasses’ eyes. Aim it down at the open book from reading distance so
-              the page fills most of the frame.
+              the page fills most of the frame; the page is read live as you point.
             </p>
           )}
           <div className={styles.buttons}>
@@ -117,18 +90,8 @@ export function CameraView({
                   ? "Retry camera"
                   : "Start camera"}
             </button>
-            <button type="button" onClick={onUpload}>
-              Upload a page photo{camera.kind === "error" ? " instead" : ""}
-            </button>
           </div>
         </div>
-      )}
-
-      {still && (
-        <figure className={styles.thumb}>
-          <img src={still.url} alt="Last page photo" />
-          <figcaption>{still.source === "upload" ? "Uploaded" : "Last still"}</figcaption>
-        </figure>
       )}
     </div>
   );

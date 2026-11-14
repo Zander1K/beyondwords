@@ -53,7 +53,7 @@ export function useLiveScan(
     void (async () => {
       let scans = 0;
       let lastUnwarpAt = Number.NEGATIVE_INFINITY;
-      store().setScan({ status: "scanning", source: "camera" });
+      store().setScan({ status: "scanning" });
       while (!stopped) {
         const video = videoRef.current;
         if (!video || video.readyState < 2 || !video.videoWidth) {
@@ -69,7 +69,7 @@ export function useLiveScan(
           if (result.unwarpTried) lastUnwarpAt = performance.now();
           scans += 1;
           if (result.lines.length === 0) {
-            store().setScan({ status: "empty", source: "camera", ocrMs: result.ms });
+            store().setScan({ status: "empty", ocrMs: result.ms });
           } else {
             const page = await analyzePage(result.lines);
             if (stopped) break;

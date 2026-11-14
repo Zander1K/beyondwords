@@ -50,7 +50,7 @@ stats, audio-only mode). Open **Reader**:
    so lines your hand covers keep their last reading and a turned page starts over. Boxes are
    drawn over the view; a **mock** page analysis splits lines into phrases and hard words.
    Tilted or curled pages are flattened when the quick read is unsure (at most every 10 s, as it
-   takes ~2 s or more). No camera? **Upload a page photo** instead. Nothing is saved or
+   takes ~2 s or more). Camera frames are never saved or
    uploaded.
 2. **Start reading** (the glasses display session needs your go-ahead).
 3. **Point** just under a word: the exact word above your fingertip is highlighted on the

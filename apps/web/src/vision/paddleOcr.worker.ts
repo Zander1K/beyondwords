@@ -17,8 +17,8 @@ const UNWARP_BELOW_CONFIDENCE = 0.85;
 
 export interface WorkerRequest {
   id: number;
-  /** A live video frame (continuous scanning) or encoded image bytes (an uploaded photo). */
-  image: ImageBitmap | ArrayBuffer;
+  /** A live video frame. */
+  image: ImageBitmap;
   /** Allow the slow flattening pass if the quick read is unsure. */
   allowUnwarp: boolean;
 }
@@ -63,11 +63,7 @@ function service(kind: "fast" | "unwarp"): Promise<PaddleOcrService> {
 }
 
 /** The library reads canvases directly; a frame is drawn once and reused for both passes. */
-function toInput(image: ImageBitmap | ArrayBuffer): () => OffscreenCanvas | ArrayBuffer {
-  if (image instanceof ArrayBuffer) {
-    // Encoded bytes may be consumed by a pass; give each pass its own copy.
-    return () => image.slice(0);
-  }
+function toInput(image: ImageBitmap): () => OffscreenCanvas {
   const canvas = new OffscreenCanvas(image.width, image.height);
   canvas.getContext("2d")?.drawImage(image, 0, 0);
   image.close();
@@ -75,7 +71,7 @@ function toInput(image: ImageBitmap | ArrayBuffer): () => OffscreenCanvas | Arra
 }
 
 async function recognize(
-  image: ImageBitmap | ArrayBuffer,
+  image: ImageBitmap,
   allowUnwarp: boolean,
 ): Promise<{ result: PaddleOcrResult; unwarped: boolean; unwarpTried: boolean }> {
   const input = toInput(image);
