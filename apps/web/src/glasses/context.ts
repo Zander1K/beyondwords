@@ -1,6 +1,6 @@
-import { createContext, useCallback, useContext, useSyncExternalStore } from "react";
+import { createContext, useContext } from "react";
 
-import type { GlassesAdapter, GlassesState } from "./adapter";
+import type { GlassesAdapter } from "./adapter";
 import { WebSimulatorAdapter } from "./web-simulator/WebSimulatorAdapter";
 
 /**
@@ -20,15 +20,4 @@ export const GlassesContext = createContext<GlassesAdapter>(glasses);
 /** The glasses, as the app sees them. Tests can swap in a fake via GlassesContext. */
 export function useGlasses(): GlassesAdapter {
   return useContext(GlassesContext);
-}
-
-/** The glasses' physical state (worn, folded, battery, ...), re-rendering on change. */
-export function useGlassesState(): GlassesState {
-  const adapter = useGlasses();
-  const subscribe = useCallback(
-    (onChange: () => void) => adapter.onStateChange(onChange),
-    [adapter],
-  );
-  const snapshot = () => adapter.state;
-  return useSyncExternalStore(subscribe, snapshot, snapshot);
 }

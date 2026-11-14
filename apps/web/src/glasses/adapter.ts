@@ -1,95 +1,90 @@
-// GlassesAdapter: the only way the app talks to "the glasses".
+// GlassesAdapter: the only way the app talks to "the glasses". Interface from
+// SIMULATION_FEATURES.md section 6 (replaces the TASK.md version).
 //
 // Today the browser stands in for the glasses (WebSimulatorAdapter). Later a MetaDatAdapter
 // talks to real Meta glasses through the Wearables Device Access Toolkit. The rest of the app
-// must only use this interface, never browser camera/audio/speech APIs directly (enforced by
-// ESLint: those APIs are only allowed in src/glasses/web-simulator/).
-//
-// Hardware inputs (Neural Band, temple touchpad, capture button) are translated by the adapter
-// into the app-level intents below, so the app never depends on which device sent them.
+// must only use this interface, never browser camera/audio APIs directly (enforced by ESLint:
+// those APIs are only allowed in src/glasses/web-simulator/).
 
 /**
- * App-level intents from the glasses' hardware inputs.
- * - next / prev: move through phrases
- * - select: open the word card for the current phrase
- * - dismiss: back / close
- * - play-pause: read the current phrase aloud, or stop reading
- * - capture: take a photo of the page
- * - assistant: start listening for a voice command (push-to-talk)
+ * Six abstract input actions from the Neural Band and the frame touchpad.
+ * OPEN QUESTION: the exact action events a third-party app receives are not documented
+ * (SIMULATION_FEATURES.md section 9, question 1). `rotate` is P2 and not built.
  */
-export type Gesture =
-  "next" | "prev" | "select" | "dismiss" | "play-pause" | "capture" | "assistant";
+export type GlassesGesture = "select" | "back" | "left" | "right" | "up" | "down";
 
-export type Cue = "tick" | "ok" | "lost-hand" | "error" | "shutter" | "listening";
+/** Display session lifecycle: stopped -> starting -> started -> stopping -> stopped. */
+export type SessionState = "stopped" | "starting" | "started" | "stopping";
+
+export type SessionEvent =
+  "interrupted" | "resumed" | "slept" | "woke" | "disconnected" | "reconnected";
+
+export type StatusKind =
+  "listening" | "thinking" | "hand-lost" | "offline" | "reconnecting" | "no-page";
+
+export type Cue = "tick" | "ok" | "lost-hand" | "error";
+
+export type WordCardAction = "hear" | "picture";
 
 export interface WordCard {
   word: string;
-  /** Short definition. The display shows one short line, not a paragraph. */
+  /** Short definition, one or two lines. */
   short: string;
+  actions?: WordCardAction[];
+  /**
+   * Which action button is highlighted. Addition to the section 6 interface.
+   * OPEN QUESTION: whether the real display moves focus between buttons itself or the app
+   * re-renders the card with a new focus (assumed here: the app re-renders).
+   */
+  focused?: WordCardAction;
 }
 
 export interface GlassesCapabilities {
-  /** Ray-Ban Display: true. Ray-Ban Meta Gen 2 (audio-only): false. */
+  /** false in Gen 2 / audio-only mode. */
   display: boolean;
-  /** Ray-Ban Display: 600x600. */
-  displaySize?: { w: number; h: number };
+  displaySize?: { w: 600; h: 600 };
   neuralBand: boolean;
-  /** Voice commands can be recognised (see listen()). */
-  voice: boolean;
+  touchpad: boolean;
 }
 
-/** Physical state of the glasses. Changes come from the device, not the app. */
-export interface GlassesState {
-  connected: boolean;
-  /** On the user's face. When false, the app should pause reading. */
-  worn: boolean;
-  /** Arms folded: the camera stops and the display is off. */
-  folded: boolean;
-  /** 0-100. */
-  battery: number;
-  /** Speaker volume 0-1, changed on the device (touchpad swipe / Neural Band twist). */
-  volume: number;
-  /** The camera is in use; the privacy LED on the frame is lit. */
-  cameraActive: boolean;
+export interface GlassesSession {
+  readonly state: SessionState;
+  /** User-initiated. Resolves once the session is `started`. */
+  start(): Promise<void>;
+  /** Resolves once the session is `stopped`. */
+  stop(): Promise<void>;
 }
 
 export interface GlassesAdapter {
-  /** Current capabilities. Can change while running (e.g. the simulator's audio-only toggle). */
   readonly capabilities: GlassesCapabilities;
-  /** Current device state. */
-  readonly state: GlassesState;
+
+  // Session lifecycle
+  readonly session: GlassesSession;
   /** Returns an unsubscribe function. */
-  onStateChange(handler: (state: GlassesState) => void): () => void;
+  onSessionEvent(handler: (e: SessionEvent) => void): () => void;
 
   // Input from the glasses
-  /** Book page frames (point-of-view camera). Stops when the glasses are folded. */
+  /** Live first-person camera. The caller stops the returned stream's tracks when done. */
   startCamera(): Promise<MediaStream>;
-  /** Stop the camera (the privacy LED goes off). */
-  stopCamera(): void;
-  /** A still photo of the page from the running camera (capture button). Not saved anywhere. */
-  capturePhoto(): Promise<Blob>;
+  /** A high-quality still from the running camera, for page analysis. */
+  captureStill(): Promise<Blob>;
   startMic(onAudio: (pcm: Int16Array) => void): Promise<void>;
+  stopMic(): void;
   /** Returns an unsubscribe function. */
-  onGesture(handler: (g: Gesture) => void): () => void;
-  /** Listen for one voice command (push-to-talk). Resolves with the transcript, "" if none. */
-  listen(): Promise<string>;
-  /** Voice commands heard without push-to-talk (e.g. after a wake phrase). Unsubscribe fn. */
-  onUtterance(handler: (text: string) => void): () => void;
+  onGesture(handler: (g: GlassesGesture) => void): () => void;
 
-  // Output to the glasses
+  // Output to the glasses. Each call replaces the whole display scene. Ignored (and logged)
+  // unless the session is `started`.
   /** `emphasis` is a [start, end) character range of `text` to highlight. */
   showPhrase(text: string, opts?: { emphasis?: [number, number] }): void;
   showWordCard(card: WordCard): void;
   /** Only if capabilities.display. */
   showImage(url: string): void;
-  /** Live camera view on the display, to line up the page. Needs a running camera. */
-  showViewfinder(): void;
+  /** Small status icon shown alongside the current item; null hides it. */
+  showStatus(kind: StatusKind | null): void;
   clearDisplay(): void;
-  /** Read-along and answers. Resolves when speech finishes or is stopped. */
   speak(text: string): Promise<void>;
-  /** Stop any speech in progress. */
   stopSpeaking(): void;
-  /** Audio cues, mainly for the no-display Gen 2. */
   playCue(kind: Cue): void;
 
   dispose(): void;
@@ -102,7 +97,7 @@ export type GlassesErrorCode =
   | "insecure-context"
   | "unsupported"
   | "camera-off"
-  | "glasses-unavailable"
+  | "session-inactive"
   | "not-implemented"
   | "unknown";
 
@@ -116,5 +111,5 @@ export class GlassesError extends Error {
   }
 }
 
-/** Ray-Ban Display panel size in pixels (CLAUDE.md section 7). */
+/** Ray-Ban Display panel size in pixels. [VERIFIED] SIMULATION_FEATURES.md section 2.3. */
 export const RAY_BAN_DISPLAY_SIZE = { w: 600, h: 600 } as const;

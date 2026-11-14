@@ -15,27 +15,24 @@ const MESSAGES: Record<GlassesErrorCode, string> = {
     "The camera only works on localhost or over HTTPS. See apps/web/README.md for testing on a phone.",
   unsupported: "This browser cannot use the camera. Try a recent Chrome, Edge, Firefox or Safari.",
   "camera-off": "Start the camera first.",
-  "glasses-unavailable":
-    "The glasses can't use the camera right now. Check they're connected and unfolded (simulator panel).",
+  "session-inactive": "Start the glasses session first.",
   "not-implemented": "The camera is not available on these glasses yet.",
   unknown: "The camera could not start. Try again.",
 };
 
 interface Props {
   camera: CameraStatus;
-  cameraOn: boolean;
-  stoppedByDevice: boolean;
   capture: { url: string; at: number } | null;
   onStart: () => void;
   onStop: () => void;
   onCapture: () => void;
-  onViewfinder: () => void;
 }
 
 export function CameraPanel(props: Props) {
-  const { camera, cameraOn, stoppedByDevice, capture } = props;
+  const { camera, capture } = props;
+  const cameraOn = camera.kind === "on";
   const videoRef = useRef<HTMLVideoElement>(null);
-  const stream = camera.kind === "on" && cameraOn ? camera.stream : null;
+  const stream = camera.kind === "on" ? camera.stream : null;
 
   useEffect(() => {
     const video = videoRef.current;
@@ -59,10 +56,7 @@ export function CameraPanel(props: Props) {
         {cameraOn ? (
           <>
             <button type="button" onClick={props.onCapture}>
-              Capture page <kbd>C</kbd>
-            </button>
-            <button type="button" onClick={props.onViewfinder}>
-              Viewfinder on glasses
+              Capture page
             </button>
             <button type="button" onClick={props.onStop}>
               Stop camera
@@ -78,12 +72,6 @@ export function CameraPanel(props: Props) {
       {camera.kind === "error" && (
         <p className={styles.error} role="alert">
           {MESSAGES[camera.code]}
-        </p>
-      )}
-      {stoppedByDevice && (
-        <p className={styles.error} role="alert">
-          The camera stopped because the glasses were folded or disconnected. Start it again when
-          they're ready.
         </p>
       )}
 

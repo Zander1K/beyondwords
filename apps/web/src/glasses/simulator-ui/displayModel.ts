@@ -10,7 +10,7 @@
 // OPEN QUESTION: real text limits for Ray-Ban Display (font size, lines per screen). Confirm
 // against the Meta DAT display docs / SOP section 9 and tune.
 
-import type { WordCard } from "../adapter";
+import type { WordCard, WordCardAction } from "../adapter";
 
 export const DISPLAY_LIMITS = {
   phraseMaxChars: 60,
@@ -20,10 +20,14 @@ export const DISPLAY_LIMITS = {
 
 export type DisplayContent =
   | { kind: "phrase"; text: string; emphasis?: [number, number] }
-  | { kind: "word"; word: string; short: string }
-  | { kind: "image"; url: string }
-  /** Live camera view, to line up the page. */
-  | { kind: "viewfinder" };
+  | {
+      kind: "word";
+      word: string;
+      short: string;
+      actions: WordCardAction[];
+      focused?: WordCardAction;
+    }
+  | { kind: "image"; url: string };
 
 /** Collapse all whitespace (including newlines) to single spaces: no paragraphs on the display. */
 export function normaliseText(text: string): string {
@@ -71,7 +75,11 @@ export function makeWordCard(card: WordCard): DisplayContent | null {
   const word = truncate(normaliseText(card.word), DISPLAY_LIMITS.wordMaxChars);
   if (!word) return null;
   const short = truncate(normaliseText(card.short), DISPLAY_LIMITS.shortMaxChars);
-  return { kind: "word", word, short };
+  const actions = [...new Set(card.actions ?? [])];
+  const focused = card.focused && actions.includes(card.focused) ? card.focused : actions[0];
+  return focused
+    ? { kind: "word", word, short, actions, focused }
+    : { kind: "word", word, short, actions };
 }
 
 export function makeImage(url: string): DisplayContent | null {

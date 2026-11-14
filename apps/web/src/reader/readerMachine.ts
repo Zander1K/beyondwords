@@ -2,13 +2,22 @@
 // Phrase-level, not word-by-word (CLAUDE.md section 8). No React, no browser APIs.
 // TODO(alex): build order step 3-4: drive this from page JSON and finger tracking instead of
 // demo phrases and gestures; add pacing and fading support.
-import type { Gesture } from "@/glasses";
+import type { GlassesGesture } from "@/glasses";
 
-/** The gestures that move through the text. */
-export type NavGesture = Extract<Gesture, "next" | "prev" | "select" | "dismiss">;
+/** Reader-level navigation. Step 2 replaces this with line/phrase navigation. */
+export type NavGesture = "next" | "prev" | "select" | "dismiss";
 
-export function isNavGesture(g: Gesture): g is NavGesture {
-  return g === "next" || g === "prev" || g === "select" || g === "dismiss";
+const NAV: Record<GlassesGesture, NavGesture> = {
+  right: "next",
+  down: "next",
+  left: "prev",
+  up: "prev",
+  select: "select",
+  back: "dismiss",
+};
+
+export function toNavGesture(g: GlassesGesture): NavGesture {
+  return NAV[g];
 }
 
 export type ReaderView = "phrase" | "word" | "cleared";

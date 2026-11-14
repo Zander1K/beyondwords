@@ -1,21 +1,23 @@
 // MetaDatAdapter: future adapter for real Meta glasses via the Wearables Device Access Toolkit
 // (DAT). Stub only: every method throws "not implemented". No Meta or Expo packages installed.
 //
-// The mapping below is what we know from the DAT SDK 0.6 surface as exposed by the community
-// wrapper we evaluated before the web migration (registration, permissions, device sessions,
-// camera streaming, photo capture, mock devices). Anything that wrapper did NOT expose is marked
-// OPEN QUESTION. Full table: docs/glasses-adapter.md.
+// Mapping sources: Meta's display access overview (components, 600x600, whole-screen updates,
+// session lifecycle, touchpad/Neural Band input), and the DAT 0.6 camera surface as exposed by
+// the community React Native wrapper we evaluated before the web migration (registration,
+// camera permission, device sessions, streaming, photo capture). Full table and open questions:
+// docs/glasses-adapter.md and SIMULATION_FEATURES.md.
 //
-// OPEN QUESTION: DAT is a native (iOS/Android) SDK. How does a web app reach it? Options: a thin
-// native companion app that bridges to this web app (WebView / local WebSocket), or a native
-// shell. Not decided; this adapter assumes some bridge exists.
+// OPEN QUESTION: DAT is a native (iOS/Android) SDK. How does a web app reach it (companion app
+// bridge or native shell)? This adapter assumes some bridge exists.
 import {
   type Cue,
-  type Gesture,
   type GlassesAdapter,
   type GlassesCapabilities,
   GlassesError,
-  type GlassesState,
+  type GlassesGesture,
+  type GlassesSession,
+  type SessionEvent,
+  type StatusKind,
   type WordCard,
 } from "../adapter";
 
@@ -24,99 +26,90 @@ function notImplemented(method: string): never {
 }
 
 export class MetaDatAdapter implements GlassesAdapter {
-  // DAT: Device.deviceType ("metaRayBanDisplay" -> display true, 600x600; "rayBanMeta" Gen 2 ->
-  // display false). Before connecting we assume the safe audio-only case.
-  // OPEN QUESTION: does DAT report display size, or do we hard-code it per device type?
-  // OPEN QUESTION: does DAT expose Neural Band at all? Assume no until confirmed.
-  // OPEN QUESTION: voice input on real glasses goes mic -> Gemini Live; no on-device commands.
-  readonly capabilities: GlassesCapabilities = { display: false, neuralBand: false, voice: false };
+  // DAT: device type (Ray-Ban Display has the 600x600 display; Ray-Ban Meta Gen 2 has none).
+  // Before connecting we assume the safe audio-only case.
+  // OPEN QUESTION: which input actions third-party apps receive from band and touchpad.
+  readonly capabilities: GlassesCapabilities = {
+    display: false,
+    neuralBand: false,
+    touchpad: false,
+  };
 
-  // DAT: device list + link state (connected / disconnected / connecting) and mock-device
-  // power, don/doff (worn) and fold/unfold events; stream errors include "hingesClosed".
-  // OPEN QUESTION: does DAT report battery and volume to apps? Assume not until confirmed.
-  get state(): GlassesState {
-    return notImplemented("state");
+  // DAT display session: stopped -> starting -> started -> stopping. The user must start it;
+  // the app gets exclusive display control while it runs. [VERIFIED in Meta's display docs]
+  readonly session: GlassesSession = {
+    get state() {
+      return notImplemented("session.state");
+    },
+    start: () => notImplemented("session.start"),
+    stop: () => notImplemented("session.stop"),
+  };
+
+  // DAT: session state changes from the system (interrupted by calls/notifications, display
+  // sleep/wake, device link state for disconnect/reconnect).
+  onSessionEvent(_handler: (e: SessionEvent) => void): () => void {
+    return notImplemented("onSessionEvent");
   }
 
-  // DAT: onLinkStateChange / onDevicesChange events, plus don/doff and fold where exposed.
-  onStateChange(_handler: (state: GlassesState) => void): () => void {
-    return notImplemented("onStateChange");
-  }
-
-  // DAT: createSession(deviceId) -> startSession -> addStreamToSession({ resolution, frameRate }),
-  // after startRegistration() (via the Meta AI app) and requestPermission("camera").
-  // OPEN QUESTION: DAT renders frames into a native view and reports frame metadata; it does not
-  // hand JS a MediaStream. We need a bridge that turns frames into a MediaStream (or change this
-  // method to return frames). Photo capture (capturePhoto) is a fallback for page snapshots.
-  // OPEN QUESTION: GlassesAdapter has no connect/register step; DAT needs one.
+  // DAT: startRegistration() (via the Meta AI app), requestPermission("camera"), then
+  // createSession -> startSession -> addStreamToSession({ resolution, frameRate }).
+  // OPEN QUESTION: DAT renders frames natively and reports frame metadata; it does not hand JS a
+  // MediaStream. The bridge has to produce one (or this method changes).
   startCamera(): Promise<MediaStream> {
     return notImplemented("startCamera");
   }
 
-  // DAT: stopSession(sessionId) (or removeStreamFromSession). The glasses' privacy LED is
-  // driven by the device itself.
-  stopCamera(): void {
-    notImplemented("stopCamera");
-  }
-
   // DAT: capturePhoto("jpeg") on a streaming session; the photo arrives via onPhotoCaptured as
-  // a file path (and optionally base64). The bridge would turn it into a Blob.
-  capturePhoto(): Promise<Blob> {
-    return notImplemented("capturePhoto");
+  // a file path (optionally base64). The bridge would turn it into a Blob.
+  captureStill(): Promise<Blob> {
+    return notImplemented("captureStill");
   }
 
-  // DAT: not part of the camera/session API we saw. The glasses mic normally reaches the phone
-  // as a Bluetooth audio input (OS level), not through DAT.
-  // OPEN QUESTION: confirm the mic route and whether the bridge can forward PCM to the web app.
+  // DAT: not part of the camera/session API. The glasses mic normally reaches the phone as a
+  // Bluetooth audio input (OS level). OPEN QUESTION: route and format through the bridge.
   startMic(_onAudio: (pcm: Int16Array) => void): Promise<void> {
     return notImplemented("startMic");
   }
 
-  // DAT: Neural Band / touchpad gestures were not exposed by the wrapper we evaluated.
-  // OPEN QUESTION: is there a DAT API for Neural Band events? If not, fall back to phone taps.
-  onGesture(_handler: (g: Gesture) => void): () => void {
+  // DAT: stop the Bluetooth audio capture started above.
+  stopMic(): void {
+    notImplemented("stopMic");
+  }
+
+  // DAT: input actions converted by the system from the touchpad and Neural Band and delivered
+  // to the app [VERIFIED]. OPEN QUESTION: the exact event names (select/back/directional?).
+  onGesture(_handler: (g: GlassesGesture) => void): () => void {
     return notImplemented("onGesture");
   }
 
-  // DAT: none. Push-to-talk would stream startMic() audio to Gemini Live and return its
-  // transcript. OPEN QUESTION: can a DAT app use the touchpad hold / a wake word at all?
-  listen(): Promise<string> {
-    return notImplemented("listen");
-  }
-
-  // DAT: none ("Hey Meta" wakes Meta AI, not our app). OPEN QUESTION, as above.
-  onUtterance(_handler: (text: string) => void): () => void {
-    return notImplemented("onUtterance");
-  }
-
-  // DAT: display output. OPEN QUESTION: the wrapper exposed no display API and lists Ray-Ban
-  // Display as untested. Needs the official DAT display docs or a custom native module.
+  // DAT display: a Text component (body preset) in a FlexBox; the emphasised span as a
+  // separate Text with a stronger preset. Each update replaces the whole screen.
   showPhrase(_text: string, _opts?: { emphasis?: [number, number] }): void {
     notImplemented("showPhrase");
   }
 
-  // DAT: display output (as showPhrase). OPEN QUESTION, same as above.
+  // DAT display: FlexBox with Text (heading = word, body = definition) and Buttons for
+  // "Hear it" / "Picture it". OPEN QUESTION: how button focus/selection works.
   showWordCard(_card: WordCard): void {
     notImplemented("showWordCard");
   }
 
-  // DAT: display output (as showPhrase). Only when capabilities.display. OPEN QUESTION.
+  // DAT display: Image component from a URL (size, corner radius).
   showImage(_url: string): void {
     notImplemented("showImage");
   }
 
-  // DAT: display output (as showPhrase). OPEN QUESTION: can apps show a live camera view?
-  showViewfinder(): void {
-    notImplemented("showViewfinder");
+  // DAT display: system Icon + Text (meta preset), re-sent with the current item.
+  showStatus(_kind: StatusKind | null): void {
+    notImplemented("showStatus");
   }
 
-  // DAT: display output (as showPhrase). OPEN QUESTION.
+  // DAT display: an empty scene (black is see-through). [ASSUMPTION]
   clearDisplay(): void {
     notImplemented("clearDisplay");
   }
 
-  // DAT: none. Speech is phone-side TTS played through the glasses speakers as a Bluetooth
-  // audio output (OS level). OPEN QUESTION: confirm routing through the bridge.
+  // DAT: none. Phone-side TTS played through the glasses speakers over Bluetooth audio.
   speak(_text: string): Promise<void> {
     return notImplemented("speak");
   }
@@ -126,12 +119,12 @@ export class MetaDatAdapter implements GlassesAdapter {
     notImplemented("stopSpeaking");
   }
 
-  // DAT: none. Same audio route as speak(). Primary feedback channel on Gen 2 (no display).
+  // DAT: none. Same audio route as speak(). Main feedback channel on Gen 2 (no display).
   playCue(_kind: Cue): void {
     notImplemented("playCue");
   }
 
-  // DAT: stopSession(sessionId) for each open session; remove event listeners.
+  // DAT: stop the display session and any camera stream sessions; remove listeners.
   dispose(): void {
     notImplemented("dispose");
   }

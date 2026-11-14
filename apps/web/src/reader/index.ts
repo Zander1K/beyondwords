@@ -2,7 +2,7 @@
 export { DEMO_PHRASES, type DemoPhrase } from "./demoPhrases";
 export {
   initialReaderState,
-  isNavGesture,
+  toNavGesture,
   type NavGesture,
   readerStep,
   type ReaderState,

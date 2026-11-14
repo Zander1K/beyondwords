@@ -49,28 +49,13 @@ Rewrite or drop anything that imports `react-native`, `expo-*`, `expo-router`, n
 ### 4.3 Build the glasses layer in `apps/web/src/glasses/`
 - `adapter.ts`: the `GlassesAdapter` interface:
 
-```ts
-interface GlassesAdapter {
-  capabilities: { display: boolean; displaySize?: { w: number; h: number }; neuralBand: boolean };
+> **Superseded:** the interface below this task originally specified has been replaced by the one in
+> `SIMULATION_FEATURES.md` section 6 (six gestures `select/back/left/right/up/down`, an adapter-owned
+> display session `stopped/starting/started/stopping` with session events, `captureStill`, `stopMic`,
+> `showStatus`, `stopSpeaking`). Where the two differ, `SIMULATION_FEATURES.md` wins.
 
-  // Input from the glasses
-  startCamera(): Promise<MediaStream>;                               // book page frames
-  startMic(onAudio: (pcm: Int16Array) => void): Promise<void>;
-  onGesture(handler: (g: "next" | "prev" | "select" | "dismiss") => void): () => void;
 
-  // Output to the glasses
-  showPhrase(text: string, opts?: { emphasis?: [number, number] }): void;
-  showWordCard(card: { word: string; short: string }): void;
-  showImage(url: string): void;                 // only if capabilities.display
-  clearDisplay(): void;
-  speak(text: string): Promise<void>;           // read-along / answers
-  playCue(kind: "tick" | "ok" | "lost-hand" | "error"): void;   // for the no-display Gen 2
-
-  dispose(): void;
-}
-```
-
-- `web-simulator/WebSimulatorAdapter`: camera and mic via `getUserMedia`, speaker via Web Audio / `speechSynthesis`, gestures from keys (`ArrowRight`, `ArrowLeft`, `Enter`, `Escape`) plus on-screen buttons, display output rendered into the simulator panel.
+- `web-simulator/WebSimulatorAdapter`: camera and mic via `getUserMedia`, speaker via Web Audio / `speechSynthesis`, gestures from keys (`Enter` select, `Escape` back, arrow keys left/right/up/down) plus an on-screen six-action pad, display output rendered into the simulator panel.
 - `simulator-ui/`: the 600x600 display panel with a ~20 degree FOV frame and right-lens offset. It must enforce the real display constraints itself: **one** short phrase, word card or image at a time, no scrolling paragraphs. Include a toggle for **audio-only mode** (sets `display: false`).
 - `meta-dat/MetaDatAdapter`: a stub that throws "not implemented". In comments, list which Meta DAT capability each method would map to. Also write this mapping in `docs/glasses-adapter.md`. Do not install any Meta or Expo packages.
 - **Rule:** `navigator.mediaDevices` and browser audio APIs may only be used inside `src/glasses/web-simulator/`. Everything else goes through the adapter.

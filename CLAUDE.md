@@ -19,12 +19,12 @@ The frontend is a **web app** (`apps/web`), not a mobile app. (It replaced an ea
 | Glasses camera (aimed at the page) | Browser camera |
 | Glasses mic and speakers | Browser mic and speaker |
 | Ray-Ban Display (600x600, ~20 degree FOV, right lens only) | Display simulator panel |
-| Neural Band gestures, temple touchpad, capture button | Keys and on-screen buttons (mapping in `docs/glasses-adapter.md`) |
-| Privacy LED, worn / folded / connected / battery | Simulated device state |
-| Voice | Browser speech recognition (push-to-talk) with a typed fallback |
+| Neural Band and touchpad input | Six abstract actions `select`, `back`, `left`, `right`, `up`, `down`: keys (`Enter`, `Escape`, arrows) and an on-screen gesture pad |
+| Display session (stopped / starting / started / stopping; interrupt, sleep/wake, disconnect) | Adapter-owned session with simulator controls |
+| Voice | Push-to-talk mic streamed to `/live` |
 | Ray-Ban Meta Gen 2 (no display) | Audio-only mode |
 
-Only glasses features relevant to reading are simulated; add others when a use case needs them.
+Only glasses features relevant to reading are simulated. The full feature list, the session lifecycle and the `GlassesAdapter` interface are defined in `SIMULATION_FEATURES.md`; where it differs from this file or `TASK.md`, it wins.
 
 All glasses I/O goes through one interface, `GlassesAdapter`, so a real `MetaDatAdapter` can replace the simulator later without rewriting the app. See `docs/glasses-adapter.md`.
 
