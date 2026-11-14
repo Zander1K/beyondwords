@@ -3,8 +3,8 @@
   "private": true,
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "mobile": "pnpm --filter mobile start",
-    "lint": "pnpm --filter mobile lint",
-    "test": "pnpm --filter mobile test"
+    "web": "pnpm --filter web dev",
+    "lint": "pnpm --filter web lint",
+    "test": "pnpm --filter web test"
   }
 }

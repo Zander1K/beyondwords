@@ -11,7 +11,7 @@ settings = get_settings()
 middleware.configure_logging(settings.log_level)
 
 app = FastAPI(title=settings.app_name, version="0.1.0")
-middleware.install(app)
+middleware.install(app, cors_origins=settings.cors_origin_list)
 app.include_router(health.router)
 
 # TODO(Matthew/Mick Ola): include books, pages, words, progress and live routers once

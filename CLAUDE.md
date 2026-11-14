@@ -11,9 +11,22 @@ Core idea: the problem is **decoding, not comprehension**. The app reads *with* 
 
 Built for the Junction 2026 hackathon (Meta "AI Glasses for Everyone, Everyday" challenge, plus NVIDIA Nemotron and Google Gemini tracks). Prioritise a working, demoable vertical slice over completeness.
 
+### Decision: web app proof of concept that mirrors the glasses
+The frontend is a **web app** (`apps/web`), not a mobile app. (It replaced an earlier React Native / Expo app in `apps/mobile`; git history keeps it.) The browser stands in for the glasses:
+
+| Glasses | Web simulator |
+|---|---|
+| Glasses camera (aimed at the page) | Browser camera |
+| Glasses mic and speakers | Browser mic and speaker |
+| Ray-Ban Display (600x600, ~20 degree FOV, right lens only) | Display simulator panel |
+| Neural Band gestures | Keys (`ArrowRight`, `ArrowLeft`, `Enter`, `Escape`) and on-screen buttons |
+| Ray-Ban Meta Gen 2 (no display) | Audio-only mode |
+
+All glasses I/O goes through one interface, `GlassesAdapter`, so a real `MetaDatAdapter` can replace the simulator later without rewriting the app. See `docs/glasses-adapter.md`.
+
 ### Core user loop
 1. User opens a book and points the glasses camera at a page.
-2. Phone captures the frame, runs OCR + hand tracking, backend analyses the page.
+2. The app captures the frame (browser today, real glasses via `MetaDatAdapter` later), runs OCR + hand tracking, backend analyses the page.
 3. User runs a finger under a line; the current phrase is highlighted on the glasses display and read aloud (read-along).
 4. User asks questions by voice ("what does *aloof* mean here?", "why did he do that?"); Gemini Live answers, grounded by the backend brain.
 5. Progress and a personal word bank are saved to MariaDB.
@@ -23,7 +36,7 @@ Built for the Junction 2026 hackathon (Meta "AI Glasses for Everyone, Everyday" 
 | Person | Owns | Primary directories |
 |---|---|---|
 | Matthew | Brain of the app (NVIDIA Nemotron) | `apps/api/app/brain/` |
-| Alex | Frontend, Meta Wearables Device Access Toolkit (DAT) | `apps/mobile/` |
+| Alex | Frontend (web app, glasses adapter), Meta Wearables Device Access Toolkit (DAT) | `apps/web/` |
 | Mick Ola | Architecture, MariaDB, Gemini integration | `apps/api/app/db/`, `apps/api/app/gemini/`, `infra/`, `db/` |
 
 Cross-boundary changes (API contracts, schema, shared types) need a note in the PR description tagging the other owner. Do not silently change a contract.
@@ -33,7 +46,8 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 | Layer | Choice |
 |---|---|
 | Glasses | Meta Ray-Ban Display (full) and Ray-Ban Meta Gen 2 (audio-first) via Meta Wearables DAT 1.0 |
-| Mobile app | React Native + Expo (TypeScript). Community wrappers for DAT (e.g. `expo-meta-wearables-dat`); a native module is likely needed for display / Neural Band |
+| Web app | React + Vite (TypeScript, strict), React Router, Zustand, CSS modules, Vitest. The browser simulates the glasses via `WebSimulatorAdapter`; real DAT moves to a later `MetaDatAdapter` |
+| Hand tracking / OCR | In the browser: MediaPipe HandLandmarker (`@mediapipe/tasks-vision`), Tesseract.js in a worker (planned) |
 | API / middleware | FastAPI (Python 3.11+), async, Pydantic v2 |
 | Database | MariaDB (SQLAlchemy 2.x async + Alembic migrations) |
 | Brain | NVIDIA Nemotron 3.5 Super VL, served with vLLM on **Verda**. NVIDIA Build is the fallback (free tier ~40 req/min/key) |
@@ -57,21 +71,24 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 ├── packages/
 │   └── contracts/                # SHARED source of truth for API types
 │       ├── openapi.json          # generated from FastAPI, committed
-│       └── ts/                   # generated TypeScript types for the mobile app
+│       └── ts/                   # generated TypeScript types for the web app
 ├── apps/
-│   ├── mobile/                   # React Native + Expo (Alex)
-│   │   ├── app.config.ts
+│   ├── web/                      # React + Vite web app that mirrors the glasses (Alex)
+│   │   ├── vite.config.ts
 │   │   ├── package.json
 │   │   └── src/
-│   │       ├── app/              # screens / navigation (Expo Router)
-│   │       ├── glasses/          # DAT wrapper: camera stream, mic, speaker, display, Neural Band
-│   │       ├── vision/           # hand tracking (MediaPipe Hands / Apple Vision), OCR, line picking
+│   │       ├── screens/          # Library, Reader, Word Bank, Settings (React Router)
+│   │       ├── glasses/          # ALL glasses I/O
+│   │       │   ├── adapter.ts    # GlassesAdapter interface
+│   │       │   ├── web-simulator/   # WebSimulatorAdapter: browser camera, mic, speaker, gesture keys
+│   │       │   ├── simulator-ui/    # 600x600 Ray-Ban Display simulator panel, audio-only toggle
+│   │       │   └── meta-dat/        # MetaDatAdapter stub (real glasses via DAT, later)
+│   │       ├── vision/           # hand tracking (MediaPipe), OCR (Tesseract.js), line picking
 │   │       ├── reader/           # highlight state machine, phrase pacing, read-along
 │   │       ├── live/             # Gemini Live session + WebSocket client
 │   │       ├── api/              # typed client generated from packages/contracts
 │   │       ├── state/            # app state (Zustand)
-│   │       ├── ui/               # components, spacing-first typography
-│   │       └── __tests__/
+│   │       └── ui/               # components, spacing-first typography
 │   └── api/                      # FastAPI service (Matthew + Mick)
 │       ├── pyproject.toml
 │       ├── Dockerfile
@@ -128,18 +145,19 @@ Tables: `users`, `books`, `user_books`, `pages`, `lines`, `word_bank`, `reading_
 | GET | `/progress/{user_book_id}` | Progress summary |
 | WS | `/live` | Gemini Live session bridge |
 
-The paths marked above beyond `/books/identify`, `/progress` and `/live` are proposed; confirm against SOP section 5 and adjust. The **page JSON schema** is defined in SOP section 8.1. Implement it exactly as Pydantic models in `app/schemas/page.py`, generate OpenAPI, and generate TS types from it so mobile and backend can never drift.
+The paths marked above beyond `/books/identify`, `/progress` and `/live` are proposed; confirm against SOP section 5 and adjust. The **page JSON schema** is defined in SOP section 8.1. Implement it exactly as Pydantic models in `app/schemas/page.py`, generate OpenAPI, and generate TS types from it so the web app and backend can never drift.
 
 ## 7. How the pieces cooperate
 
-- **Finger tracking runs on the phone**, not on the glasses and not in the cloud: MediaPipe Hands or Apple Vision finds the fingertip; OCR line boxes pick the nearest line; the reader module turns that into the current phrase.
+- **Finger tracking runs in the browser**, not on the glasses and not in the cloud: MediaPipe HandLandmarker finds the fingertip; OCR line boxes pick the nearest line; the reader module turns that into the current phrase.
+- **Glasses adapter rule:** all glasses I/O goes through `GlassesAdapter`. `navigator.mediaDevices` and browser audio APIs may only be used inside `apps/web/src/glasses/web-simulator/` (ESLint enforces it).
 - **Nemotron handles understanding**: reading order, phrase boundaries, hard words, document reasoning, grounding checks, conversation plans.
 - **Gemini Live is the voice**, and calls `ask_brain()`. Gemini tool calls are not guaranteed to fire (reported ~60-70%) and sessions last roughly 10-15 minutes, so:
   - **Inject page and book context server-side** at session start and on every page change; never rely on the tool call to get context.
   - Auto-reconnect and restore context when a session expires.
 - **Highlight shows on the glasses display only**, not on the paper. Ray-Ban Display: 600x600, ~20 degree FOV, right lens. Ray-Ban Meta Gen 2 has no display, so degrade to audio cues.
 - No eye tracking exists. Do not design around gaze.
-- Meta AI's own on-glasses vision is **not** exposed to apps. Our app uses the camera feed via DAT.
+- Meta AI's own on-glasses vision is **not** exposed to apps. Our app uses the camera feed via DAT (in the web proof of concept, the browser camera stands in).
 
 ## 8. Product and design rules (non-negotiable)
 
@@ -183,21 +201,22 @@ Required env vars (names only): `DATABASE_URL`, `NEMOTRON_BASE_URL`, `NEMOTRON_A
 ## 12. Commands (create these in the Makefile)
 
 ```
-make dev        # docker compose up (api + mariadb), run mobile dev server separately
+make dev        # docker compose up (api + mariadb); run the web app separately with `make web`
+make web        # pnpm --filter web dev (Vite, http://localhost:5173)
 make migrate    # alembic upgrade head
-make test       # pytest (api) + jest (mobile)
-make lint       # ruff + eslint
+make test       # pytest (api) + vitest (web)
+make lint       # ruff (api) + eslint/prettier/tsc (web)
 make contracts  # regenerate openapi.json and TS types
 make eval       # run eval/run_eval.py
 ```
 
 ## 13. Build order (follow this; stop at each checkpoint and let a human test)
 
-1. **Scaffold** the whole tree above with empty modules, working `make dev`, health endpoint, DB connection, and an Expo app that boots. Checkpoint: `GET /health` returns OK; app renders on a phone.
+1. **Scaffold** the whole tree above with empty modules, working `make dev`, health endpoint, DB connection, and a web app that boots (`pnpm --filter web dev`) with the `GlassesAdapter`, `WebSimulatorAdapter` and display simulator. Checkpoint: `GET /health` returns OK and is reachable from the web app; app renders in the browser.
 2. **Contracts**: page JSON schema, OpenAPI export, generated TS types.
-3. **Vertical slice**: photo of a page -> OCR -> `/pages/analyze` (Nemotron) -> page JSON -> highlight a phrase on a phone screen (mock the glasses).
-4. **Finger guidance** on the phone: hand tracking -> nearest line -> phrase highlight.
-5. **Glasses**: DAT camera stream in, display/audio out. Fall back to phone-only if display APIs block us.
+3. **Vertical slice**: photo of a page -> OCR -> `/pages/analyze` (Nemotron) -> page JSON -> highlight a phrase on the display simulator (via `GlassesAdapter`).
+4. **Finger guidance** in the browser: hand tracking -> nearest line -> phrase highlight.
+5. **Glasses**: `MetaDatAdapter`: DAT camera stream in, display/audio out. Fall back to the web simulator if DAT or display APIs block us.
 6. **Word help**: tap or ask a word -> contextual definition + breakdown -> word bank row.
 7. **Gemini Live** conversation with server-side context injection and `ask_brain()`.
 8. **Illustrations** and progress/fading.
@@ -209,7 +228,7 @@ Each step should leave `main` runnable.
 
 - First task when asked to scaffold: create the directory tree in section 4 with minimal placeholder files (docstring or `TODO(owner)` comment per module), configs, `.env.example`, `docker-compose.yml`, `Makefile`, and READMEs per app. Do not implement features yet.
 - Respect ownership boundaries in section 2. If a task crosses them, say so and propose the contract first.
-- When something is unspecified or uncertain (DAT display coverage in Expo wrappers, Nemotron VL memory on Verda, exact endpoint paths), do not invent details: leave a clearly marked `TODO` or `OPEN QUESTION:` and list it in your summary.
+- When something is unspecified or uncertain (DAT display coverage, Nemotron VL memory on Verda, exact endpoint paths), do not invent details: leave a clearly marked `TODO` or `OPEN QUESTION:` and list it in your summary.
 - Prefer the simplest thing that works for a 48-hour hackathon demo; note any shortcut as `HACK:` so it can be revisited.
 - Never commit secrets, real user images, or copyrighted book text.
 - Before declaring a task done: run lint and tests for the touched app, and state what you could not verify (especially anything needing real glasses hardware).

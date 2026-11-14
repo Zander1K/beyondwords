@@ -25,6 +25,14 @@ class Settings(BaseSettings):
     nvidia_build_api_key: str = ""
     gemini_api_key: str = ""
 
+    # Browser origins allowed to call the API (CORS) and open the /live WebSocket.
+    # Comma-separated. Default: the web app's Vite dev server.
+    cors_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
+
     # TODO(Mick Ola): feature flags (e.g. illustrations, fading assist) once the SOP defines them.
 
 

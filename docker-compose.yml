@@ -1,4 +1,4 @@
-# Local dev stack: FastAPI + MariaDB. Mobile dev server runs separately (see README).
+# Local dev stack: FastAPI + MariaDB. The web app's dev server runs separately (`make web`).
 services:
   mariadb:
     image: mariadb:11.4

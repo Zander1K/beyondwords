@@ -1,0 +1,31 @@
+.reader {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.hint {
+  color: var(--color-muted);
+  font-size: 0.95rem;
+}
+
+/* The "page" as the user sees it on screen, with the current phrase highlighted. */
+.text {
+  max-width: 38rem;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.current {
+  background: #fff1b8;
+  border-radius: 4px;
+  box-shadow: 0 0 0 2px #fff1b8;
+}
+
+.glasses,
+.camera {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}

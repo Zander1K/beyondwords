@@ -64,7 +64,7 @@ Run `make lint-api test-api` before pushing.
 ## Adding an endpoint
 
 1. **Schema**: request/response models in `app/schemas/<area>.py`. These are the contract with
-   the mobile app, so tag the other owner in the PR (CLAUDE.md section 2).
+   the web app, so tag the other owner in the PR (CLAUDE.md section 2).
 2. **Logic**: in `app/brain/`, `app/gemini/` or `app/db/repositories/`, not in the router.
 3. **Router**: in `app/routers/<area>.py`, make an `APIRouter(prefix=..., tags=[...])` and call
    the logic. Register it in `app/main.py` with `app.include_router(...)`.

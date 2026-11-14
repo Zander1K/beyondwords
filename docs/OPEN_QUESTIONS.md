@@ -14,11 +14,13 @@ Decisions left open during the step 1 scaffold (2026-11-14). Each one is also ma
 | 6 | How does word review work (states, spaced repetition)? `word_bank.review_state` is a free string defaulting to `new` for now. | Mick Ola | `apps/api/app/db/models.py` (`WordBankEntry`) | 6 |
 | 7 | Which values can `LLM_PROVIDER` take (e.g. `nemotron`, `nvidia_build`, `gemini`, `muse_spark`)? | Matthew | `.env.example`, `apps/api/app/config.py`, `apps/api/app/brain/llm.py` | 3 |
 | 8 | Which tool generates the TypeScript types for `make contracts` (e.g. `openapi-typescript`)? | Mick Ola | `Makefile` (`contracts`), `packages/contracts/README.md` | 2 |
-| 9 | Does an Expo community DAT wrapper (e.g. `expo-meta-wearables-dat`) support the display and Neural Band, or do we need a native module? | Alex | `apps/mobile/src/glasses/index.ts` | 5 |
-| 10 | Which on-phone OCR and hand-tracking libraries (MediaPipe Hands vs Apple Vision; OCR lib)? | Alex | `apps/mobile/src/vision/index.ts` | 3–4 |
-| 11 | iOS bundle id and Android package name (needed for DAT development builds). | Alex | `apps/mobile/app.config.ts` | 5 |
+| 9 | How does the web app reach Meta DAT (a native SDK): companion app bridge or native shell? And does DAT expose display output and Neural Band input? The RN wrapper we evaluated before the web migration did not. | Alex | `apps/web/src/glasses/meta-dat/MetaDatAdapter.ts`, `docs/glasses-adapter.md` | 5 |
+| 10 | Intended in-browser libraries are MediaPipe HandLandmarker and Tesseract.js (in a worker); not installed yet. Are they fast and accurate enough on real page photos? | Alex | `apps/web/src/vision/` | 3–4 |
+| 11 | Real Ray-Ban Display text limits (characters per line, lines, font size) and the display's position in the right lens. The simulator uses guesses (HACK). | Alex | `apps/web/src/glasses/simulator-ui/displayModel.ts`, `DisplaySimulator.tsx` | 5 |
 | 12 | ~~What GPU and memory are available on Verda, and does Nemotron 3.5 Super VL fit?~~ Resolved 2026-11-14: Verda hosts it for Junction (vLLM 0.32, NVFP4 on B300, 1M context) at the `NEMOTRON_BASE_URL` in `.env.example`, so we don't self-host. Still open: rate limits on the shared endpoint. | Matthew | `infra/verda/README.md` | 3 |
 | 13 | Where does the team keep the eval page photos? They are git-ignored and must not be committed. | Matthew | `eval/pages/README.md` | 3 |
+| 14 | What audio format does Gemini Live expect from the web app (sample rate, chunk size), and is the `/live` message protocol JSON or binary? The simulator mic emits PCM16 at the browser's native rate. | Mick Ola + Alex | `apps/web/src/live/index.ts`, `apps/web/src/glasses/web-simulator/WebSimulatorAdapter.ts` | 7 |
+| 15 | `GlassesAdapter` has no connect/register step, and `startCamera()` returns a `MediaStream`; real DAT needs registration and does not hand JS a `MediaStream`. Change the interface before building `MetaDatAdapter`? | Alex | `apps/web/src/glasses/adapter.ts` | 5 |
 
 ## Not yet verified (environment gaps)
 
@@ -28,5 +30,5 @@ The step 1 scaffold machine had no Docker, so these still need a first run:
 - `make migrate` against a real MariaDB. Migration `0001` was hand-written and checked only
   structurally (SQLite test) and by rendering MariaDB SQL offline (`alembic upgrade head --sql`).
 - `/health` reporting `"database": "ok"` against a live DB.
-- The Expo app on a physical phone (only the iOS JS bundle was built).
+- The web app's camera, mic and audio in a real browser, and over an HTTPS tunnel on a phone.
 - Anything on real glasses hardware.

@@ -7,11 +7,17 @@ Built for Junction 2026. Working name: change `APP_NAME` in `.env` to rename.
 See `CLAUDE.md` for the full brief and `docs/SOP.md` for product behaviour.
 Unresolved decisions are tracked in [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md).
 
+The frontend is a **web app that mirrors the glasses**: the browser stands in for Meta glasses
+(camera, mic, speakers, a Ray-Ban Display simulator, keys for Neural Band gestures). All glasses
+I/O goes through one `GlassesAdapter`, so a real Meta DAT adapter can replace the simulator
+later. See [`docs/glasses-adapter.md`](docs/glasses-adapter.md). (It replaced an earlier
+React Native app; git history has it.)
+
 ## Layout
 
 | Path | What | Owner |
 |---|---|---|
-| `apps/mobile` | React Native + Expo app (glasses via Meta DAT) | Alex |
+| `apps/web` | React + Vite web app that mirrors the glasses (browser as glasses simulator) | Alex |
 | `apps/api` | FastAPI service | Matthew (brain), Mick Ola (db, gemini) |
 | `packages/contracts` | Shared API types (OpenAPI + generated TS) | Mick Ola |
 | `db/` | Alembic migrations, seed data | Mick Ola |
@@ -31,11 +37,11 @@ Full stack:
 
 ```sh
 cp .env.example .env     # make dev does this for you if missing
-make install             # uv sync (api) + pnpm install (mobile)
+make install             # uv sync (api) + pnpm install (web)
 make dev                 # api on http://localhost:8000 + mariadb on :3306
 make migrate             # in another terminal: create the tables
 curl localhost:8000/health
-pnpm mobile              # Expo dev server, scan the QR code with Expo Go
+make web                 # web app on http://localhost:5173 (same as `pnpm --filter web dev`)
 ```
 
 ## Commands
@@ -43,11 +49,12 @@ pnpm mobile              # Expo dev server, scan the QR code with Expo Go
 | Command | Does |
 |---|---|
 | `make dev` | `docker compose up` (api + mariadb) |
+| `make web` | Web app dev server (Vite) on http://localhost:5173 |
 | `make api` | Run the API on the host with reload (no Docker) |
 | `make db` | Start only MariaDB in Docker (pair with `make api`) |
 | `make format` | Auto-fix API lint and formatting |
 | `make migrate` | `alembic upgrade head` in the api container |
-| `make test` | pytest (api) + jest (mobile) |
-| `make lint` | ruff (api) + eslint/prettier/tsc (mobile) |
+| `make test` | pytest (api) + vitest (web) |
+| `make lint` | ruff (api) + eslint/prettier/tsc (web) |
 | `make contracts` | Regenerate `openapi.json` and TS types (step 2, not yet implemented) |
 | `make eval` | Run `eval/run_eval.py` (not yet implemented) |
