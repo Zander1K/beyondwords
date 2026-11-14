@@ -4,30 +4,13 @@
 // HACK: demo page until page capture -> /pages/analyze exists.
 import { useEffect, useRef, useState } from "react";
 
-import {
-  type GlassesAdapter,
-  GlassesError,
-  type GlassesErrorCode,
-  type GlassesGesture,
-  type SessionEvent,
-  useGlasses,
-} from "@/glasses";
+import { type GlassesAdapter, type GlassesGesture, type SessionEvent, useGlasses } from "@/glasses";
 import { CARD_ACTIONS, currentPhrase, type Page, type ReaderState } from "@/reader";
 import { useReaderStore } from "@/state";
-
-export type CameraStatus =
-  | { kind: "off" }
-  | { kind: "starting" }
-  | { kind: "on"; stream: MediaStream }
-  | { kind: "error"; code: GlassesErrorCode };
 
 export interface Notice {
   text: string;
   tone: "info" | "warn";
-}
-
-function errorCode(error: unknown): GlassesErrorCode {
-  return error instanceof GlassesError ? error.code : "unknown";
 }
 
 /** Send the whole current reader view to the glasses (each call replaces the display). */
@@ -66,8 +49,6 @@ export function useReaderController() {
   const session = useReaderStore((s) => s.session);
   const offline = useReaderStore((s) => s.offline);
   const asleep = useReaderStore((s) => s.asleep);
-  const [camera, setCamera] = useState<CameraStatus>({ kind: "off" });
-  const [capture, setCapture] = useState<{ url: string; at: number } | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const store = useReaderStore.getState;
@@ -169,33 +150,6 @@ export function useReaderController() {
   });
   useEffect(() => glasses.onGesture((g) => latest.current(g)), [glasses]);
 
-  // ---- camera (step 5 builds the live camera view) ----
-
-  const startCamera = async () => {
-    setCamera({ kind: "starting" });
-    try {
-      setCamera({ kind: "on", stream: await glasses.startCamera() });
-    } catch (error) {
-      setCamera({ kind: "error", code: errorCode(error) });
-    }
-  };
-
-  const stopCamera = () => {
-    if (camera.kind === "on") for (const t of camera.stream.getTracks()) t.stop();
-    setCamera({ kind: "off" });
-  };
-
-  const capturePage = async () => {
-    try {
-      const blob = await glasses.captureStill();
-      setCapture({ url: URL.createObjectURL(blob), at: Date.now() });
-    } catch {
-      glasses.playCue("error");
-    }
-  };
-
-  useEffect(() => () => (capture ? URL.revokeObjectURL(capture.url) : undefined), [capture]);
-
   return {
     page,
     reader,
@@ -203,16 +157,11 @@ export function useReaderController() {
     offline,
     asleep,
     notice,
-    camera,
-    capture,
     actions: {
       startSession,
       stopSession,
       /** Phone-screen fallback navigation while the glasses are offline (SIM-SES-05). */
       phone: act,
-      startCamera,
-      stopCamera,
-      capturePage,
     },
   };
 }
