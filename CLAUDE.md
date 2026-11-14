@@ -15,7 +15,7 @@ Built for the Junction 2026 hackathon (Meta "AI Glasses for Everyone, Everyday" 
 1. User opens a book and points the glasses camera at a page.
 2. Phone captures the frame, runs OCR + hand tracking, backend analyses the page.
 3. User runs a finger under a line; the current phrase is highlighted on the glasses display and read aloud (read-along).
-4. User asks questions by voice ("what does *aloof* mean here?", "why did he do that?"); Gemini Live answers, grounded by the backend brain.
+4. User asks questions by voice ("what does *aloof* mean here?", "why did he do that?"); the phone turns speech into text, Gemini answers as text (grounded by the backend brain), and the phone reads the answer aloud through the glasses.
 5. Progress and a personal word bank are saved to PostgreSQL.
 
 ## 2. Team and ownership
@@ -37,7 +37,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 | API / middleware | FastAPI (Python 3.11+), async, Pydantic v2 |
 | Database | PostgreSQL (SQLAlchemy 2.x async + asyncpg + Alembic migrations). Switched from MariaDB on 2026-11-14; the SOP still says MariaDB and needs updating. |
 | Brain | NVIDIA Nemotron 3.5 Super VL, served with vLLM on **Verda**. NVIDIA Build is the fallback (free tier ~40 req/min/key) |
-| Voice / conversation | Gemini Live, which calls our `ask_brain()` tool |
+| Voice / conversation | Speech-to-text and text-to-speech on the phone; Gemini (`gemini-4-hydrogen`) runs the text conversation behind `POST /ask` and calls our `ask_brain()` tool. Changed from Gemini Live audio on 2026-11-14 (docs/gemini.md); the SOP still says Gemini Live. |
 | Illustrations | Gemini image generation via the `illustrate()` tool |
 | Model layer | Swappable via `brain/llm.py` so Meta Muse Spark can replace Gemini in production |
 
@@ -67,7 +67,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 │   │       ├── glasses/          # DAT wrapper: camera stream, mic, speaker, display, Neural Band
 │   │       ├── vision/           # hand tracking (MediaPipe Hands / Apple Vision), OCR, line picking
 │   │       ├── reader/           # highlight state machine, phrase pacing, read-along
-│   │       ├── live/             # Gemini Live session + WebSocket client
+│   │       ├── live/             # conversation: speech-to-text, POST /ask, text-to-speech
 │   │       ├── api/              # typed client generated from packages/contracts
 │   │       ├── state/            # app state (Zustand)
 │   │       ├── ui/               # components, spacing-first typography
@@ -130,7 +130,7 @@ Columns follow SOP section 5; `apps/api/app/db/models.py` documents each one.
 | POST | `/illustrate` | Prompt from passage -> image (Gemini) |
 | POST | `/progress` | Write reading events, update word bank |
 | GET | `/progress/{user_book_id}` | Progress summary |
-| WS | `/live` | Gemini Live session bridge |
+| POST | `/ask` | Reader question (text) -> short spoken-style answer via Gemini + `ask_brain()` (implemented; replaces `WS /live`) |
 
 The paths marked above beyond `/books/identify`, `/progress` and `/live` are proposed; confirm against SOP section 5 and adjust. The **page JSON schema** is defined in SOP section 8.1. Implement it exactly as Pydantic models in `app/schemas/page.py`, generate OpenAPI, and generate TS types from it so mobile and backend can never drift.
 
@@ -138,9 +138,8 @@ The paths marked above beyond `/books/identify`, `/progress` and `/live` are pro
 
 - **Finger tracking runs on the phone**, not on the glasses and not in the cloud: MediaPipe Hands or Apple Vision finds the fingertip; OCR line boxes pick the nearest line; the reader module turns that into the current phrase.
 - **Nemotron handles understanding**: reading order, phrase boundaries, hard words, document reasoning, grounding checks, conversation plans.
-- **Gemini Live is the voice**, and calls `ask_brain()`. Gemini tool calls are not guaranteed to fire (reported ~60-70%) and sessions last roughly 10-15 minutes, so:
-  - **Inject page and book context server-side** at session start and on every page change; never rely on the tool call to get context.
-  - Auto-reconnect and restore context when a session expires.
+- **Gemini runs the conversation as text** (voice stays on the phone) and calls `ask_brain()`. Tool calls are not guaranteed to fire, so:
+  - **Inject page and book context server-side** on every question; never rely on the tool call to get context.
 - **Highlight shows on the glasses display only**, not on the paper. Ray-Ban Display: 600x600, ~20 degree FOV, right lens. Ray-Ban Meta Gen 2 has no display, so degrade to audio cues.
 - No eye tracking exists. Do not design around gaze.
 - Meta AI's own on-glasses vision is **not** exposed to apps. Our app uses the camera feed via DAT.
@@ -161,7 +160,7 @@ Implement graceful degradation, never a dead end:
 - Brain unavailable or slow -> fall back to local OCR + plain phrase splitting; show a subtle status, keep reading working.
 - Hand tracking lost -> keep last line, offer a manual next-line gesture (Neural Band or tap).
 - Rate limit (NVIDIA Build ~40 req/min/key) -> client-side queue, batching, cache page analyses by image hash.
-- Gemini Live session expires -> reconnect and re-inject context.
+- Gemini unavailable -> `POST /ask` returns 503 "Explanations are paused. Reading continues."; reading keeps working.
 - Always log failures with a request id; never crash the reading session.
 
 Evaluation: `eval/pages/` holds a small set of real photos (curved book spines, shadows, glare, two-column, small print, children's books). `eval/run_eval.py` reports OCR line accuracy, reading-order accuracy and grounding pass rate. Run it before changing prompts or models.
@@ -173,7 +172,7 @@ Evaluation: `eval/pages/` holds a small set of real photos (curved book spines, 
 - No book text in the library, only metadata.
 - Secrets in `.env`, never in code or git. Provide `.env.example` with every variable name and a comment.
 
-Required env vars (names only): `DATABASE_URL`, `NEMOTRON_BASE_URL`, `NEMOTRON_API_KEY`, `NVIDIA_BUILD_API_KEY`, `GEMINI_API_KEY`, `LLM_PROVIDER`, `APP_NAME`, `LOG_LEVEL`.
+Required env vars (names only): `DATABASE_URL`, `NEMOTRON_BASE_URL`, `NEMOTRON_API_KEY`, `NVIDIA_BUILD_API_KEY`, `GEMINI_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_IMAGE_MODEL`, `GOOGLE_BOOKS_API_KEY`, `LLM_PROVIDER`, `APP_NAME`, `LOG_LEVEL`.
 
 ## 11. Coding conventions
 
@@ -203,7 +202,7 @@ make eval       # run eval/run_eval.py
 4. **Finger guidance** on the phone: hand tracking -> nearest line -> phrase highlight.
 5. **Glasses**: DAT camera stream in, display/audio out. Fall back to phone-only if display APIs block us.
 6. **Word help**: tap or ask a word -> contextual definition + breakdown -> word bank row.
-7. **Gemini Live** conversation with server-side context injection and `ask_brain()`.
+7. **Gemini conversation** (`POST /ask`, text in and out) with server-side context injection and `ask_brain()`.
 8. **Illustrations** and progress/fading.
 9. **Polish for demo**: demo book, runbook, offline-safe fallbacks.
 
