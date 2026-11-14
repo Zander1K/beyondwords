@@ -43,8 +43,11 @@ def test_no_table_stores_raw_media() -> None:
             assert not any(word in column.name for word in forbidden), (table.name, column.name)
 
 
-def test_initial_migration_matches_models() -> None:
-    """The hand-written migration 0001 must create exactly what the models declare."""
+MIGRATIONS = ("0001_initial_tables", "0002_users_username")
+
+
+def test_migrations_match_models() -> None:
+    """The hand-written migrations, run in order, must create exactly what the models declare."""
     import importlib.util
     from pathlib import Path
 
@@ -52,18 +55,20 @@ def test_initial_migration_matches_models() -> None:
     from alembic.operations import Operations
     from sqlalchemy import MetaData, UniqueConstraint, create_engine, inspect
 
-    path = Path(__file__).parents[4] / "db/migrations/versions/0001_initial_tables.py"
-    spec = importlib.util.spec_from_file_location("migration_0001", path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
+    versions = Path(__file__).parents[4] / "db/migrations/versions"
+    assert {p.stem for p in versions.glob("[0-9]*.py")} == set(MIGRATIONS), "update MIGRATIONS"
 
     # SQLite in-memory is only a structural check (tables/columns/indexes), not PostgreSQL DDL.
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         ctx = MigrationContext.configure(conn)
         with Operations.context(ctx):
-            spec.loader.exec_module(module)
-            module.upgrade()
+            for name in MIGRATIONS:
+                spec = importlib.util.spec_from_file_location(name, versions / f"{name}.py")
+                assert spec and spec.loader
+                module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(module)
+                module.upgrade()
         insp = inspect(conn)
         migrated = MetaData()
         migrated.reflect(conn)
