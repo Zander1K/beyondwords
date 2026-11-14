@@ -1,8 +1,8 @@
-# Reading Companion
+# Beyond Words
 
 Smart-glasses add-on for Meta AI glasses that helps people who find reading effortful read
 printed books comfortably. It reads *with* you, keeps your place and explains hard words in context.
-Built for Junction 2026. Working name: change `APP_NAME` in `.env` to rename.
+Built for Junction 2026. The app is called **Beyond Words**; change `APP_NAME` in `.env` to rename it.
 
 See `CLAUDE.md` for the full brief and `docs/SOP.md` for product behaviour.
 Unresolved decisions are tracked in [`docs/OPEN_QUESTIONS.md`](docs/OPEN_QUESTIONS.md).

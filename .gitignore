@@ -21,6 +21,8 @@ coverage/
 # Never commit real user images or book scans (see CLAUDE.md section 10)
 eval/pages/*
 !eval/pages/README.md
+# Photos of the demo book used to tune text detection (copyrighted pages, and a person)
+images-for-learning/
 
 # OS / editors
 .DS_Store

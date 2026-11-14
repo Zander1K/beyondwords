@@ -1,6 +1,6 @@
 # web
 
-The Reading Companion web app: a proof of concept that mirrors the Meta glasses integration.
+The Beyond Words web app: a proof of concept that mirrors the Meta glasses integration.
 The browser stands in for the glasses (camera, mic, speakers, a Ray-Ban Display simulator, and
 keys for Neural Band gestures). Owner: Alex.
 
@@ -22,6 +22,8 @@ The API should be running for the Settings screen's connection check (`make api`
 
 | Path                         | What                                                                                                                                                                          |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/landing/`               | The public landing page (`/`): black and blue, after ALX Studio's design. Its one call to action, "Test this App", opens the access dialog. Copy is in `content.ts`           |
+| `src/access/`                | Who may use the app: the username and password check, the session, and `RequireAccess`, which guards every app route                                                          |
 | `src/screens/`               | Library, Reader, Word Bank, Settings                                                                                                                                          |
 | `src/glasses/`               | The glasses layer. Everything else talks to the glasses only through `GlassesAdapter`                                                                                         |
 | `src/glasses/adapter.ts`     | `GlassesAdapter` interface                                                                                                                                                    |
@@ -35,6 +37,25 @@ The API should be running for the Settings screen's connection check (`make api`
 | `src/state/`                 | Zustand stores (reading spacing)                                                                                                                                              |
 | `src/ui/`                    | Global styles and spacing CSS variables                                                                                                                                       |
 
+## Landing page and access
+
+`/` is a public landing page. Its one call to action, **Test this App**, asks for a **username**
+(2 to 32 characters) and the **access password**, then opens the app (Reader). The app's own
+routes (`/library`, `/reader`, `/words`, `/settings`) send anyone who has not signed in back to
+the landing page, and bring them to where they were headed once they have. The sign-in lasts
+for the browser tab (`sessionStorage`); **Sign out** is in the app header.
+
+**This is a courtesy gate for a demo, not security.** The check runs in the browser, so anyone
+who reads the page's code can find it, and the SHA-256 digest of the password in
+`src/access/access.ts` can be guessed offline. The repository holds only that digest, not the
+password. To change the password: `printf '%s' 'the new password' | shasum -a 256` and paste the
+hex into `ACCESS_PASSWORD_SHA256`. If the app ever needs real protection, the check has to move
+to the API (FastAPI), which must then refuse unauthenticated calls.
+
+The landing page uses the Geist font from Google Fonts (a `<link>` in `index.html`); without a
+connection it falls back to the system font. The app's name comes from `APP_NAME` in `.env`
+(read when the dev server starts, so restart it after changing it).
+
 ## Trying the glasses simulator
 
 The camera view is the glasses' eyes: what is read, where you are and your gestures all come
@@ -42,16 +63,17 @@ from it. **Reader** is a single view: the live camera fills it (**Fullscreen** i
 bar; on iPhone it fills the screen instead), the simulated glasses display floats on top in the
 right-lens position, status runs along the top, and **Controls** opens a sheet with the page
 text, overlay options and the glasses simulator (gesture pad and log, system events, display
-stats, audio-only mode). Open **Reader**:
+stats, audio-only mode). Sign in from the landing page, then open **Reader**:
 
 1. **Start camera** and aim it down at an open book so the page fills most of the frame. The
    page is read **continuously**, with no scan button: PaddleOCR reads frame after frame in a
-   Web Worker (about once a second, slower on phones), and each read is merged into the page,
+   Web Worker (a full read of a page takes a few seconds, then about a second or two while the page is held still; slower on phones), and each read is merged into the page,
    so lines your hand covers keep their last reading and a turned page starts over. Boxes are
    drawn over the view; a **mock** page analysis splits lines into phrases and hard words.
-   Tilted or curled pages are flattened when the quick read is unsure (at most every 10 s, as it
-   takes ~2 s or more). Camera frames are never saved or
-   uploaded.
+   Each line is found from the text detector's map and flattened along its own curve before it
+   is read, so curled and tilted pages and open books (two pages, split at the gutter) read
+   correctly. Lines that look the same as in the last frame keep their reading, so a page held
+   still is cheap to keep reading. Camera frames are never saved or uploaded.
 2. **Start reading** (the glasses display session needs your go-ahead).
 3. **Point** just under a word: the exact word above your fingertip is highlighted on the
    glasses (inside its phrase) and outlined on the camera view; a pinch (`select`) opens that
@@ -75,8 +97,7 @@ stats, audio-only mode). Open **Reader**:
    Recreate adapter. **Stress test** checks the 5 updates/s display limit.
 
 The first camera start downloads the hand model (~7.8 MB); the first read downloads the OCR
-models (PP-OCRv6 small, ~31 MB) and ONNX Runtime (~7 MB compressed), plus ~30 MB more the first time a page
-needs flattening. This needs an internet connection (HACK: vendor them for an offline demo). Word help definitions are mock.
+models (PP-OCRv6 small, ~31 MB) and ONNX Runtime (~7 MB compressed), This needs an internet connection (HACK: vendor them for an offline demo). Word help definitions are mock.
 
 ## Config
 

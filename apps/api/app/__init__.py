@@ -1,1 +1,1 @@
-"""Reading Companion API (FastAPI)."""
+"""Beyond Words API (FastAPI)."""

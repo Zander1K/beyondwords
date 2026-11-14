@@ -330,6 +330,7 @@ export class WebSimulatorAdapter implements GlassesAdapter {
       const gestures = recognizer.update(
         frame.hands.map((h) => h.landmarks),
         frame.at,
+        frame.hands.map((h) => h.world),
       );
       for (const g of gestures) this.emitGesture(g, `camera ${CAMERA_SOURCE[g]}`);
     });

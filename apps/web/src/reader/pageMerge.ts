@@ -39,28 +39,64 @@ function intersects(a: Box, b: Box): boolean {
   return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h;
 }
 
-/** Same line in two reads: overlapping vertically (half the smaller height) and horizontally. */
-function sameLine(a: Box, b: Box): boolean {
-  const vertical = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
-  const horizontal = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
-  return vertical >= 0.5 * Math.min(a.h, b.h) && horizontal > 0;
+/** Where a line's baseline is at horizontal position `x` (normalised). */
+function baselineAt(b: NonNullable<PageLine["baseline"]>, x: number): number {
+  return b.x1 === b.x0 ? b.y0 : b.y0 + ((b.y1 - b.y0) * (x - b.x0)) / (b.x1 - b.x0);
 }
 
-/** Vertical overlap of two boxes (0 if apart). */
-function verticalOverlap(a: Box, b: Box): number {
-  return Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y));
+/**
+ * Reading order: page by page (left first), then top to bottom, comparing a page's baselines at
+ * one x (the page's middle) so lines of different lengths on a tilted page stay in order.
+ */
+function readingOrder(lines: PageLine[]): PageLine[] {
+  const middles = new Map<number, number>();
+  for (const block of new Set(lines.map((l) => l.block ?? 0))) {
+    const xs = lines
+      .filter((l) => (l.block ?? 0) === block && l.baseline)
+      .flatMap((l) => (l.baseline ? [l.baseline.x0, l.baseline.x1] : []));
+    middles.set(block, xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : 0.5);
+  }
+  const y = (l: PageLine) =>
+    l.baseline ? baselineAt(l.baseline, middles.get(l.block ?? 0) ?? 0.5) : (l.box?.y ?? 0);
+  return [...lines].sort((a, b) => (a.block ?? 0) - (b.block ?? 0) || y(a) - y(b));
 }
 
-/** The line in `lines` that is the same line as `box`, overlapping it most. */
-function bestMatch(lines: PageLine[], box: Box): PageLine | undefined {
+/**
+ * How far apart two lines are vertically, as a fraction of their text height (0 = same place),
+ * or null if they do not overlap horizontally. Uses baselines when both have them: on a tilted
+ * page the boxes of neighbouring lines overlap, their baselines do not.
+ */
+function lineDistance(a: PageLine, b: PageLine): number | null {
+  if (!a.box || !b.box) return null;
+  const from = Math.max(a.box.x, b.box.x);
+  const to = Math.min(a.box.x + a.box.w, b.box.x + b.box.w);
+  if (to <= from) return null;
+  const ab = a.baseline;
+  const bb = b.baseline;
+  if (ab?.height && bb?.height) {
+    const mid = (from + to) / 2;
+    return Math.abs(baselineAt(ab, mid) - baselineAt(bb, mid)) / Math.min(ab.height, bb.height);
+  }
+  const overlap = Math.min(a.box.y + a.box.h, b.box.y + b.box.h) - Math.max(a.box.y, b.box.y);
+  return 1 - overlap / Math.min(a.box.h, b.box.h);
+}
+
+/** Same line in two reads: within half a line height of each other, overlapping horizontally. */
+function sameLine(a: PageLine, b: PageLine): boolean {
+  const d = lineDistance(a, b);
+  return d !== null && d <= 0.5;
+}
+
+/** The line in `lines` that is the same line as `line`, closest to it. */
+function bestMatch(lines: PageLine[], line: PageLine): PageLine | undefined {
   let best: PageLine | undefined;
-  let bestOverlap = 0;
+  let bestDistance = Number.POSITIVE_INFINITY;
   for (const l of lines) {
-    if (!l.box || !sameLine(l.box, box)) continue;
-    const overlap = verticalOverlap(l.box, box);
-    if (overlap > bestOverlap) {
+    const d = lineDistance(l, line);
+    if (d === null || d > 0.5) continue;
+    if (d < bestDistance) {
       best = l;
-      bestOverlap = overlap;
+      bestDistance = d;
     }
   }
   return best;
@@ -97,9 +133,8 @@ export function mergePages(
   const letters = (l: PageLine) => (l.text.match(/\p{L}/gu) ?? []).length;
   const usedPrev = new Set<PageLine>();
   const fromRead: PageLine[] = next.lines.map((n) => {
-    const nBox = n.box;
-    if (!nBox) return n;
-    const old = bestMatch(prev.lines.filter(underHand), nBox);
+    if (!n.box) return n;
+    const old = bestMatch(prev.lines.filter(underHand), n);
     if (old && letters(old) > letters(n)) {
       usedPrev.add(old);
       return old;
@@ -110,11 +145,10 @@ export function mergePages(
   const kept: PageLine[] = [];
   for (const line of prev.lines) {
     if (usedPrev.has(line) || !line.box || !underHand(line)) continue;
-    const box = line.box;
-    if (next.lines.some((n) => n.box && sameLine(n.box, box))) continue;
+    if (next.lines.some((n) => sameLine(n, line))) continue;
     kept.push(line); // hidden under the hand in this read: keep its last reading
   }
-  const lines = [...fromRead, ...kept].sort((a, b) => (a.box?.y ?? 0) - (b.box?.y ?? 0));
+  const lines = readingOrder([...fromRead, ...kept]);
   return { page: { id: prev.id, lines }, newPage: false };
 }
 

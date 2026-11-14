@@ -63,3 +63,14 @@ export function keyToGesture(event: KeyLike): GlassesGesture | null {
   if (event.key === "Enter" && (tag === "BUTTON" || tag === "A")) return null;
   return KEY_TO_GESTURE[event.key] ?? null;
 }
+
+/**
+ * The C key shows or hides the simulator's controls (the same as holding thumb and little finger out to the camera).
+ * Not a glasses gesture, so it is kept apart from keyToGesture. Same guards: no modifier combos,
+ * no key repeat, nothing while typing in a form field.
+ */
+export function isControlsShortcut(event: KeyLike): boolean {
+  if (event.altKey || event.ctrlKey || event.metaKey || event.repeat) return false;
+  if (isEditable(event.target)) return false;
+  return event.key === "c" || event.key === "C";
+}

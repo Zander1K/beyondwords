@@ -43,6 +43,23 @@
   color: #fff;
 }
 
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.9rem;
+}
+
+.user {
+  color: var(--color-muted);
+}
+
+.signOut {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
 .main {
   max-width: 72rem;
   margin: 0 auto;

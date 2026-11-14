@@ -2,7 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 
 import { WebSimulatorAdapter } from "../web-simulator/WebSimulatorAdapter";
 import { DISPLAY_LIMITS, makePhrase, makeWordCard, normaliseText } from "./displayModel";
-import { buildScene, type SceneNode } from "./scene";
+import { buildScene, PROBLEM_COPY, STATUS_LABELS, STATUS_TONE, type SceneNode } from "./scene";
+import type { StatusKind } from "../adapter";
 
 const LONG =
   "The old lighthouse stood alone at the edge of the grey cliffs and every night its lamp swept slowly across the water";
@@ -98,6 +99,96 @@ describe("SIM-DSP-01 component-limited scenes", () => {
   });
 });
 
+describe("display problems: say what is wrong and what to do", () => {
+  const nodes = (scene: ReturnType<typeof buildScene>) => {
+    const out: SceneNode[] = [];
+    if (scene) walk(scene, (n) => out.push(n));
+    return out;
+  };
+
+  it("a word card with a problem has no actions and no definition", () => {
+    expect(
+      makeWordCard({ word: "qzx7", short: "ignored", problem: "not-found", actions: ["hear"] }),
+    ).toEqual({
+      kind: "word",
+      word: "qzx7",
+      short: "",
+      actions: [],
+      problem: "not-found",
+    });
+  });
+
+  it.each(["not-found", "load-failed"] as const)(
+    "shows the %s problem as a tinted card with an icon, the word, the problem and a hint",
+    (problem) => {
+      const card = makeWordCard({ word: "aloof", short: "", problem });
+      if (!card) throw new Error("expected a card");
+      const scene = buildScene(card, null);
+      const all = nodes(scene);
+      const root = scene?.type === "flex" ? scene.children[0] : undefined;
+      expect(root).toMatchObject({
+        type: "flex",
+        surface: "card",
+        tone: problem === "not-found" ? "warn" : "error",
+      });
+      expect(all).toContainEqual({ type: "text", preset: "heading", text: "aloof" });
+      expect(all).toContainEqual({
+        type: "text",
+        preset: "body",
+        text: PROBLEM_COPY[problem].title,
+      });
+      expect(all).toContainEqual({
+        type: "text",
+        preset: "meta",
+        text: PROBLEM_COPY[problem].hint,
+      });
+      expect(all.some((n) => n.type === "icon")).toBe(true);
+      // Nothing to press when there is nothing to hear.
+      expect(all.some((n) => n.type === "button")).toBe(false);
+      for (const n of all) expect(ALLOWED.has(n.type)).toBe(true);
+    },
+  );
+
+  it("shows a status as a pill, tinted amber for 'check this' and red for 'failed'", () => {
+    const pillOf = (kind: StatusKind) => {
+      const scene = buildScene(null, kind);
+      return scene?.type === "flex" ? scene.children[0] : undefined;
+    };
+    expect(pillOf("reading")).toMatchObject({ surface: "pill", tone: "default" });
+    expect(pillOf("no-word")).toMatchObject({ surface: "pill", tone: "warn" });
+    expect(pillOf("load-failed")).toMatchObject({ surface: "pill", tone: "error" });
+    expect(STATUS_TONE.offline).toBe("error");
+    expect(STATUS_TONE["hand-lost"]).toBe("warn");
+  });
+
+  it("has words and a tone for every status", () => {
+    const kinds: StatusKind[] = [
+      "listening",
+      "thinking",
+      "reading",
+      "hand-lost",
+      "offline",
+      "reconnecting",
+      "no-page",
+      "no-word",
+      "load-failed",
+    ];
+    for (const kind of kinds) {
+      expect(STATUS_LABELS[kind]).toBeTruthy();
+      expect(["default", "warn", "error"]).toContain(STATUS_TONE[kind]);
+    }
+  });
+
+  it("the phrase and the word card sit on a frosted card", () => {
+    const phrase = buildScene({ kind: "phrase", text: "The old lighthouse" }, null);
+    const word = buildScene({ kind: "word", word: "lamp", short: "A light.", actions: [] }, null);
+    for (const scene of [phrase, word]) {
+      const root = scene?.type === "flex" ? scene.children[0] : undefined;
+      expect(root).toMatchObject({ type: "flex", surface: "card" });
+    }
+  });
+});
+
 describe("simulated display", () => {
   it("replaces the previous item instead of stacking, with one optional status", async () => {
     const adapter = new WebSimulatorAdapter({ keyTarget: new EventTarget(), startDelayMs: 0 });
@@ -115,6 +206,15 @@ describe("simulated display", () => {
     expect(adapter.store.getState().status).toBe("hand-lost");
     adapter.clearDisplay();
     expect(adapter.store.getState().item).toBeNull();
+    adapter.dispose();
+  });
+
+  it("shows a word card problem on the display store", async () => {
+    const adapter = new WebSimulatorAdapter({ keyTarget: new EventTarget(), startDelayMs: 0 });
+    adapter.setMaxUpdatesPerSecond(20);
+    await adapter.session.start();
+    adapter.showWordCard({ word: "qzx7", short: "", problem: "not-found" });
+    expect(adapter.store.getState().item).toMatchObject({ kind: "word", problem: "not-found" });
     adapter.dispose();
   });
 

@@ -1,12 +1,36 @@
-/* One view: the camera fills it; bars, HUD, captions and the controls sheet float on top. */
+/* One view: the camera fills it; the glass layers (pills, issues, hint, dock, sheet) and the
+   glasses display float on top. */
 .viewer {
   position: relative;
   height: calc(100dvh - 8.5rem);
-  min-height: 22rem;
-  border-radius: 14px;
+  min-height: 24rem;
+  border-radius: 24px;
   overflow: hidden;
-  background: #000;
-  color: #fff;
+  background: #05040c;
+  color: var(--glass-text);
+  box-shadow:
+    0 24px 60px rgb(10 6 30 / 0.35),
+    0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+/* The open controls sheet takes the left side. Everything centred in the view (dock, hint,
+   issues, captions) centres in the room that is left: they read --inset. On narrow screens the
+   sheet is a bottom sheet and takes no width. */
+.viewer[data-controls="open"] {
+  --inset: 28.25rem;
+}
+
+@media (max-width: 640px) {
+  .viewer[data-controls="open"] {
+    --inset: 0px;
+  }
+}
+
+/* On a phone the header's nav wraps onto more lines, so leave room for them. */
+@media (max-width: 640px) {
+  .viewer {
+    height: calc(100dvh - 13.5rem);
+  }
 }
 
 .viewer[data-fullscreen="native"] {
@@ -23,127 +47,102 @@
   border-radius: 0;
 }
 
-/* Bars over the camera: translucent so the page stays visible. */
-.topBar,
-.bottomBar {
+/* A soft shade at the top and bottom keeps the glass legible over a bright page. */
+.viewer::before,
+.viewer::after {
+  content: "";
   position: absolute;
   left: 0;
   right: 0;
+  z-index: 1;
+  height: 6rem;
+  pointer-events: none;
+}
+
+.viewer::before {
+  top: 0;
+  background: linear-gradient(rgb(6 4 20 / 0.5), transparent);
+}
+
+.viewer::after {
+  bottom: 0;
+  background: linear-gradient(transparent, rgb(6 4 20 / 0.55));
+}
+
+.topBar {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
   z-index: 3;
+  /* The pills keep their tooltips; the empty space does not block the camera view. */
+  pointer-events: none;
+}
+
+.topBar > * {
+  pointer-events: auto;
+}
+
+/* ---- bottom column: issues, the controls hint, then the dock ---- */
+
+.bottom {
+  position: absolute;
+  left: calc(var(--inset, 0px) + (100% - var(--inset, 0px)) / 2);
+  bottom: max(0.9rem, env(safe-area-inset-bottom));
+  z-index: 4;
+  transform: translateX(-50%);
+  transition: left 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: calc(100% - var(--inset, 0px) - 1.5rem);
+  /* The column spans the width; only what is in it takes clicks. */
+  pointer-events: none;
+}
+
+.bottom > * {
+  pointer-events: auto;
+}
+
+/* The actions: a floating glass pill. */
+.dock {
+  composes: pill from "../../ui/glass.module.css";
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  font-size: 0.85rem;
+  gap: 0.35rem;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 0.35rem;
   letter-spacing: 0;
   word-spacing: 0;
 }
 
-.topBar {
-  top: 0;
-  background: linear-gradient(rgb(0 0 0 / 0.65), rgb(0 0 0 / 0));
-  padding-bottom: var(--space-4);
+.button {
+  composes: button from "../../ui/glass.module.css";
 }
 
-.topBar [data-alert="true"] {
-  color: #ffb4a8;
-  font-weight: 600;
+.primary {
+  composes: primary from "../../ui/glass.module.css";
 }
 
-.bottomBar {
-  bottom: 0;
-  background: linear-gradient(rgb(0 0 0 / 0), rgb(0 0 0 / 0.7));
-  padding-top: var(--space-4);
-  padding-bottom: max(var(--space-2), env(safe-area-inset-bottom));
-}
-
-.bottomBar button {
-  background: rgb(255 255 255 / 0.14);
-  color: #fff;
-  border-color: rgb(255 255 255 / 0.35);
-  font-size: 0.9rem;
-  padding: var(--space-1) var(--space-3);
-}
-
-.bottomBar button:disabled {
-  opacity: 0.45;
-}
-
-.bottomBar .primary {
-  background: var(--color-accent);
-  border-color: var(--color-accent);
-}
-
-.spacer {
-  flex: 1;
-}
-
-.live {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-weight: 700;
-}
-
-.dot {
-  width: 0.65rem;
-  height: 0.65rem;
-  border-radius: 50%;
-  background: #ff3b30;
-  box-shadow: 0 0 0 4px rgb(255 59 48 / 0.3);
-  animation: blink 1.6s ease-in-out infinite;
-}
-
-@keyframes blink {
-  50% {
-    opacity: 0.45;
-  }
-}
-
-.badge {
-  padding: 0.05rem 0.6rem;
-  border-radius: 999px;
-  border: 1px solid rgb(255 255 255 / 0.4);
-  font-weight: 600;
-}
-
-.badge[data-state="started"] {
-  background: rgb(31 122 77 / 0.85);
-  border-color: transparent;
-}
-
-.notice {
-  position: absolute;
-  top: 2.6rem;
-  left: var(--space-3);
-  z-index: 3;
-  max-width: min(28rem, 55%);
-  margin: 0;
-  padding: var(--space-1) var(--space-3);
-  border-radius: 6px;
-  background: rgb(0 0 0 / 0.6);
-  border-left: 4px solid #4cc38a;
-  font-size: 0.85rem;
-}
-
-.notice[data-tone="warn"] {
-  border-left-color: #ff8a65;
-}
+/* ---- offline caption: the phrase on the phone while the glasses are away ---- */
 
 .phoneCaption {
+  composes: tinted from "../../ui/glass.module.css";
   position: absolute;
-  left: 50%;
-  bottom: 4.5rem;
+  left: calc(var(--inset, 0px) + (100% - var(--inset, 0px)) / 2);
+  top: 3.4rem;
   z-index: 3;
   transform: translateX(-50%);
+  width: max-content;
   display: grid;
   gap: var(--space-1);
   justify-items: center;
-  max-width: min(36rem, 90%);
+  max-width: min(32rem, calc(100% - var(--inset, 0px) - 1.5rem));
   padding: var(--space-2) var(--space-4);
-  border-radius: 12px;
-  background: rgb(0 0 0 / 0.75);
+  border-radius: 22px;
   font-size: var(--reading-font-size);
   line-height: var(--reading-line-height);
   letter-spacing: var(--reading-letter-spacing);
@@ -152,8 +151,8 @@
 }
 
 .phoneLabel {
+  color: var(--tone-warn);
   font-size: 0.75rem;
-  color: #ffcf99;
   letter-spacing: 0.02em;
 }
 
@@ -162,93 +161,7 @@
   gap: var(--space-2);
 }
 
-.phoneNav button {
-  background: rgb(255 255 255 / 0.15);
-  color: #fff;
-  border-color: rgb(255 255 255 / 0.35);
+.phoneButton {
+  composes: button from "../../ui/glass.module.css";
   min-width: 2.75rem;
-}
-
-/* Controls sheet: slides over the right side (bottom on narrow screens). */
-.sheet {
-  position: absolute;
-  top: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 4;
-  width: min(26rem, 100%);
-  overflow-y: auto;
-  padding: var(--space-3);
-  background: var(--color-bg);
-  color: var(--color-text);
-  box-shadow: -8px 0 24px rgb(0 0 0 / 0.35);
-}
-
-@media (max-width: 640px) {
-  .sheet {
-    top: auto;
-    left: 0;
-    width: 100%;
-    max-height: 75%;
-    border-radius: 14px 14px 0 0;
-  }
-}
-
-.sheetHeader {
-  position: sticky;
-  top: calc(-1 * var(--space-3));
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-3)) var(--space-3);
-  padding: var(--space-3);
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.sheetHeader h2 {
-  margin: 0;
-  font-size: 1.1rem;
-}
-
-.section {
-  display: grid;
-  gap: var(--space-2);
-  margin-bottom: var(--space-4);
-}
-
-.section h3 {
-  margin: 0;
-  font-size: 1rem;
-}
-
-.hint {
-  margin: 0;
-  color: var(--color-muted);
-  font-size: 0.9rem;
-}
-
-.toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.text {
-  padding: var(--space-3);
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  max-height: 14rem;
-  overflow-y: auto;
-}
-
-.line {
-  margin: 0 0 var(--space-1);
-}
-
-.current {
-  background: #fff1b8;
-  border-radius: 4px;
-  box-shadow: 0 0 0 2px #fff1b8;
 }

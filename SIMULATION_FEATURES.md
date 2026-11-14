@@ -1,6 +1,6 @@
 # SIMULATION_FEATURES.md — Meta glasses + Neural Band features for the live-camera web simulation
 
-> Purpose: the complete list of Meta Ray-Ban Display / Ray-Ban Meta Gen 2 and Meta Neural Band features our reading companion needs, and exactly how each one must work in the **web simulation built around a live camera view**.
+> Purpose: the complete list of Meta Ray-Ban Display / Ray-Ban Meta Gen 2 and Meta Neural Band features Beyond Words needs, and exactly how each one must work in the **web simulation built around a live camera view**.
 > Companion docs: `CLAUDE.md` (project context), `TASK.md` (mobile-to-web migration). Where this file and `TASK.md` differ on the gesture set or session behaviour, **this file wins** (see section 6, which lists the required `GlassesAdapter` changes).
 > Status tags: **[VERIFIED]** = stated in Meta's public docs I read. **[ASSUMPTION]** = our design choice or an unverified detail. **[OPEN]** = must confirm with the Meta mentor before we claim it.
 

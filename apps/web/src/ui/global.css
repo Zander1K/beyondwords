@@ -24,6 +24,32 @@
   --color-ok: #1f7a4d;
   --color-warn: #a4441c;
 
+  /* Glass: the simulator's translucent surfaces (glasses display, status pills, dock, controls).
+     Inspired by Meta's Ray-Ban Display UI: frosted violet-to-blue cards with a bright inner edge,
+     large radii and light type. The blur is a simulator rendering choice; the real display is
+     additive (OPEN QUESTION: translucent fills on the real display). */
+  --glass-text: #f6f4ff;
+  --glass-text-dim: rgb(246 244 255 / 0.7);
+  --glass-fill: linear-gradient(
+    148deg,
+    rgb(136 96 255 / 0.56),
+    rgb(66 88 226 / 0.46) 58%,
+    rgb(30 42 130 / 0.44)
+  );
+  --glass-fill-dark: rgb(16 14 32 / 0.52);
+  --glass-fill-soft: linear-gradient(148deg, rgb(255 255 255 / 0.16), rgb(255 255 255 / 0.06));
+  --glass-edge: rgb(255 255 255 / 0.24);
+  --glass-inset: inset 0 1px 0 rgb(255 255 255 / 0.34), inset 0 -1px 0 rgb(255 255 255 / 0.06);
+  --glass-shadow: 0 18px 48px rgb(6 3 24 / 0.45), 0 2px 8px rgb(6 3 24 / 0.3);
+  /* brightness keeps white text readable over a bright page. */
+  --glass-blur: blur(22px) saturate(1.6) brightness(0.8);
+  --tone-ok: #58e39b;
+  --tone-warn: #ffc65c;
+  --tone-error: #ff7f8f;
+  --tone-info: #a4bcff;
+  /* The assistant ring: blue to violet to magenta. */
+  --ring: conic-gradient(from 210deg, #38bdf8, #6366f1, #b44fe3, #f0509a, #38bdf8);
+
   color-scheme: light;
 }
 

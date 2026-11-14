@@ -3,6 +3,7 @@
 // stats and audio-only mode.
 import { useStore } from "zustand";
 
+import type { StatusKind, WordCard } from "../adapter";
 import type { WebSimulatorAdapter } from "../web-simulator/WebSimulatorAdapter";
 import styles from "./GlassesControls.module.css";
 import { GesturePad } from "./GesturePad";
@@ -14,6 +15,63 @@ function stressTest(adapter: WebSimulatorAdapter): void {
     adapter.showPhrase(`Stress update ${++n}`);
     if (n >= 100) clearInterval(timer);
   }, 20);
+}
+
+/** Display states to look at without having to cause them (design QA). */
+const PREVIEW_CARDS: { label: string; card: WordCard }[] = [
+  {
+    label: "Word card",
+    card: { word: "aloof", short: "Distant and not friendly.", actions: ["hear"], focused: "hear" },
+  },
+  { label: "No definition", card: { word: "qzx7", short: "", problem: "not-found" } },
+  { label: "Failed to load", card: { word: "aloof", short: "", problem: "load-failed" } },
+];
+
+const PREVIEW_STATUSES: { label: string; kind: StatusKind }[] = [
+  { label: "Reading", kind: "reading" },
+  { label: "Listening", kind: "listening" },
+  { label: "Hand lost", kind: "hand-lost" },
+  { label: "No page", kind: "no-page" },
+  { label: "No word", kind: "no-word" },
+  { label: "Read failed", kind: "load-failed" },
+  { label: "Offline", kind: "offline" },
+];
+
+function PreviewStates({ adapter, started }: { adapter: WebSimulatorAdapter; started: boolean }) {
+  return (
+    <>
+      <p className={styles.note}>
+        Shows a state on the glasses display until the reader changes it. Start reading first.
+      </p>
+      <div className={styles.toggles}>
+        {PREVIEW_CARDS.map((p) => (
+          <button
+            key={p.label}
+            type="button"
+            disabled={!started}
+            onClick={() => adapter.showWordCard(p.card)}
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+      <div className={styles.toggles}>
+        {PREVIEW_STATUSES.map((p) => (
+          <button
+            key={p.kind}
+            type="button"
+            disabled={!started}
+            onClick={() => adapter.showStatus(p.kind)}
+          >
+            {p.label}
+          </button>
+        ))}
+        <button type="button" disabled={!started} onClick={() => adapter.showStatus(null)}>
+          Clear status
+        </button>
+      </div>
+    </>
+  );
 }
 
 function UpdateInfo({ adapter }: { adapter: WebSimulatorAdapter }) {
@@ -165,6 +223,10 @@ export function GlassesControls({ adapter, onRecreate }: Props) {
               ))}
             </ul>
           )}
+        </fieldset>
+        <fieldset className={styles.group}>
+          <legend>Preview display states</legend>
+          <PreviewStates adapter={adapter} started={started} />
         </fieldset>
         <fieldset className={styles.group}>
           <legend>Mode</legend>

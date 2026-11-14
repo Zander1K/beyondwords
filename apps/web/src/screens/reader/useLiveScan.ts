@@ -15,10 +15,12 @@ import { useReaderStore } from "@/state";
 import { ocr } from "./ocrEngine";
 import type { OverlayHand } from "./VisionOverlay";
 
-/** Fastest scan rate. [ASSUMPTION] ~1/s keeps up with page moves without hogging the CPU. */
-const MIN_SCAN_INTERVAL_MS = 800;
-/** The slow flattening pass (tilted / curled pages) runs at most this often. */
-const UNWARP_EVERY_MS = 10_000;
+/**
+ * Fastest scan rate: 5 reads/s. Reads still run one at a time, so when a read takes longer than
+ * this (slow CPU, WASM instead of WebGPU, the flattening pass) the rate is set by the read time.
+ * [ASSUMPTION] OCR runs in its worker; watch the main thread (hand tracking fps) on slow laptops.
+ */
+const MIN_SCAN_INTERVAL_MS = 200;
 /** Margin around a hand when deciding which lines it hides (fraction of the frame). */
 const HAND_MARGIN = 0.04;
 
@@ -52,7 +54,6 @@ export function useLiveScan(
 
     void (async () => {
       let scans = 0;
-      let lastUnwarpAt = Number.NEGATIVE_INFINITY;
       store().setScan({ status: "scanning" });
       while (!stopped) {
         const video = videoRef.current;
@@ -63,10 +64,8 @@ export function useLiveScan(
         const started = performance.now();
         try {
           const frame = await createImageBitmap(video);
-          const allowUnwarp = started - lastUnwarpAt > UNWARP_EVERY_MS;
-          const result = await ocr.recognizeFrame(frame, allowUnwarp);
+          const result = await ocr.recognizeFrame(frame);
           if (stopped) break;
-          if (result.unwarpTried) lastUnwarpAt = performance.now();
           scans += 1;
           if (result.lines.length === 0) {
             store().setScan({ status: "empty", ocrMs: result.ms });
@@ -80,7 +79,7 @@ export function useLiveScan(
               lines: store().page.lines.length,
               ocrMs: result.ms,
               scans,
-              unwarped: result.unwarped,
+              reused: result.reused,
             });
           }
         } catch (error) {
@@ -90,6 +89,7 @@ export function useLiveScan(
             status: "error",
             message:
               "Reading the page failed. Check the connection (the OCR model downloads once).",
+            cause: error instanceof Error ? error.message : String(error),
           });
           await wait(2000);
         }

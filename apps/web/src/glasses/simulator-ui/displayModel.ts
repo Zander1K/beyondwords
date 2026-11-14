@@ -7,7 +7,7 @@
 // [ASSUMPTION] The limits are ours; Meta's docs give none. ~12 words per phrase and ~25 words
 // per definition (SIMULATION_FEATURES.md SIM-DSP-03).
 // OPEN QUESTION: real text limits for the 600x600 display (section 9, question 2).
-import type { WordCard, WordCardAction } from "../adapter";
+import type { WordCard, WordCardAction, WordCardProblem } from "../adapter";
 
 export const DISPLAY_LIMITS = {
   phraseMaxWords: 12,
@@ -23,6 +23,8 @@ export type DisplayContent =
       short: string;
       actions: WordCardAction[];
       focused?: WordCardAction;
+      /** No definition to show: the card says what went wrong instead. */
+      problem?: WordCardProblem;
     }
   | { kind: "image"; url: string };
 
@@ -81,6 +83,10 @@ export function makeWordCard(card: WordCard, warn: Warn = () => {}): DisplayCont
   );
   if (shortCut) {
     warn(`definition over ${DISPLAY_LIMITS.definitionMaxWords} words truncated: "${card.word}"`);
+  }
+  if (card.problem) {
+    // Nothing to hear or picture: no actions, just the problem.
+    return { kind: "word", word, short: "", actions: [], problem: card.problem };
   }
   const actions = [...new Set(card.actions ?? [])];
   const focused = card.focused && actions.includes(card.focused) ? card.focused : actions[0];

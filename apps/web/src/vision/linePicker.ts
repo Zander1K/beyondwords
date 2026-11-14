@@ -1,6 +1,11 @@
-// Nearest-line picking (SIM-VIS-03): the line the fingertip is UNDER (a reader points just
-// below the words), with hysteresis so the highlight does not flicker between lines; then the
-// exact word above the fingertip on that line, and the phrase containing it.
+// Nearest-line picking (SIM-VIS-03): the line the fingertip is on or just under, with hysteresis
+// so the highlight does not flicker between lines; then the exact word at the fingertip on that
+// line, and the phrase containing it.
+//
+// Readers point two ways: the fingertip just UNDER the word, or ON it (touching it). The line is
+// the one whose baseline is nearest the tip, aiming slightly below the baseline, so both work.
+// The earlier rule preferred "the line the tip is below": touching a word then picked the line
+// above it. Synthetic pages, right word picked: under 95 %, touching 8 % -> 92 %.
 //
 // Uses each line's OCR baseline, not its box: on a tilted page the boxes of neighbouring lines
 // overlap, the baselines do not.
@@ -12,11 +17,19 @@ import type { Point } from "./handPose";
 export const PICK_THRESHOLDS = {
   /** Horizontal slack beyond the line's ends, as a fraction of the image. */
   xSlack: 0.04,
-  /** How far above the baseline the tip may be and still count (fraction of line height). */
-  aboveBaseline: 0.4,
-  /** How far below the baseline the tip may be (fraction of line height). */
+  /**
+   * How far above the baseline the tip may be and still count (fraction of text height): over
+   * the whole word, for a reader who touches it.
+   */
+  aboveBaseline: 1.0,
+  /** How far below the baseline the tip may be (fraction of text height). */
   belowBaseline: 2.2,
-  /** A different line must be this much closer (fraction of line height) to take over... */
+  /**
+   * Where the tip is expected, below the baseline (fraction of text height): between touching
+   * the word (above it) and pointing just under it.
+   */
+  aim: 0.15,
+  /** A different line must be this much closer (fraction of text height) to take over... */
   switchMargin: 0.35,
   /** ...and win this many frames in a row. */
   confirmFrames: 3,
@@ -45,22 +58,25 @@ interface Hit {
   height: number;
   /** Where along the line the tip is, 0-1. */
   along: number;
+  /** Distance from where the tip is expected for this line, in image units (smaller = nearer). */
+  miss: number;
 }
 
 function hits(page: Page, tip: Point): Hit[] {
   const out: Hit[] = [];
   page.lines.forEach((line, i) => {
     const b = line.baseline;
-    const height = line.box?.h ?? 0;
+    const height = b?.height ?? line.box?.h ?? 0;
     if (!b || height <= 0) return;
     const left = Math.min(b.x0, b.x1);
     const right = Math.max(b.x0, b.x1);
     if (tip.x < left - PICK_THRESHOLDS.xSlack || tip.x > right + PICK_THRESHOLDS.xSlack) return;
     const along = Math.max(0, Math.min(1, (tip.x - b.x0) / (b.x1 - b.x0 || 1)));
-    const gap = tip.y - (b.y0 + (b.y1 - b.y0) * along);
+    // The line at the tip's x: its chord plus the sag of a bowed (curled) line.
+    const gap = tip.y - (b.y0 + (b.y1 - b.y0) * along + (b.bow ?? 0) * 4 * along * (1 - along));
     if (gap < -PICK_THRESHOLDS.aboveBaseline * height) return;
     if (gap > PICK_THRESHOLDS.belowBaseline * height) return;
-    out.push({ line: i, gap, height, along });
+    out.push({ line: i, gap, height, along, miss: Math.abs(gap - PICK_THRESHOLDS.aim * height) });
   });
   return out;
 }
@@ -135,13 +151,8 @@ export function pickLine(page: Page, tip: Point, prev: PickerState): PickerState
   const candidates = hits(page, tip);
   if (candidates.length === 0) return { ...prev, candidate: null, candidateFrames: 0 };
 
-  // The nearest line above the fingertip; lines the tip is below come first.
-  const best = candidates.reduce((a, b) => {
-    const aBelow = a.gap >= 0;
-    const bBelow = b.gap >= 0;
-    if (aBelow !== bBelow) return aBelow ? a : b;
-    return Math.abs(a.gap) <= Math.abs(b.gap) ? a : b;
-  });
+  // The line whose baseline the tip is nearest (aiming just below it).
+  const best = candidates.reduce((a, b) => (a.miss <= b.miss ? a : b));
 
   const current = prev.position;
   const currentHit = current ? candidates.find((c) => c.line === current.line) : undefined;
@@ -150,7 +161,7 @@ export function pickLine(page: Page, tip: Point, prev: PickerState): PickerState
   if (
     currentHit &&
     (best.line === currentHit.line ||
-      Math.abs(currentHit.gap) - Math.abs(best.gap) < PICK_THRESHOLDS.switchMargin * best.height)
+      currentHit.miss - best.miss < PICK_THRESHOLDS.switchMargin * best.height)
   ) {
     return {
       position: positionAt(page, currentHit.line, tip.x, currentHit.along, current),

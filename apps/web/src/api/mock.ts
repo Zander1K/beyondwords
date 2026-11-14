@@ -8,8 +8,10 @@ import type { Box, Page, PageLine, PageWord, Phrase } from "@/reader";
 export interface AnalyzeLine {
   text: string;
   box: Box;
-  baseline: { x0: number; y0: number; x1: number; y1: number };
+  baseline: { x0: number; y0: number; x1: number; y1: number; height?: number; bow?: number };
   words?: PageWord[];
+  /** Page (or column) of an open book, in reading order. */
+  block?: number;
 }
 
 /** Longest phrase we build. [ASSUMPTION] Phrase-level reading wants ~3-6 words. */
@@ -94,6 +96,7 @@ export async function mockAnalyzePage(lines: AnalyzeLine[]): Promise<Page> {
       baseline: l.baseline,
       // Word offsets stay valid: phrases re-join the line's words with single spaces.
       words: l.words,
+      block: l.block,
     };
   });
   return { id: `scan-${Date.now()}`, lines: pageLines.filter((l) => l.phrases.length) };
@@ -105,6 +108,12 @@ export async function mockAnalyzePage(lines: AnalyzeLine[]): Promise<Page> {
  */
 export function mockDefineWord(word: string): WordCard {
   const clean = word.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
+  // Nothing to look up: a stray mark, or an OCR misread with digits in it. The digits are
+  // checked on the raw token: trimming the edges would hide "qzx7" as "qzx".
+  const letters = (clean.match(/\p{L}/gu) ?? []).length;
+  if (letters < 2 || /\d/.test(word)) {
+    return { word: clean || word, short: "", problem: "not-found" };
+  }
   const short =
     MOCK_DEFINITIONS[clean.toLowerCase()] ??
     "(mock) A definition will come from the reading brain.";

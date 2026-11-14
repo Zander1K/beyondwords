@@ -5,7 +5,11 @@
 //
 // Callers never pass markup: the adapter turns show* calls into a scene of these nodes, and the
 // panel renders nothing else.
-import type { StatusKind, WordCardAction } from "../adapter";
+//
+// Look: a phrase, a word card or a status sits on a frosted card or pill (`surface`), tinted
+// amber or red when something is wrong (`tone`). OPEN QUESTION: whether the real FlexBox can
+// carry a translucent fill, radius and tint; if not, the same layout works on plain black.
+import type { StatusKind, WordCardAction, WordCardProblem } from "../adapter";
 import type { DisplayContent } from "./displayModel";
 
 export type TextPreset = "heading" | "body" | "meta";
@@ -15,9 +19,12 @@ export type TextPreset = "heading" | "body" | "meta";
  * highlight uses `tone: "accent"`; if the display only has presets, fall back to the heading
  * preset for the emphasised words.
  */
-export type TextTone = "default" | "accent" | "muted";
+export type TextTone = "default" | "accent" | "muted" | "ok" | "warn" | "error";
 
-export type IconName = StatusKind;
+/** Tint of a card or pill: violet-blue normally, amber for a warning, red for an error. */
+export type SurfaceTone = "default" | "warn" | "error";
+
+export type IconName = StatusKind | "not-found";
 
 export type SceneNode =
   | {
@@ -27,6 +34,9 @@ export type SceneNode =
       align?: "start" | "center" | "end";
       justify?: "start" | "center" | "end" | "between";
       wrap?: boolean;
+      /** A frosted card (the content) or a small pill (a status). */
+      surface?: "card" | "pill";
+      tone?: SurfaceTone;
       children: SceneNode[];
     }
   | { type: "text"; preset: TextPreset; text: string; tone?: TextTone }
@@ -45,18 +55,48 @@ const ACTION_LABELS: Record<WordCardAction, string> = {
 export const STATUS_LABELS: Record<StatusKind, string> = {
   listening: "Listening",
   thinking: "Thinking",
+  reading: "Reading the page",
   "hand-lost": "Hand lost",
   offline: "Offline",
   reconnecting: "Reconnecting",
-  "no-page": "No page",
+  "no-page": "No page in view",
+  "no-word": "Point at a word first",
+  "load-failed": "Couldn't read the page",
+};
+
+/** Normal activity is violet-blue, "check this" is amber, "this failed" is red. */
+export const STATUS_TONE: Record<StatusKind, SurfaceTone> = {
+  listening: "default",
+  thinking: "default",
+  reading: "default",
+  reconnecting: "default",
+  "hand-lost": "warn",
+  "no-page": "warn",
+  "no-word": "warn",
+  offline: "error",
+  "load-failed": "error",
+};
+
+/** What a word card says when it has no definition: a headline and what to do next. */
+export const PROBLEM_COPY: Record<WordCardProblem, { title: string; hint: string }> = {
+  "not-found": {
+    title: "No definition found",
+    hint: "Try another word, or move closer to the page",
+  },
+  "load-failed": {
+    title: "Couldn't load the definition",
+    hint: "Check the connection and try again",
+  },
 };
 
 function statusRow(status: StatusKind): SceneNode {
   return {
     type: "flex",
     direction: "row",
-    gap: 8,
+    gap: 12,
     align: "center",
+    surface: "pill",
+    tone: STATUS_TONE[status],
     children: [
       { type: "icon", name: status },
       { type: "text", preset: "meta", text: STATUS_LABELS[status] },
@@ -82,7 +122,33 @@ function phraseRow(text: string, emphasis?: [number, number]): SceneNode {
       tone: emphasised ? "accent" : "default",
     });
   }
-  return { type: "flex", direction: "row", wrap: true, gap: 12, justify: "center", children };
+  return {
+    type: "flex",
+    direction: "row",
+    wrap: true,
+    gap: 14,
+    justify: "center",
+    surface: "card",
+    children,
+  };
+}
+
+function problemCard(word: string, problem: WordCardProblem): SceneNode {
+  const copy = PROBLEM_COPY[problem];
+  return {
+    type: "flex",
+    direction: "column",
+    gap: 12,
+    align: "center",
+    surface: "card",
+    tone: problem === "not-found" ? "warn" : "error",
+    children: [
+      { type: "icon", name: problem === "not-found" ? "not-found" : "load-failed" },
+      { type: "text", preset: "heading", text: word },
+      { type: "text", preset: "body", text: copy.title },
+      { type: "text", preset: "meta", text: copy.hint },
+    ],
+  };
 }
 
 function itemNode(item: DisplayContent): SceneNode {
@@ -90,11 +156,13 @@ function itemNode(item: DisplayContent): SceneNode {
     case "phrase":
       return phraseRow(item.text, item.emphasis);
     case "word":
+      if (item.problem) return problemCard(item.word, item.problem);
       return {
         type: "flex",
         direction: "column",
         gap: 16,
         align: "center",
+        surface: "card",
         children: [
           { type: "text", preset: "heading", text: item.word },
           { type: "text", preset: "body", text: item.short },
@@ -116,11 +184,11 @@ function itemNode(item: DisplayContent): SceneNode {
         ],
       };
     case "image":
-      return { type: "image", url: item.url, width: 480, height: 400, radius: 24 };
+      return { type: "image", url: item.url, width: 480, height: 400, radius: 28 };
   }
 }
 
-/** One item (or none) plus an optional small status icon: the one-thing-at-a-time rule. */
+/** One item (or none) plus an optional small status pill: the one-thing-at-a-time rule. */
 export function buildScene(item: DisplayContent | null, status: StatusKind | null): Scene {
   if (!item && !status) return null;
   const children: SceneNode[] = [];
@@ -129,7 +197,7 @@ export function buildScene(item: DisplayContent | null, status: StatusKind | nul
   return {
     type: "flex",
     direction: "column",
-    gap: 24,
+    gap: 20,
     align: "center",
     justify: "center",
     children,

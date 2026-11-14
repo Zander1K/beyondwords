@@ -6,7 +6,7 @@
 // bucket on first use. Vendor them into public/ for an offline demo.
 import type { HandLandmarker } from "@mediapipe/tasks-vision";
 
-import type { Hand } from "./handPose";
+import type { Hand, Hand3 } from "./handPose";
 
 const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
 const MODEL_URL =
@@ -15,6 +15,8 @@ const MODEL_URL =
 export interface TrackedHand {
   /** 21 landmarks, normalised to the camera image. */
   landmarks: Hand;
+  /** The same 21 landmarks in 3D (metres, hand-centred): pose tests use these when present. */
+  world?: Hand3;
   /** The subject's hand, as MediaPipe reports it. */
   handedness: "Left" | "Right" | null;
   score: number;
@@ -49,8 +51,10 @@ export class MediaPipeHandTracker implements HandTracker {
       runningMode: "VIDEO" as const,
       numHands: 2,
       minHandDetectionConfidence: 0.5,
-      minHandPresenceConfidence: 0.5,
-      minTrackingConfidence: 0.5,
+      // [ASSUMPTION] Slightly below the 0.5 defaults so a hand resting on a busy, printed page
+      // keeps being tracked instead of being dropped and re-detected (the cursor blinks out).
+      minHandPresenceConfidence: 0.4,
+      minTrackingConfidence: 0.4,
     });
     try {
       this.landmarker = await HandLandmarker.createFromOptions(fileset, options("GPU"));
@@ -69,8 +73,10 @@ export class MediaPipeHandTracker implements HandTracker {
     const hands: TrackedHand[] = result.landmarks.map((landmarks, i) => {
       const category = result.handedness[i]?.[0];
       const name = category?.categoryName;
+      const world = result.worldLandmarks[i];
       return {
         landmarks: landmarks.map(({ x, y }) => ({ x, y })),
+        world: world?.map(({ x, y, z }) => ({ x, y, z })),
         handedness: name === "Left" || name === "Right" ? name : null,
         score: category?.score ?? 0,
       };

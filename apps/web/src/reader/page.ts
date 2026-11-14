@@ -23,10 +23,15 @@ export interface PageLine {
   phrases: Phrase[];
   /** Where the line is in the camera image (normalised), from OCR. */
   box?: Box;
-  /** The line's baseline (normalised), used to pick the line under the fingertip. */
-  baseline?: { x0: number; y0: number; x1: number; y1: number };
+  /**
+   * The line's baseline (normalised), used to pick the line under the fingertip, and the height
+   * of the text above it (normalised to the image height; the box is taller on a tilted page).
+   */
+  baseline?: { x0: number; y0: number; x1: number; y1: number; height?: number; bow?: number };
   /** Words with their boxes (normalised) and [start, end) offsets in `text`, from OCR. */
   words?: PageWord[];
+  /** Which page (or column) of an open book the line is on, in reading order (0 = left). */
+  block?: number;
 }
 
 export interface PageWord {

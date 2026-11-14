@@ -58,13 +58,25 @@ export function renderReader(glasses: GlassesAdapter, page: Page, reader: Reader
   }
 }
 
-/** The small status icon on the glasses for the current reading state. */
-export function statusFor(scan: ScanState, handLost = false): StatusKind | null {
+/**
+ * The small status pill on the glasses for the current reading state. A short-lived `hint`
+ * (nothing pointed at) wins, then failures, then what is going on.
+ */
+export function statusFor(
+  scan: ScanState,
+  handLost = false,
+  hint: StatusKind | null = null,
+): StatusKind | null {
+  if (hint) return hint;
+  if (scan.status === "error") return "load-failed";
   if (handLost) return "hand-lost";
-  if (scan.status === "scanning") return "thinking";
-  if (scan.status === "empty" || scan.status === "error") return "no-page";
+  if (scan.status === "scanning") return "reading";
+  if (scan.status === "empty") return "no-page";
   return null;
 }
+
+/** How long a hint ("point at a word first") stays on the glasses. */
+export const HINT_MS = 2500;
 
 const SESSION_NOTICES: Partial<Record<SessionEvent, Notice>> = {
   interrupted: {
@@ -89,6 +101,15 @@ export function useReaderController() {
   const scan = useReaderStore((s) => s.scan);
   const handLost = useReaderStore((s) => s.handLost);
   const [notice, setNotice] = useState<Notice | null>(null);
+  // A short-lived message on the glasses ("point at a word first"), cleared by a timer.
+  const [hint, setHint] = useState<StatusKind | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showHint = (kind: StatusKind) => {
+    clearTimeout(hintTimer.current);
+    setHint(kind);
+    hintTimer.current = setTimeout(() => setHint(null), HINT_MS);
+  };
+  useEffect(() => () => clearTimeout(hintTimer.current), []);
 
   const store = useReaderStore.getState;
 
@@ -164,13 +185,13 @@ export function useReaderController() {
       lastSent.current = null; // force a full re-send when the display comes back
       return;
     }
-    const status = statusFor(scan, handLost);
+    const status = statusFor(scan, handLost, hint);
     const key = `${readerViewKey(page, reader)}|${status ?? ""}`;
     if (key === lastSent.current) return;
     lastSent.current = key;
     renderReader(glasses, page, reader);
     glasses.showStatus(status);
-  }, [glasses, page, reader, session, asleep, scan, handLost]);
+  }, [glasses, page, reader, session, asleep, scan, handLost, hint]);
   useEffect(() => {
     lastSent.current = null; // a new adapter shows nothing yet
   }, [glasses]);
@@ -183,10 +204,14 @@ export function useReaderController() {
     const outcome = step.outcome;
     if (outcome === "boundary" || outcome === "no-word") {
       glasses.playCue("error");
+      // Say it on the display too: a sound alone does not tell you what to do.
+      if (outcome === "no-word") showHint("no-word");
     } else if (typeof outcome === "object" && outcome.action === "hear") {
       const card =
         step.state.card ?? currentPhrase(store().page, step.state.position)?.hardWord?.card;
-      if (card) void glasses.speak(`${card.word}. ${card.short}`);
+      // Nothing to read out when the card says the definition is missing.
+      if (card?.problem) glasses.playCue("error");
+      else if (card) void glasses.speak(`${card.word}. ${card.short}`);
     } else if (outcome === "moved" && !glasses.capabilities.display) {
       glasses.playCue("tick");
     }

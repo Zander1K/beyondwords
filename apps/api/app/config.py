@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(".env", "../../.env"), extra="ignore")
 
-    app_name: str = "Reading Companion"
+    app_name: str = "Beyond Words"
     log_level: str = "INFO"
 
     database_url: str = "mysql+aiomysql://reading:reading@127.0.0.1:3306/reading_companion"

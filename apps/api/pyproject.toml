@@ -1,7 +1,7 @@
 [project]
 name = "reading-companion-api"
 version = "0.1.0"
-description = "FastAPI backend for the Smart Glasses Reading Companion"
+description = "FastAPI backend for Beyond Words"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.115",

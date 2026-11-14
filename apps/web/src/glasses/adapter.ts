@@ -19,17 +19,37 @@ export type SessionState = "stopped" | "starting" | "started" | "stopping";
 export type SessionEvent =
   "interrupted" | "resumed" | "slept" | "woke" | "disconnected" | "reconnected";
 
+/**
+ * `reading`, `no-word` and `load-failed` are additions to the section 6 interface: the display
+ * needs to say what is wrong (page being read, nothing pointed at, something did not load).
+ */
 export type StatusKind =
-  "listening" | "thinking" | "hand-lost" | "offline" | "reconnecting" | "no-page";
+  | "listening"
+  | "thinking"
+  | "reading"
+  | "hand-lost"
+  | "offline"
+  | "reconnecting"
+  | "no-page"
+  | "no-word"
+  | "load-failed";
 
 export type Cue = "tick" | "ok" | "lost-hand" | "error";
 
 export type WordCardAction = "hear" | "picture";
 
+/**
+ * Why a word card has no definition (addition to the section 6 interface): the word is not in
+ * the dictionary / could not be read, or the lookup did not load.
+ */
+export type WordCardProblem = "not-found" | "load-failed";
+
 export interface WordCard {
   word: string;
-  /** Short definition, one or two lines. */
+  /** Short definition, one or two lines. May be empty when `problem` is set. */
   short: string;
+  /** The card shows what went wrong instead of a definition. */
+  problem?: WordCardProblem;
   actions?: WordCardAction[];
   /**
    * Which action button is highlighted. Addition to the section 6 interface.

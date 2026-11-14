@@ -1,62 +1,29 @@
 // Reader: one view. The live camera (the glasses' eyes) fills it, can go fullscreen, and the
-// simulated glasses display floats on top in the right-lens position. Status sits in a slim top
-// bar, actions in a bottom bar, and everything else in a Controls sheet inside the view (so it
-// also works in fullscreen).
+// simulated glasses display floats on top in the right-lens position. Everything else is glass
+// over the camera: status pills (top left), issue messages where a problem is (top centre), a
+// dock of actions (bottom), and a Controls sheet that slides in from the right. The controls
+// show and hide with the Controls button, the C key, or by holding thumb and little finger out to the camera.
 // The page is read continuously from the live camera: frame -> OCR -> page analysis (MOCK) ->
 // merged into the page; the fingertip picks the exact word every frame. A demo page is shown
 // until the first read (HACK, so the glasses have something before the camera starts).
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { GlassesControlsPanel, GlassesHudLayer } from "@/glasses";
+import { GlassesHudLayer, useControlsShortcut } from "@/glasses";
 import { currentPhrase } from "@/reader";
-import { type ScanState, useReaderStore } from "@/state";
+import { useReaderStore } from "@/state";
 
 import { CameraView } from "./CameraView";
+import { ControlsHint } from "./ControlsHint";
+import { ControlsSheet } from "./ControlsSheet";
+import { deriveIssues, derivePills, type Issue } from "./health";
 import styles from "./ReaderScreen.module.css";
+import { IssueStack, StatusPills } from "./ReaderStatus";
 import { useCamera } from "./useCamera";
 import { useFullscreen } from "./useFullscreen";
-import { type TrackingStats, useHandTracking } from "./useHandTracking";
+import { useHandTracking } from "./useHandTracking";
 import { useLiveScan } from "./useLiveScan";
 import { useReaderController } from "./useReaderController";
 import { type OverlayHand, VisionOverlay } from "./VisionOverlay";
-
-const SESSION_LABEL = {
-  stopped: "Glasses off",
-  starting: "Starting…",
-  started: "Reading",
-  stopping: "Stopping…",
-} as const;
-
-function TrackingReadout({ stats, handLost }: { stats: TrackingStats; handLost: boolean }) {
-  if (stats.status === "off") return null;
-  if (stats.status === "loading") return <span>Hands: loading…</span>;
-  if (stats.status === "error") return <span role="alert">Hands: unavailable</span>;
-  return (
-    <span data-alert={handLost}>
-      {handLost ? "Hand lost · holding line" : `Hands ${stats.fps} fps · ${stats.detectMs} ms`}
-    </span>
-  );
-}
-
-function ScanReadout({ scan }: { scan: ScanState }) {
-  switch (scan.status) {
-    case "idle":
-      return <span>Page: demo text</span>;
-    case "scanning":
-      return <span>Reading page…</span>;
-    case "live":
-      return (
-        <span>
-          Live text: {scan.lines} lines · {scan.ocrMs} ms/read
-          {scan.unwarped && " · flattened"}
-        </span>
-      );
-    case "empty":
-      return <span data-alert="true">No text in view · aim at the page</span>;
-    case "error":
-      return <span data-alert="true">{scan.message}</span>;
-  }
-}
 
 export function ReaderScreen() {
   const r = useReaderController();
@@ -66,11 +33,17 @@ export function ReaderScreen() {
   const fullscreen = useFullscreen(viewerRef);
   const [controlsOpen, setControlsOpen] = useState(false);
   const [skeleton, setSkeleton] = useState(false);
+  const [boxes, setBoxes] = useState(false);
+  const [dismissed, setDismissed] = useState<string | null>(null);
   const scan = useReaderStore((s) => s.scan);
   const handLost = useReaderStore((s) => s.handLost);
   const live = cam.stream !== null;
-  const tracking = useHandTracking(videoRef, live);
-  const { line, phrase } = r.reader.position;
+
+  const toggleControls = useCallback(() => setControlsOpen((open) => !open), []);
+  const tracking = useHandTracking(videoRef, live, toggleControls);
+
+  // The C key does the same as the hand gesture.
+  useControlsShortcut(toggleControls);
 
   // The page is read continuously from the live view (no Scan button); lines under the hand
   // keep their last reading, so the scanner needs to know where the hands are.
@@ -80,17 +53,51 @@ export function ReaderScreen() {
   }, [tracking.hands]);
   useLiveScan(videoRef, live, handsRef);
 
-  const notice = r.notice;
+  // What is working and what is not, shown where it matters.
+  const health = useMemo(
+    () => ({
+      camera: cam.camera,
+      session: r.session,
+      asleep: r.asleep,
+      offline: r.offline,
+      scan,
+      tracking: tracking.stats,
+      handLost,
+    }),
+    [cam.camera, r.session, r.asleep, r.offline, scan, tracking.stats, handLost],
+  );
+  const pills = useMemo(() => derivePills(health), [health]);
+  const issues = useMemo(() => {
+    const list: Issue[] = deriveIssues(health);
+    // One-off notices (call interrupted, glasses disconnected) can be closed.
+    const notice = r.notice;
+    if (notice && notice.text !== dismissed) {
+      list.push({
+        id: "notice",
+        severity: notice.tone === "warn" ? "warn" : "info",
+        title: notice.text,
+        dismissible: true,
+      });
+    }
+    return list;
+  }, [health, r.notice, dismissed]);
+
   const phoneCaption = r.offline ? currentPhrase(r.page, r.reader.position)?.text : undefined;
 
   return (
-    <div ref={viewerRef} className={styles.viewer} data-fullscreen={fullscreen.mode}>
+    <div
+      ref={viewerRef}
+      className={styles.viewer}
+      data-fullscreen={fullscreen.mode}
+      data-controls={controlsOpen ? "open" : "closed"}
+    >
       <CameraView camera={cam.camera} videoRef={videoRef} onStart={() => void cam.start()}>
         <VisionOverlay
           page={r.page}
           position={r.reader.position}
           hands={tracking.hands}
           showSkeleton={skeleton}
+          showBoxes={boxes}
           connections={tracking.connections}
         />
       </CameraView>
@@ -98,26 +105,8 @@ export function ReaderScreen() {
       <GlassesHudLayer />
 
       <div className={styles.topBar}>
-        {live ? (
-          <span className={styles.live} role="status">
-            <span className={styles.dot} aria-hidden="true" /> Camera on
-          </span>
-        ) : (
-          <span>Camera off</span>
-        )}
-        <span className={styles.badge} data-state={r.session}>
-          {SESSION_LABEL[r.session]}
-          {r.asleep && " · asleep"}
-        </span>
-        <ScanReadout scan={scan} />
-        <TrackingReadout stats={tracking.stats} handLost={handLost} />
+        <StatusPills pills={pills} />
       </div>
-
-      {notice && (
-        <p className={styles.notice} data-tone={notice.tone} role="status">
-          {notice.text}
-        </p>
-      )}
 
       {phoneCaption && (
         // SIM-SES-05: glasses offline, so the phone shows the phrase instead.
@@ -125,127 +114,128 @@ export function ReaderScreen() {
           <span className={styles.phoneLabel}>Glasses offline · on the phone</span>
           <span>{phoneCaption}</span>
           <div className={styles.phoneNav}>
-            <button type="button" onClick={() => r.actions.phone("up")} aria-label="Previous line">
+            <button
+              type="button"
+              className={styles.phoneButton}
+              onClick={() => r.actions.phone("up")}
+              aria-label="Previous line"
+            >
               ↑
             </button>
             <button
               type="button"
+              className={styles.phoneButton}
               onClick={() => r.actions.phone("left")}
               aria-label="Previous phrase"
             >
               ←
             </button>
-            <button type="button" onClick={() => r.actions.phone("right")} aria-label="Next phrase">
+            <button
+              type="button"
+              className={styles.phoneButton}
+              onClick={() => r.actions.phone("right")}
+              aria-label="Next phrase"
+            >
               →
             </button>
-            <button type="button" onClick={() => r.actions.phone("down")} aria-label="Next line">
+            <button
+              type="button"
+              className={styles.phoneButton}
+              onClick={() => r.actions.phone("down")}
+              aria-label="Next line"
+            >
               ↓
             </button>
           </div>
         </div>
       )}
 
-      <div className={styles.bottomBar}>
-        {r.session === "stopped" ? (
-          <button
-            type="button"
-            className={styles.primary}
-            onClick={() => void r.actions.startSession()}
-            disabled={r.offline}
-          >
-            Start reading
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => void r.actions.stopSession()}
-            disabled={r.session !== "started"}
-          >
-            Stop reading
-          </button>
-        )}
-        {live ? (
-          <>
-            <button type="button" onClick={cam.stop}>
+      {/* Issues, the controls hint and the dock stack in one column, so they never overlap
+          when the dock wraps on a narrow screen. */}
+      <div className={styles.bottom}>
+        <IssueStack
+          issues={issues}
+          onAction={(id) => {
+            if (id === "retry-hands") tracking.retry();
+          }}
+          onDismiss={(id) => {
+            if (id === "notice" && r.notice) setDismissed(r.notice.text);
+          }}
+        />
+
+        <ControlsHint
+          open={controlsOpen}
+          cameraOn={live}
+          progress={tracking.holdProgress}
+          onToggle={toggleControls}
+        />
+
+        <div className={styles.dock} role="toolbar" aria-label="Reading actions">
+          {r.session === "stopped" ? (
+            <button
+              type="button"
+              className={styles.primary}
+              onClick={() => void r.actions.startSession()}
+              disabled={r.offline}
+            >
+              Start reading
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void r.actions.stopSession()}
+              disabled={r.session !== "started"}
+            >
+              Stop reading
+            </button>
+          )}
+          {live ? (
+            <button type="button" className={styles.button} onClick={cam.stop}>
               Camera off
             </button>
-          </>
-        ) : (
+          ) : (
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void cam.start()}
+              disabled={cam.camera.kind === "starting"}
+            >
+              Camera on
+            </button>
+          )}
           <button
             type="button"
-            onClick={() => void cam.start()}
-            disabled={cam.camera.kind === "starting"}
+            className={styles.button}
+            onClick={toggleControls}
+            aria-expanded={controlsOpen}
+            aria-controls="reader-controls"
           >
-            Camera on
+            Controls
           </button>
-        )}
-        <span className={styles.spacer} />
-        <button
-          type="button"
-          onClick={() => setControlsOpen((o) => !o)}
-          aria-expanded={controlsOpen}
-          aria-controls="reader-controls"
-        >
-          Controls
-        </button>
-        <button type="button" onClick={fullscreen.toggle} aria-pressed={fullscreen.mode !== "off"}>
-          {fullscreen.mode === "off" ? "Fullscreen" : "Exit fullscreen"}
-        </button>
+          <button
+            type="button"
+            className={styles.button}
+            onClick={fullscreen.toggle}
+            aria-pressed={fullscreen.mode !== "off"}
+          >
+            {fullscreen.mode === "off" ? "Fullscreen" : "Exit fullscreen"}
+          </button>
+        </div>
       </div>
 
-      {controlsOpen && (
-        <aside id="reader-controls" className={styles.sheet} aria-label="Controls">
-          <div className={styles.sheetHeader}>
-            <h2>Controls</h2>
-            <button type="button" onClick={() => setControlsOpen(false)}>
-              Close
-            </button>
-          </div>
-
-          <section className={styles.section}>
-            <h3>Page</h3>
-            {r.session === "stopped" && !r.offline && (
-              <p className={styles.hint}>
-                Press Start reading: the glasses display session needs your go-ahead.
-              </p>
-            )}
-            <div className={styles.text}>
-              {r.page.lines.map((l, li) => (
-                <p key={li} className={styles.line}>
-                  {l.phrases.map((p, pi) => (
-                    <span
-                      key={pi}
-                      className={li === line && pi === phrase ? styles.current : undefined}
-                    >
-                      {p.text}{" "}
-                    </span>
-                  ))}
-                </p>
-              ))}
-            </div>
-          </section>
-
-          <section className={styles.section}>
-            <h3>Camera view</h3>
-            <label className={styles.toggle}>
-              <input
-                type="checkbox"
-                checked={skeleton}
-                onChange={(e) => setSkeleton(e.target.checked)}
-              />
-              Show hand skeleton
-            </label>
-            <p className={styles.hint}>
-              Camera frames stay in this browser tab: nothing is saved or uploaded.
-            </p>
-          </section>
-
-          <section className={styles.section}>
-            <h3>Glasses simulator</h3>
-            <GlassesControlsPanel />
-          </section>
-        </aside>
-      )}
+      <ControlsSheet
+        open={controlsOpen}
+        onClose={() => setControlsOpen(false)}
+        page={r.page}
+        position={r.reader.position}
+        sessionStopped={r.session === "stopped"}
+        offline={r.offline}
+        showSkeleton={skeleton}
+        onSkeleton={setSkeleton}
+        showBoxes={boxes}
+        onBoxes={setBoxes}
+      />
     </div>
   );
 }

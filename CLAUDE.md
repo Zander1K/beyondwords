@@ -1,6 +1,6 @@
-# CLAUDE.md — Smart Glasses Reading Companion (monorepo)
+# CLAUDE.md — Beyond Words, the smart-glasses reading companion (monorepo)
 
-> Working name: **Reading Companion** (final name TBD; keep it in one config constant, `APP_NAME`, so renaming is a one-line change).
+> Name: **Beyond Words** (formerly the working name "Reading Companion"; keep it in one config constant, `APP_NAME`, so renaming is a one-line change).
 > Source of truth for product behaviour: the "Smart Glasses Reading Companion — Application SOP" doc. If this file and the SOP disagree, the SOP wins. Flag the conflict instead of guessing.
 
 ## 1. What we are building
@@ -52,7 +52,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 |---|---|
 | Glasses | Meta Ray-Ban Display (full) and Ray-Ban Meta Gen 2 (audio-first) via Meta Wearables DAT 1.0 |
 | Web app | React + Vite (TypeScript, strict), React Router, Zustand, CSS modules, Vitest. The browser simulates the glasses via `WebSimulatorAdapter`; real DAT moves to a later `MetaDatAdapter` |
-| Hand tracking / OCR | In the browser: MediaPipe HandLandmarker (`@mediapipe/tasks-vision`); PaddleOCR (`ppu-paddle-ocr`, ONNX Runtime Web) in a Web Worker, with page unwarping for tilted pages |
+| Hand tracking / OCR | In the browser: MediaPipe HandLandmarker (`@mediapipe/tasks-vision`); PaddleOCR (`ppu-paddle-ocr`, ONNX Runtime Web) in a Web Worker; each text line is found from the detector's map and flattened along its own curve before it is read, so curled and tilted pages and two-page spreads work |
 | API / middleware | FastAPI (Python 3.11+), async, Pydantic v2 |
 | Database | MariaDB (SQLAlchemy 2.x async + Alembic migrations) |
 | Brain | NVIDIA Nemotron 3.5 Super VL, served with vLLM on **Verda**. NVIDIA Build is the fallback (free tier ~40 req/min/key) |

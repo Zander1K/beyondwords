@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { GlassesGesture } from "../adapter";
-import { keyToGesture } from "./gestures";
+import { isControlsShortcut, keyToGesture } from "./gestures";
 import { WebSimulatorAdapter } from "./WebSimulatorAdapter";
 
 function pressKey(target: EventTarget, key: string, extra: Record<string, unknown> = {}): Event {
@@ -137,5 +137,25 @@ describe("SIM-GST-02 gesture log", () => {
     for (let i = 0; i < 30; i++) adapter.emitGesture("right");
     expect(adapter.store.getState().gestureLog).toHaveLength(20);
     adapter.dispose();
+  });
+});
+
+describe("controls shortcut (C)", () => {
+  it("is the C key, with or without caps lock", () => {
+    expect(isControlsShortcut({ key: "c" })).toBe(true);
+    expect(isControlsShortcut({ key: "C" })).toBe(true);
+    expect(isControlsShortcut({ key: "x" })).toBe(false);
+  });
+
+  it("leaves browser shortcuts, key repeat and typing alone", () => {
+    expect(isControlsShortcut({ key: "c", metaKey: true })).toBe(false); // copy
+    expect(isControlsShortcut({ key: "c", ctrlKey: true })).toBe(false);
+    expect(isControlsShortcut({ key: "c", repeat: true })).toBe(false);
+    expect(isControlsShortcut({ key: "c", target: { tagName: "INPUT" } })).toBe(false);
+    expect(isControlsShortcut({ key: "c", target: { isContentEditable: true } })).toBe(false);
+  });
+
+  it("is not a glasses gesture", () => {
+    expect(keyToGesture({ key: "c" })).toBeNull();
   });
 });

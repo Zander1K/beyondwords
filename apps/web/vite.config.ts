@@ -12,7 +12,7 @@ const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
 export default defineConfig(({ mode }) => {
   // Read every var (prefix "") only to pick out APP_NAME; nothing else is passed to the bundle.
   const env = loadEnv(mode, repoRoot, "");
-  const appName = env.APP_NAME || "Reading Companion";
+  const appName = env.APP_NAME || "Beyond Words";
   // LAN mode (`make web-lan`): reachable from phones on the same network. Phones only allow
   // the camera and mic over HTTPS, so this serves a self-signed certificate (accept the browser
   // warning once on the phone). Normal dev stays on localhost, which needs no HTTPS.
@@ -26,9 +26,9 @@ export default defineConfig(({ mode }) => {
       react(),
       ...(lan ? [basicSsl({ name: "reading-companion-lan" })] : []),
       {
-        // Puts APP_NAME into the <title> placeholder in index.html.
+        // Puts APP_NAME into every %APP_NAME% placeholder in index.html (title, description).
         name: "app-name-title",
-        transformIndexHtml: (html: string) => html.replace("%APP_NAME%", appName),
+        transformIndexHtml: (html: string) => html.split("%APP_NAME%").join(appName),
       },
     ],
     define: {

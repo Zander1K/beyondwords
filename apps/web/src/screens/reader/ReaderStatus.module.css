@@ -1,0 +1,199 @@
+/* Status pills (top left of the camera view) and issue messages (in the bottom column above the
+   dock, where they cannot collide with the pills, the glasses display or the controls sheet). Glass, with the
+   state in the colour. */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pill {
+  composes: pill from "../../ui/glass.module.css";
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.28rem 0.8rem 0.28rem 0.62rem;
+  font-size: 0.78rem;
+  font-weight: 550;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1.3;
+}
+
+.dot {
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.45);
+}
+
+.pill[data-tone="ok"] .dot {
+  background: var(--tone-ok);
+  box-shadow: 0 0 0 3px rgb(88 227 155 / 0.22);
+}
+
+.pill[data-tone="warn"] {
+  color: var(--tone-warn);
+  border-color: rgb(255 214 140 / 0.45);
+}
+
+.pill[data-tone="warn"] .dot {
+  background: var(--tone-warn);
+}
+
+.pill[data-tone="error"] {
+  color: var(--tone-error);
+  border-color: rgb(255 168 184 / 0.55);
+}
+
+.pill[data-tone="error"] .dot {
+  background: var(--tone-error);
+  box-shadow: 0 0 0 3px rgb(255 127 143 / 0.25);
+}
+
+.pill[data-tone="off"] {
+  color: var(--glass-text-dim);
+}
+
+.ring {
+  composes: ring from "../../ui/glass.module.css";
+  --ring-size: 0.85rem;
+}
+
+/* ---- issues ---- */
+
+.stack {
+  display: grid;
+  gap: 0.5rem;
+  width: min(25rem, 100%);
+}
+
+.issue {
+  composes: panel from "../../ui/glass.module.css";
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.8rem 0.9rem 0.8rem 0.85rem;
+  border-radius: 18px;
+  font-size: 0.86rem;
+  letter-spacing: 0;
+  word-spacing: 0;
+  line-height: 1.4;
+  animation: arrive 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.issue[data-severity="info"] {
+  /* Darker than the display's card: a toast has to stay readable over a bright page. */
+  background: linear-gradient(148deg, rgb(112 76 236 / 0.66), rgb(36 46 150 / 0.72));
+}
+
+/* Darker than the display's cards: a toast has to stay readable over a bright page. */
+.issue[data-severity="warn"] {
+  background: linear-gradient(148deg, rgb(196 112 16 / 0.82), rgb(104 52 22 / 0.9));
+  border-color: rgb(255 214 140 / 0.5);
+}
+
+.issue[data-severity="error"] {
+  background: linear-gradient(148deg, rgb(190 38 78 / 0.82), rgb(92 22 78 / 0.9));
+  border-color: rgb(255 168 184 / 0.55);
+}
+
+.icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+}
+
+.icon svg {
+  width: 1.4rem;
+  height: 1.4rem;
+}
+
+.issue[data-severity="warn"] .icon {
+  color: #ffd98a;
+}
+
+.issue[data-severity="error"] .icon {
+  color: #ffb3bd;
+}
+
+.issue[data-severity="info"] .icon {
+  color: var(--tone-info);
+}
+
+.icon .ring {
+  --ring-size: 1.3rem;
+}
+
+.body {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  justify-items: start;
+}
+
+.title {
+  font-weight: 650;
+}
+
+.detail {
+  color: rgb(246 244 255 / 0.82);
+}
+
+/* The underlying error text: small and monospace, one or two lines, so it can be read out. */
+.cause {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  max-width: 100%;
+  color: rgb(246 244 255 / 0.7);
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.72rem;
+  word-break: break-word;
+}
+
+.action {
+  composes: button from "../../ui/glass.module.css";
+  margin-top: 0.35rem;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.82rem;
+}
+
+.close {
+  flex: none;
+  margin-left: auto;
+  width: 1.6rem;
+  height: 1.6rem;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--glass-text-dim);
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.close:hover {
+  background: rgb(255 255 255 / 0.15);
+  color: #fff;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .issue {
+    animation: none;
+  }
+}

@@ -15,3 +15,4 @@ export {
 } from "./context";
 export { GlassesControlsPanel, GlassesHudLayer } from "./GlassesPanel";
 export { GlassesProvider } from "./GlassesProvider";
+export { useControlsShortcut } from "./useControlsShortcut";

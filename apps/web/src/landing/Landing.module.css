@@ -1,0 +1,828 @@
+/* The landing page, after ALX Studio's design system (Geist, inset rounded shells, a pixel dot
+   texture, two-tone headlines, ringed cards, blur-and-lift entrances), in black and blue.
+   Plain CSS modules, not Tailwind: this repo's stack is CSS modules.
+
+   The app's own global styles set wide reading spacing on <body>; the page resets it, because
+   the reading spacing is for the reader, not for marketing type. The tokens below are inherited
+   by the page's other modules (the access dialog, which draws in the top layer, too). */
+.page {
+  --ink: #05070c;
+  --night: #070b14;
+  --card: #0b111d;
+  --line: #1c2537;
+  --b200: #bfe2fe;
+  --b300: #8ed1ff;
+  --b400: #51b6ff;
+  --b500: #2b9aff;
+  --b600: #157efc;
+  --b700: #1468e6;
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+
+  min-height: 100vh;
+  overflow-x: clip;
+  background: var(--ink);
+  color: #fff;
+  font-family:
+    "Geist",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+  font-size: 17px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  word-spacing: 0;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.page ::selection {
+  background: rgb(43 154 255 / 0.35);
+}
+
+/* A zero-specificity reset (:where), so every later rule that sets a margin wins over it. */
+:where(.page) :is(h1, h2, h3, p, ol, ul) {
+  margin: 0;
+  padding: 0;
+}
+
+:where(.page) :is(ol, ul) {
+  list-style: none;
+}
+
+.container {
+  width: 100%;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 20px;
+}
+
+@media (min-width: 640px) {
+  .container {
+    padding-inline: 32px;
+  }
+}
+
+.accent {
+  color: var(--b400);
+}
+
+/* ---- entrance: each piece blurs and lifts in, in turn ---- */
+
+.enter {
+  animation: reveal 0.9s var(--ease) both;
+  animation-delay: var(--delay, 0s);
+}
+
+@keyframes reveal {
+  0% {
+    opacity: 0.01;
+    filter: blur(8px);
+    transform: translateY(14px);
+  }
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .enter {
+    animation: none;
+  }
+}
+
+/* ---- nav ---- */
+
+.nav {
+  position: fixed;
+  z-index: 40;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 84px;
+  transition:
+    background-color 0.3s ease,
+    box-shadow 0.3s ease,
+    backdrop-filter 0.3s ease;
+}
+
+.nav[data-scrolled="true"] {
+  background: rgb(5 7 12 / 0.72);
+  box-shadow: 0 1px 0 rgb(255 255 255 / 0.07);
+  -webkit-backdrop-filter: blur(16px) saturate(1.4);
+  backdrop-filter: blur(16px) saturate(1.4);
+}
+
+.navInner {
+  display: flex;
+  height: 100%;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logoLink {
+  color: inherit;
+  text-decoration: none;
+}
+
+.logoLink:focus-visible {
+  outline: 2px solid var(--b400);
+  outline-offset: 4px;
+  border-radius: 8px;
+}
+
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* The mark: a ring in the blues, the same ring the app uses for "working on it". */
+.mark {
+  width: 24px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: conic-gradient(from 210deg, #8ed1ff, #157efc, #1c4b8e, #51b6ff, #8ed1ff);
+  -webkit-mask: radial-gradient(farthest-side, transparent 52%, #000 56%);
+  mask: radial-gradient(farthest-side, transparent 52%, #000 56%);
+  box-shadow: 0 0 18px rgb(43 154 255 / 0.5);
+}
+
+/* ---- shells: the inset, rounded surfaces everything sits on ---- */
+
+.shell {
+  padding: 8px;
+}
+
+@media (min-width: 640px) {
+  .shell {
+    padding: 12px;
+  }
+}
+
+.hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border-radius: 24px;
+  background:
+    radial-gradient(70% 55% at 50% 118%, rgb(21 126 252 / 0.55), transparent 72%),
+    radial-gradient(60% 50% at 84% 6%, rgb(21 126 252 / 0.2), transparent 70%),
+    linear-gradient(180deg, #05070c 0%, #070d1c 55%, #08142e 100%);
+  box-shadow: inset 0 0 0 1px #121a2b;
+}
+
+@media (min-width: 640px) {
+  .hero {
+    border-radius: 32px;
+  }
+}
+
+/* A hairline of light along the top edge. */
+.hero::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  left: 4rem;
+  right: 4rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(81 182 255 / 0.65), transparent);
+}
+
+.heroGrid {
+  display: grid;
+  gap: 40px;
+  align-items: center;
+  padding-top: 120px;
+  padding-bottom: 72px;
+}
+
+@media (min-width: 640px) {
+  .heroGrid {
+    padding-top: 164px;
+    padding-bottom: 96px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .heroGrid {
+    padding-top: 168px;
+    padding-bottom: 112px;
+  }
+}
+
+.heroCopy {
+  min-width: 0;
+}
+
+.pillWrap {
+  display: block;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px 6px 12px;
+  border-radius: 999px;
+  background: rgb(255 255 255 / 0.06);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.08),
+    0 0 0 1px rgb(255 255 255 / 0.1);
+  color: rgb(255 255 255 / 0.82);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dot {
+  position: relative;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--b500);
+}
+
+.dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--b500);
+  animation: pulse 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes pulse {
+  from {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+  to {
+    opacity: 0;
+    transform: scale(2.6);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dot::after {
+    animation: none;
+    opacity: 0;
+  }
+}
+
+.title {
+  margin-top: 28px;
+  font-size: 2.6rem;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1.02;
+  text-wrap: balance;
+}
+
+@media (min-width: 640px) {
+  .title {
+    font-size: 3.75rem;
+    line-height: 1;
+  }
+}
+
+@media (min-width: 1024px) {
+  .title {
+    font-size: 4.1rem;
+  }
+}
+
+@media (min-width: 1280px) {
+  .title {
+    font-size: 4.75rem;
+  }
+}
+
+/* Each sentence of the headline starts its own line. */
+.titlePart {
+  display: block;
+}
+
+.word {
+  display: inline-block;
+}
+
+.heroText {
+  max-width: 34rem;
+  margin-top: 30px;
+  color: rgb(255 255 255 / 0.72);
+  font-size: 17px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+@media (min-width: 640px) {
+  .heroText {
+    font-size: 18px;
+  }
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 18px;
+  margin-top: 40px;
+}
+
+@media (min-width: 640px) {
+  .actions {
+    flex-direction: row;
+    align-items: center;
+    gap: 22px;
+  }
+}
+
+.note {
+  max-width: 17rem;
+  color: rgb(255 255 255 / 0.5);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+/* The picture sizes itself from this column (container query units), so it looks the same at
+   every width instead of overflowing a narrow column. */
+/* The row of partner marks under the hero button. */
+.poweredBy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px 28px;
+  margin-top: 44px;
+}
+
+.poweredLabel {
+  color: rgb(255 255 255 / 0.5);
+  font-family: "Geist Mono", ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.poweredList {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 26px;
+}
+
+.poweredList li {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  color: rgb(255 255 255 / 0.88);
+  font-size: 14.5px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.poweredLogo {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+
+/* ---- sections ---- */
+
+.section {
+  padding: 96px 0;
+}
+
+.section.tight {
+  padding: 40px 0 72px;
+}
+
+@media (min-width: 640px) {
+  .section {
+    padding: 128px 0;
+  }
+
+  .section.tight {
+    padding: 48px 0 96px;
+  }
+}
+
+.heading {
+  max-width: 46rem;
+  text-align: left;
+}
+
+/* The eyebrow, the title and the lede each sit in a Reveal wrapper: space the wrappers. */
+.heading > * + * {
+  margin-top: 22px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--b400);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 28px;
+  height: 1px;
+  background: var(--b600);
+}
+
+.h2 {
+  font-size: 2.25rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  text-wrap: balance;
+}
+
+@media (min-width: 640px) {
+  .h2 {
+    font-size: 3rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .h2 {
+    font-size: 3.5rem;
+  }
+}
+
+.lede {
+  max-width: 38rem;
+  color: rgb(255 255 255 / 0.62);
+  font-size: 17px;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+/* ---- how it works: numbered, ruled rows ---- */
+
+.steps {
+  border-top: 1px solid rgb(255 255 255 / 0.14);
+}
+
+.step {
+  display: grid;
+  gap: 4px 16px;
+  grid-template-columns: 3rem minmax(0, 1fr);
+  padding: 28px 0;
+  border-bottom: 1px solid rgb(255 255 255 / 0.09);
+}
+
+@media (min-width: 900px) {
+  .step {
+    grid-template-columns: 5rem minmax(0, 20rem) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 32px;
+    padding: 40px 0;
+  }
+}
+
+.num {
+  grid-row: span 2;
+  color: var(--b400);
+  font-family: "Geist Mono", ui-monospace, Menlo, monospace;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+@media (min-width: 900px) {
+  .num {
+    grid-row: auto;
+  }
+}
+
+.stepTitle {
+  font-size: 1.4rem;
+  font-weight: 500;
+  letter-spacing: -0.03em;
+  line-height: 1.2;
+}
+
+@media (min-width: 900px) {
+  .stepTitle {
+    font-size: 1.65rem;
+  }
+}
+
+.stepText {
+  max-width: 36rem;
+  color: rgb(255 255 255 / 0.62);
+  font-size: 16.5px;
+  line-height: 1.6;
+}
+
+/* ---- ringed dark cards ---- */
+
+.cards {
+  display: grid;
+  gap: 16px;
+  margin-top: 56px;
+}
+
+@media (min-width: 768px) {
+  .cards {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cardWrap {
+  height: 100%;
+}
+
+.card {
+  display: flex;
+  height: 100%;
+  min-height: 15rem;
+  flex-direction: column;
+  padding: 28px;
+  border-radius: 22px;
+  background: linear-gradient(180deg, #0e1524 0%, #0b111d 100%);
+  box-shadow:
+    inset 0 1px 0 #1b2436,
+    0 0 0 1px var(--line);
+  transition:
+    transform 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
+}
+
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow:
+    inset 0 1px 0 #2a3a58,
+    0 0 0 1px #2f4a7a,
+    0 18px 40px -20px rgb(21 126 252 / 0.5);
+}
+
+/* The partner's mark, in a tile at the top of its card. */
+.logoTile {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 22px;
+  place-items: center;
+  border-radius: 16px;
+  background: #0f1522;
+  box-shadow:
+    inset 0 1px 0 #1b2436,
+    0 0 0 1px #223049;
+  color: #fff;
+  transition:
+    color 0.3s var(--ease),
+    box-shadow 0.3s var(--ease);
+}
+
+.card:hover .logoTile {
+  color: var(--b300);
+  box-shadow:
+    inset 0 1px 0 #2a3a58,
+    0 0 0 1px #2f4a7a,
+    0 8px 22px -10px rgb(43 154 255 / 0.7);
+}
+
+.partnerLogo {
+  width: 26px;
+  height: 26px;
+}
+
+.role {
+  color: var(--b400);
+  font-family: "Geist Mono", ui-monospace, Menlo, monospace;
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.partner {
+  margin-top: 12px;
+  font-size: 1.9rem;
+  font-weight: 600;
+  letter-spacing: -0.035em;
+  line-height: 1.1;
+}
+
+.cardText {
+  margin-top: auto;
+  padding-top: 24px;
+  color: rgb(255 255 255 / 0.62);
+  font-size: 15.5px;
+  line-height: 1.55;
+}
+
+/* ---- the team ---- */
+
+.people {
+  display: grid;
+  gap: 14px;
+  margin-top: 48px;
+}
+
+@media (min-width: 768px) {
+  .people {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.person {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px 14px 14px;
+  border-radius: 22px;
+  background: #0f1522;
+  box-shadow:
+    inset 0 1px 0 #1b2436,
+    0 0 0 1px var(--line);
+}
+
+.avatar {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  flex-shrink: 0;
+  place-items: center;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #51b6ff, #1468e6);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.3),
+    0 8px 18px -8px #157efc;
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.personName {
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+/* ---- the closing call to action: a dark shell with a soft blue light and dots ---- */
+
+.cta {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 80px 24px;
+  border-radius: 32px;
+  background: var(--night);
+  box-shadow:
+    0 0 0 1px var(--line) inset,
+    0 40px 100px -40px rgb(21 126 252 / 0.55);
+  text-align: center;
+}
+
+@media (min-width: 640px) {
+  .cta {
+    padding: 112px 48px;
+    border-radius: 40px;
+  }
+}
+
+.cta::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(75% 60% at 50% 0%, rgb(21 126 252 / 0.38), transparent 75%);
+}
+
+.cta::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 4rem;
+  right: 4rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(81 182 255 / 0.7), transparent);
+}
+
+.ctaTitle {
+  max-width: 44rem;
+  margin: 0 auto;
+  font-size: 2.6rem;
+  font-weight: 500;
+  letter-spacing: -0.045em;
+  line-height: 1;
+  text-wrap: balance;
+}
+
+@media (min-width: 640px) {
+  .ctaTitle {
+    font-size: 3.75rem;
+  }
+}
+
+@media (min-width: 1024px) {
+  .ctaTitle {
+    font-size: 4.5rem;
+  }
+}
+
+.ctaAccent {
+  color: var(--b200);
+}
+
+.ctaText {
+  max-width: 32rem;
+  margin: 24px auto 0;
+  color: rgb(255 255 255 / 0.72);
+  font-size: 17px;
+  line-height: 1.6;
+  text-wrap: pretty;
+}
+
+.ctaButton {
+  display: flex;
+  justify-content: center;
+  margin-top: 40px;
+}
+
+/* ---- footer ---- */
+
+.footer {
+  padding: 8px;
+}
+
+@media (min-width: 640px) {
+  .footer {
+    padding: 0 12px 12px;
+  }
+}
+
+.footerInner {
+  max-width: 80rem;
+  margin-inline: auto;
+  padding: 40px 24px 28px;
+  border-radius: 24px;
+  background: var(--night);
+  box-shadow: 0 0 0 1px var(--line) inset;
+}
+
+@media (min-width: 640px) {
+  .footerInner {
+    padding: 48px 48px 32px;
+    border-radius: 32px;
+  }
+}
+
+.footerTop {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+@media (min-width: 900px) {
+  .footerTop {
+    flex-direction: row;
+    align-items: flex-start;
+    justify-content: space-between;
+  }
+}
+
+.footerLines {
+  display: grid;
+  gap: 6px;
+  color: rgb(255 255 255 / 0.78);
+  font-size: 15px;
+}
+
+@media (min-width: 900px) {
+  .footerLines {
+    text-align: right;
+  }
+}
+
+.legalRule {
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.legal {
+  max-width: 46rem;
+  color: rgb(255 255 255 / 0.45);
+  font-size: 12.5px;
+  line-height: 1.6;
+}

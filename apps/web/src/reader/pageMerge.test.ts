@@ -95,3 +95,59 @@ describe("mapPosition", () => {
     });
   });
 });
+
+describe("mergePages on a tilted page", () => {
+  // Lines 0.05 apart, tilted so each one's box overlaps its neighbours' boxes.
+  function tilted(id: string, indices: number[]): Page {
+    return {
+      id,
+      lines: indices.map((i) => {
+        const y = 0.2 + i * 0.05;
+        return {
+          ...line(phrase(TEXT[i] ?? "")),
+          box: { x: 0.2, y: y - 0.06, w: 0.6, h: 0.12 },
+          baseline: { x0: 0.2, y0: y + 0.03, x1: 0.8, y1: y - 0.03, height: 0.03 },
+        };
+      }),
+    };
+  }
+
+  it("keeps a hidden line even though a visible neighbour's box overlaps it", () => {
+    const prev = tilted("p1", [0, 1, 2, 3]);
+    const next = tilted("scan-2", [0, 1, 3]); // the hand covers line 2
+    const hand = { x: 0.4, y: 0.25, w: 0.2, h: 0.05 };
+    const { page } = mergePages(prev, next, hand);
+    expect(page.lines.map((l) => l.text)).toEqual(TEXT);
+  });
+});
+
+describe("mergePages on an open book", () => {
+  it("keeps reading order page by page, not interleaved by height", () => {
+    const at = (text: string, block: number, x: number, y: number) => ({
+      ...line(phrase(text)),
+      block,
+      box: { x, y: y - 0.03, w: 0.35, h: 0.04 },
+      baseline: { x0: x, y0: y, x1: x + 0.35, y1: y, height: 0.03 },
+    });
+    const prev: Page = {
+      id: "p1",
+      lines: [at("old lighthouse stood", 0, 0.1, 0.2), at("restless water swept", 1, 0.55, 0.2)],
+    };
+    const next: Page = {
+      id: "scan-2",
+      lines: [
+        at("restless water swept", 1, 0.55, 0.2),
+        at("lamp swept slowly", 1, 0.55, 0.3),
+        at("old lighthouse stood", 0, 0.1, 0.2),
+        at("edge grey cliffs", 0, 0.1, 0.3),
+      ],
+    };
+    const { page } = mergePages(prev, next, null);
+    expect(page.lines.map((l) => l.text)).toEqual([
+      "old lighthouse stood",
+      "edge grey cliffs",
+      "restless water swept",
+      "lamp swept slowly",
+    ]);
+  });
+});

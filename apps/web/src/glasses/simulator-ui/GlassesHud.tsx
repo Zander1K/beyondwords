@@ -1,6 +1,7 @@
 // The simulated Ray-Ban Display drawn over the live camera view, the way the wearer sees it:
 // a 600x600 display in the right lens on top of the world. Black is see-through on the real
-// display, so the scene sits on the camera image with only a light tint for contrast.
+// display, so the scene is just its frosted cards and pills floating on the camera image; faint
+// corner marks show where the 600x600 field is.
 // HACK: size and position (upper right) are illustrative. OPEN QUESTION: real FOV (~20 deg) and
 // placement in the lens (SIMULATION_FEATURES.md SIM-DSP-08, section 9).
 import { useStore } from "zustand";
@@ -29,9 +30,9 @@ export function GlassesHud({ adapter }: { adapter: WebSimulatorAdapter }) {
         aria-live="polite"
       >
         {audioOnly ? (
-          <span className={styles.caption}>No display (Gen 2 mode)</span>
+          <span className={styles.caption}>No display · audio only (Gen 2)</span>
         ) : off ? (
-          <span className={styles.caption}>
+          <span className={styles.caption} data-error={!connected}>
             {connected ? "Glasses display off" : "Glasses disconnected"}
           </span>
         ) : (

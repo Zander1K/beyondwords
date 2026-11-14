@@ -10,7 +10,7 @@
 // A pointing index finger is the reading cursor (app vision), never a gesture.
 // [ASSUMPTION] Thresholds are first guesses; tune on real footage.
 import type { GlassesGesture } from "../adapter";
-import { classifyPose, type Hand, palmCentre, type Point } from "@/vision/handPose";
+import { classifyPose, type Hand, type Hand3, palmCentre, type Point } from "@/vision/handPose";
 
 export const CAMERA_GESTURE_TUNING = {
   /** Frames a pinch must hold before it counts (filters brief touches). */
@@ -41,14 +41,21 @@ export class CameraGestureRecognizer {
    */
   constructor(private readonly options: { mirrored?: () => boolean } = {}) {}
 
-  /** Feed one frame of hands; returns the gestures recognised in it. */
-  update(hands: readonly Hand[], at: number): GlassesGesture[] {
+  /**
+   * Feed one frame of hands; returns the gestures recognised in it. `worlds` are the hands' 3D
+   * landmarks (same order), when the tracker has them.
+   */
+  update(
+    hands: readonly Hand[],
+    at: number,
+    worlds: readonly (Hand3 | undefined)[] = [],
+  ): GlassesGesture[] {
     const out: GlassesGesture[] = [];
     // HACK: hands are matched to tracks by index; MediaPipe keeps a stable order while tracking.
     this.tracks.length = hands.length;
     hands.forEach((hand, i) => {
       const track = (this.tracks[i] ??= { pinch: null, pinchFrames: 0, fired: false, palm: [] });
-      const gesture = this.updateHand(track, hand, at);
+      const gesture = this.updateHand(track, hand, at, worlds[i]);
       if (gesture && at - this.lastFiredAt >= CAMERA_GESTURE_TUNING.cooldownMs) {
         this.lastFiredAt = at;
         out.push(gesture);
@@ -57,8 +64,13 @@ export class CameraGestureRecognizer {
     return out;
   }
 
-  private updateHand(track: HandTrack, hand: Hand, at: number): GlassesGesture | null {
-    const pose = classifyPose(hand, track.pinch);
+  private updateHand(
+    track: HandTrack,
+    hand: Hand,
+    at: number,
+    world: Hand3 | undefined,
+  ): GlassesGesture | null {
+    const pose = classifyPose(hand, track.pinch, world);
 
     // Pinches fire once on the way in; the fingers must part before the next one.
     const pinch = pose === "pinch-index" ? "index" : pose === "pinch-middle" ? "middle" : null;

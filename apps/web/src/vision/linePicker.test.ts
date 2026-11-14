@@ -123,3 +123,78 @@ describe("word under the fingertip", () => {
     expect(run(page, [{ x: 0.75, y: 0.22 }], state).state.position?.word).toBe(3);
   });
 });
+
+describe("pickLine on a tilted page", () => {
+  it("measures distance to a line with its text height, not its (taller) box", () => {
+    // Two lines 0.05 apart whose boxes are 0.15 tall because the page is tilted.
+    const lines = ["aaaa bbbb", "cccc dddd"].map((text, i) => {
+      const y = 0.3 + i * 0.05;
+      return {
+        ...line(phrase(text)),
+        box: { x: 0.2, y: y - 0.1, w: 0.6, h: 0.15 },
+        baseline: { x0: 0.2, y0: y + 0.04, x1: 0.8, y1: y - 0.04, height: 0.03 },
+      };
+    });
+    const page: Page = { id: "tilted", lines };
+    // Just under the second line at its middle (baseline y = 0.35 there).
+    const state = pickLine(page, { x: 0.5, y: 0.36 }, initialPickerState);
+    expect(state.position?.line).toBe(1);
+    // Far below both lines (more than 2.2 text heights): not near any line.
+    expect(pickLine(page, { x: 0.5, y: 0.5 }, initialPickerState).position).toBeNull();
+  });
+});
+
+describe("pickLine: touching the word or pointing under it", () => {
+  // Book-like spacing: baselines 0.06 apart, text 0.035 tall.
+  const page: Page = {
+    id: "book",
+    lines: ["aaaa bbbb", "cccc dddd", "eeee ffff"].map((text, i) => {
+      const y = 0.3 + i * 0.06;
+      return {
+        ...line(phrase(text)),
+        box: { x: 0.2, y: y - 0.027, w: 0.6, h: 0.035 },
+        baseline: { x0: 0.2, y0: y, x1: 0.8, y1: y, height: 0.035 },
+      };
+    }),
+  };
+
+  it("picks the touched line when the fingertip is on the word", () => {
+    // Middle of line 1's text (baseline 0.36, text from 0.333).
+    expect(pickLine(page, { x: 0.3, y: 0.347 }, initialPickerState).position?.line).toBe(1);
+  });
+
+  it("picks the line above when the fingertip is just under it", () => {
+    expect(pickLine(page, { x: 0.3, y: 0.37 }, initialPickerState).position?.line).toBe(1);
+  });
+});
+
+describe("pickLine on a bowed (curled) page", () => {
+  // Two lines 0.04 apart whose middles sag 0.03 (almost a line's spacing) below their ends.
+  const page: Page = {
+    id: "curled",
+    lines: ["aaaa bbbb", "cccc dddd"].map((text, i) => {
+      const y = 0.4 + i * 0.04;
+      return {
+        ...line(phrase(text)),
+        box: { x: 0.2, y: y - 0.03, w: 0.6, h: 0.05 },
+        baseline: { x0: 0.2, y0: y, x1: 0.8, y1: y, height: 0.025, bow: 0.03 },
+      };
+    }),
+  };
+
+  it("finds the line where the text is, not where its chord is", () => {
+    // In the middle the first line sits at 0.4 + 0.03 = 0.43 (its chord is at 0.40, and the
+    // second line's chord at 0.44 is nearer to a tip at 0.425).
+    const tip = { x: 0.5, y: 0.43 };
+    expect(pickLine(page, tip, initialPickerState).position?.line).toBe(0);
+    // Without the bow the same tip would be taken for the second line.
+    const straight: Page = {
+      ...page,
+      lines: page.lines.map((l) => ({
+        ...l,
+        baseline: l.baseline && { ...l.baseline, bow: 0 },
+      })),
+    };
+    expect(pickLine(straight, tip, initialPickerState).position?.line).toBe(1);
+  });
+});

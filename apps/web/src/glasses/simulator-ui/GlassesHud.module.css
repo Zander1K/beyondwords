@@ -2,9 +2,9 @@
    the view: about a third of the width, never larger than 600 CSS px. */
 .hud {
   position: absolute;
-  top: 4.5rem;
+  top: 3.75rem;
   right: clamp(0.5rem, 3%, 2rem);
-  width: clamp(9rem, 34%, 600px);
+  width: clamp(10.5rem, 34%, 600px);
   z-index: 2;
   pointer-events: none;
 }
@@ -12,13 +12,27 @@
 .display {
   position: relative;
   aspect-ratio: 1;
-  border-radius: 10px;
-  /* Additive display: black is see-through. A light tint keeps white text readable over a
-     bright page; the dashed edge shows where the display is. */
-  background: rgb(0 0 0 / 0.38);
-  outline: 1px dashed rgb(255 255 255 / 0.35);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
   transition: opacity 0.6s ease;
+}
+
+/* Corner marks: where the 600x600 display field is, without drawing a box on the world. */
+.display::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  --c: rgb(255 255 255 / 0.3);
+  --len: 8%;
+  --t: 2px;
+  background:
+    linear-gradient(var(--c), var(--c)) top left / var(--len) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) top left / var(--t) var(--len) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--len) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) top right / var(--t) var(--len) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--len) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom left / var(--t) var(--len) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--len) var(--t) no-repeat,
+    linear-gradient(var(--c), var(--c)) bottom right / var(--t) var(--len) no-repeat;
 }
 
 .display[data-sleep="dimmed"] {
@@ -29,28 +43,36 @@
   opacity: 0.12;
 }
 
-/* Off / audio-only: greyed out (SIM-DSP-10, SIM-AUD-01). */
+/* Off / audio-only: a quiet glass chip (SIM-DSP-10, SIM-AUD-01). */
 .display[data-off="true"] {
-  background: rgb(60 60 60 / 0.45);
   display: grid;
   place-items: center;
 }
 
+.display[data-off="true"]::before {
+  opacity: 0.5;
+}
+
 .caption {
-  padding: 0.5rem;
-  color: rgb(255 255 255 / 0.8);
-  font-size: 0.8rem;
-  text-align: center;
+  composes: pill from "../../ui/glass.module.css";
+  padding: 0.45rem 1rem;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--glass-text-dim);
+}
+
+.caption[data-error="true"] {
+  color: var(--tone-error);
+  border-color: rgb(255 168 184 / 0.5);
 }
 
 .cue {
+  composes: pill from "../../ui/glass.module.css";
   position: absolute;
-  bottom: -1.9rem;
+  bottom: -2.2rem;
   right: 0;
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px;
-  background: rgb(0 0 0 / 0.6);
-  color: #fff;
+  padding: 0.2rem 0.75rem;
   font-size: 0.75rem;
   animation: fade 1.6s ease-out forwards;
 }
