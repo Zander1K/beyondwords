@@ -21,7 +21,13 @@ export { FingerDetector } from "./fingerDetector";
 export { HOLD_TUNING, HoldDetector, type HoldState } from "./hold";
 export { type FingerTip, findFingertip, SkinModel, skinMask } from "./fingertip";
 export { OneEuroFilter, PointFilter } from "./oneEuro";
-export { initialPickerState, pickLine, type PickerState, wordAt } from "./linePicker";
+export {
+  initialPickerState,
+  MOUSE_THRESHOLDS,
+  pickLine,
+  type PickerState,
+  wordAt,
+} from "./linePicker";
 export {
   type Baseline,
   type Box,

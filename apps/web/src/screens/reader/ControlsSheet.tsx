@@ -8,10 +8,18 @@ import { GlassesControlsPanel } from "@/glasses";
 import type { Page, ReaderPosition } from "@/reader";
 
 import styles from "./ControlsSheet.module.css";
+import { useSettings } from "@/state";
+
 import { useOcrState } from "./ocrEngine";
 import { GESTURE_GUIDE } from "./gestureGuide";
 
 type TabId = "reading" | "gestures" | "camera" | "glasses";
+
+const POINTERS = [
+  ["auto", "Automatic: finger or mouse, whichever you use"],
+  ["finger", "Finger only"],
+  ["mouse", "Mouse only"],
+] as const;
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "reading", label: "Reading" },
@@ -47,6 +55,8 @@ export function ControlsSheet({
   onBoxes,
 }: Props) {
   const [tab, setTab] = useState<TabId>("reading");
+  const pointer = useSettings((x) => x.pointer);
+  const setPointer = useSettings((x) => x.setPointer);
   const ocrChoice = useOcrState((o) => o.choice);
   const setOcrChoice = useOcrState((o) => o.setChoice);
   const cloudAvailable = useOcrState((o) => o.cloudAvailable);
@@ -168,6 +178,20 @@ export function ControlsSheet({
               />
               Show text boxes (debug)
             </label>
+            <fieldset className={styles.readerChoice}>
+              <legend>Pointer</legend>
+              {POINTERS.map(([id, label]) => (
+                <label key={id} className={styles.toggle}>
+                  <input
+                    type="radio"
+                    name="pointer"
+                    checked={pointer === id}
+                    onChange={() => setPointer(id)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
             <fieldset className={styles.readerChoice}>
               <legend>Text reader</legend>
               <label className={styles.toggle}>

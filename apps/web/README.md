@@ -96,6 +96,18 @@ Read-aloud and ask-by-voice use **ElevenLabs**, through the API (the key stays o
   recogniser sends its audio to the browser vendor to recognise the phrase.
 - Privacy: the text to speak and the recorded question go to ElevenLabs to be processed; nothing is stored here.
 
+## Read aloud (always there)
+
+The dock has a **🔊 Read aloud** toggle (on by default, remembered in this browser; also in Settings > Voice).
+With it on, a card is spoken as soon as it has real content: a word's meaning, a spoken-question answer, the
+page summary, a book-scan result. Placeholders ("Looking it up…") are never spoken, a card is not repeated while
+it stays open, and closing and reopening it reads it again. "Hear it" still reads a card on request with the
+toggle off. Phrases themselves are not read automatically (the reader keeps control; only cards are read).
+
+Browsers refuse to play sound until the page has been clicked, and a hand gesture or "Hey Meta" does not count.
+Blocked speech is no longer lost: the app shows "Your browser is blocking sound. Click anywhere…", remembers what
+was to be said, and speaks it on the next click. If neither ElevenLabs nor the browser has a voice, it says so.
+
 ## Voices
 
 Read-aloud uses the browser's own speech voices (`speechSynthesis`). The voice library

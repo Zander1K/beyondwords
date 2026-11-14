@@ -16,6 +16,7 @@ import {
   useWakeWord,
   type WakeProblem,
 } from "@/glasses";
+import { cardSpeech, cardToAutoRead } from "./cardSpeech";
 import {
   CARD_ACTIONS,
   currentPhrase,
@@ -23,7 +24,7 @@ import {
   pointedWordInPhrase,
   type ReaderState,
 } from "@/reader";
-import { type ScanState, useReaderStore } from "@/state";
+import { type ScanState, useReaderStore, useSettings } from "@/state";
 
 /** The page-gist card (shown on the display like a word card). */
 export const PAGE_CARD_TITLE = "This page";
@@ -259,6 +260,25 @@ export function useReaderController() {
     lastSent.current = null; // a new adapter shows nothing yet
   }, [glasses]);
 
+  // ---- Read aloud ----
+  // With Read aloud on, a card is spoken as soon as it has real content: a word's meaning, an
+  // answer, the page summary, the result of a book scan. Placeholders ("Looking it up…") are not,
+  // and the same text is not spoken twice while the card stays open.
+  const autoRead = useSettings((s) => s.autoRead);
+  const lastRead = useRef("");
+  useEffect(() => {
+    const card = reader.view === "card" ? reader.card : undefined;
+    if (!card) {
+      lastRead.current = ""; // closed: opening the same card again reads it again
+      return;
+    }
+    if (!autoRead || session !== "started" || asleep) return;
+    const text = cardToAutoRead(card);
+    if (!text || text === lastRead.current) return;
+    lastRead.current = text;
+    void glasses.speak(text);
+  }, [autoRead, session, asleep, reader.view, reader.card, glasses]);
+
   // ---- gestures ----
 
   /** Apply a reader action and give feedback. Used by glasses gestures and phone buttons. */
@@ -274,7 +294,7 @@ export function useReaderController() {
         step.state.card ?? currentPhrase(store().page, step.state.position)?.hardWord?.card;
       // Nothing to read out when the card says the definition is missing.
       if (card?.problem) glasses.playCue("error");
-      else if (card) void glasses.speak(`${card.word}. ${card.short}`);
+      else if (card) void glasses.speak(cardSpeech(card));
     } else if (outcome === "moved" && !glasses.capabilities.display) {
       glasses.playCue("tick");
     }
@@ -293,7 +313,7 @@ export function useReaderController() {
       showHint("no-page");
       return;
     }
-    store().showCard({ word: PAGE_CARD_TITLE, short: PAGE_CARD_LOADING });
+    store().showCard({ word: PAGE_CARD_TITLE, short: PAGE_CARD_LOADING, pending: true });
     const stillAsking = () => {
       const now = store().reader;
       return now.view === "card" && now.card?.word === PAGE_CARD_TITLE;
@@ -304,9 +324,13 @@ export function useReaderController() {
         page_lines: lines.map((l, i) => ({ id: `L${i + 1}`, text: l.text.slice(0, 1000) })),
         current_line_id: `L${at.position.line + 1}`,
       });
-      if (stillAsking()) store().showCard({ word: PAGE_CARD_TITLE, short: reply.answer });
+      if (stillAsking()) {
+        store().showCard({ word: PAGE_CARD_TITLE, short: reply.answer, say: reply.answer });
+      }
     } catch {
-      if (stillAsking()) store().showCard({ word: PAGE_CARD_TITLE, short: PAGE_CARD_FAILED });
+      if (stillAsking()) {
+        store().showCard({ word: PAGE_CARD_TITLE, short: PAGE_CARD_FAILED, say: PAGE_CARD_FAILED });
+      }
     }
   };
 
@@ -317,8 +341,12 @@ export function useReaderController() {
    * display and is read aloud. Every failure ends in a card that says what happened, and reading
    * carries on. ElevenLabs only ever hears the recording, never the waiting for "Hey Meta".
    */
-  const showAnswerCard = (text: string) =>
-    store().showCard({ word: ANSWER_CARD_TITLE, short: text });
+  const showAnswerCard = (text: string, pending = false) =>
+    store().showCard({
+      word: ANSWER_CARD_TITLE,
+      short: text,
+      ...(pending ? { pending: true } : { say: text }),
+    });
 
   /** Start listening to a question. `source` "wake" = "Hey Meta" was said (chime first). */
   const beginAsk = async (source: "button" | "wake") => {
@@ -366,7 +394,7 @@ export function useReaderController() {
     };
     try {
       const question = await speechInput.stop();
-      showAnswerCard(`“${question}” ${ANSWER_LOADING}`);
+      showAnswerCard(`“${question}” ${ANSWER_LOADING}`, true);
       const { page: current, reader: at } = store();
       const pointed =
         at.position.word !== undefined
@@ -389,7 +417,8 @@ export function useReaderController() {
         ...(pointed ? { pointed_word: pointed.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "") } : {}),
       });
       if (answerShown()) showAnswerCard(reply.answer);
-      void glasses.speak(reply.answer); // asked out loud, answered out loud
+      // Asked out loud, answered out loud: with Read aloud on, the card effect speaks it (once).
+      if (!(useSettings.getState().autoRead && answerShown())) void glasses.speak(reply.answer);
     } catch (error) {
       showAnswerCard(
         error instanceof HearingError

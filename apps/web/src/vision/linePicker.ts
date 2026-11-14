@@ -46,6 +46,21 @@ export const PICK_THRESHOLDS = {
   wordConfirmFrames: 6,
 } as const;
 
+export type PickThresholds = { -readonly [K in keyof typeof PICK_THRESHOLDS]: number };
+
+/**
+ * For a mouse cursor: it is exact and steady, so there is nothing to smooth. The word under the
+ * cursor is picked at once (no dwell, a small margin) and another line is taken as soon as the
+ * cursor is clearly nearer to it.
+ */
+export const MOUSE_THRESHOLDS: PickThresholds = {
+  ...PICK_THRESHOLDS,
+  wordSlack: 0.05,
+  wordConfirmFrames: 1,
+  confirmFrames: 1,
+  switchMargin: 0.2,
+};
+
 export interface PickerState {
   position: ReaderPosition | null;
   candidate: number | null;
@@ -72,7 +87,7 @@ interface Hit {
   miss: number;
 }
 
-function hits(page: Page, tip: Point): Hit[] {
+function hits(page: Page, tip: Point, t: PickThresholds): Hit[] {
   const out: Hit[] = [];
   page.lines.forEach((line, i) => {
     const b = line.baseline;
@@ -80,22 +95,28 @@ function hits(page: Page, tip: Point): Hit[] {
     if (!b || height <= 0) return;
     const left = Math.min(b.x0, b.x1);
     const right = Math.max(b.x0, b.x1);
-    if (tip.x < left - PICK_THRESHOLDS.xSlack || tip.x > right + PICK_THRESHOLDS.xSlack) return;
+    if (tip.x < left - t.xSlack || tip.x > right + t.xSlack) return;
     const along = Math.max(0, Math.min(1, (tip.x - b.x0) / (b.x1 - b.x0 || 1)));
     // The line at the tip's x: its chord plus the sag of a bowed (curled) line.
     const gap = tip.y - (b.y0 + (b.y1 - b.y0) * along + (b.bow ?? 0) * 4 * along * (1 - along));
-    if (gap < -PICK_THRESHOLDS.aboveBaseline * height) return;
-    if (gap > PICK_THRESHOLDS.belowBaseline * height) return;
-    out.push({ line: i, gap, height, along, miss: Math.abs(gap - PICK_THRESHOLDS.aim * height) });
+    if (gap < -t.aboveBaseline * height) return;
+    if (gap > t.belowBaseline * height) return;
+    out.push({ line: i, gap, height, along, miss: Math.abs(gap - t.aim * height) });
   });
   return out;
 }
 
-function phraseAt(page: Page, line: number, along: number, current: ReaderPosition | null): number {
+function phraseAt(
+  page: Page,
+  line: number,
+  along: number,
+  current: ReaderPosition | null,
+  t: PickThresholds,
+): number {
   const count = page.lines[line]?.phrases.length ?? 0;
   if (current && current.line === line) {
     const span = phraseSpan(page, current);
-    const slack = PICK_THRESHOLDS.phraseSlack;
+    const slack = t.phraseSlack;
     if (span && along >= span[0] - slack && along <= span[1] + slack) return current.phrase;
   }
   for (let p = 0; p < count; p++) {
@@ -114,13 +135,14 @@ export function wordAt(
   line: number,
   tipX: number,
   current: ReaderPosition | null,
+  t: PickThresholds = PICK_THRESHOLDS,
 ): number | undefined {
   const words = page.lines[line]?.words;
   if (!words?.length) return undefined;
   if (current && current.line === line && current.word !== undefined) {
     const w = words[current.word];
     if (w) {
-      const slack = w.box.w * PICK_THRESHOLDS.wordSlack;
+      const slack = w.box.w * t.wordSlack;
       if (tipX >= w.box.x - slack && tipX <= w.box.x + w.box.w + slack) return current.word;
     }
   }
@@ -144,21 +166,27 @@ function positionAt(
   tipX: number,
   along: number,
   current: ReaderPosition | null,
+  t: PickThresholds,
 ): ReaderPosition {
-  const word = wordAt(page, line, tipX, current);
+  const word = wordAt(page, line, tipX, current, t);
   const start = word !== undefined ? page.lines[line]?.words?.[word]?.start : undefined;
   if (word !== undefined && start !== undefined) {
     return { line, phrase: phraseAtOffset(page, line, start), word };
   }
-  return { line, phrase: phraseAt(page, line, along, current) };
+  return { line, phrase: phraseAt(page, line, along, current, t) };
 }
 
 /**
  * One frame of picking. Returns the new state; `state.position` is the line and phrase under the
  * fingertip, or the last one held when the tip is not near any line.
  */
-export function pickLine(page: Page, tip: Point, prev: PickerState): PickerState {
-  const candidates = hits(page, tip);
+export function pickLine(
+  page: Page,
+  tip: Point,
+  prev: PickerState,
+  t: PickThresholds = PICK_THRESHOLDS,
+): PickerState {
+  const candidates = hits(page, tip, t);
   if (candidates.length === 0) return { ...prev, candidate: null, candidateFrames: 0 };
 
   // The line whose baseline the tip is nearest (aiming just below it).
@@ -170,16 +198,15 @@ export function pickLine(page: Page, tip: Point, prev: PickerState): PickerState
   // Stay on the current line unless another one is clearly closer.
   if (
     currentHit &&
-    (best.line === currentHit.line ||
-      currentHit.miss - best.miss < PICK_THRESHOLDS.switchMargin * best.height)
+    (best.line === currentHit.line || currentHit.miss - best.miss < t.switchMargin * best.height)
   ) {
-    const proposed = positionAt(page, currentHit.line, tip.x, currentHit.along, current);
+    const proposed = positionAt(page, currentHit.line, tip.x, currentHit.along, current, t);
     // Moving to another word on this line must hold for several frames; the first word on a
     // line (nothing focused yet) is immediate.
     const held = current?.word;
     if (held !== undefined && proposed.word !== undefined && proposed.word !== held) {
       const frames = prev.wordCandidate === proposed.word ? (prev.wordFrames ?? 0) + 1 : 1;
-      if (frames < PICK_THRESHOLDS.wordConfirmFrames) {
+      if (frames < t.wordConfirmFrames) {
         return {
           position: current,
           candidate: null,
@@ -194,11 +221,11 @@ export function pickLine(page: Page, tip: Point, prev: PickerState): PickerState
 
   // A new line must win several frames in a row (first pick is immediate).
   const frames = prev.candidate === best.line ? prev.candidateFrames + 1 : 1;
-  if (current && frames < PICK_THRESHOLDS.confirmFrames) {
+  if (current && frames < t.confirmFrames) {
     return { ...prev, candidate: best.line, candidateFrames: frames };
   }
   return {
-    position: positionAt(page, best.line, tip.x, best.along, null),
+    position: positionAt(page, best.line, tip.x, best.along, null, t),
     candidate: null,
     candidateFrames: 0,
   };

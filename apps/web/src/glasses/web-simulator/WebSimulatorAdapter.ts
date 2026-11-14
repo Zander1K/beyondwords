@@ -129,6 +129,18 @@ const CAMERA_SOURCE: Record<GlassesGesture, string> = {
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 const VOICE_KEY = "beyondwords.voice";
+/** A silent, valid WAV: played once inside a click so the browser lets later sound through. */
+const SILENT_WAV =
+  "data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAESsAABErAAABAAgAZGF0YQAAAAA=";
+const UNLOCK_EVENTS = ["pointerdown", "keydown", "touchend"] as const;
+
+/** The browser refused to start sound: nobody has interacted with the page yet. */
+class AudioBlockedError extends Error {
+  constructor() {
+    super("The browser blocked sound until the page is clicked.");
+    this.name = "AudioBlockedError";
+  }
+}
 /** After ElevenLabs fails, use the browser's voice for this long before trying it again. */
 const REMOTE_RETRY_MS = 60_000;
 /** Generated phrases kept in memory. */
@@ -201,6 +213,10 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   /** Generated speech by voice and text (blob URLs): a repeated phrase is not generated again. */
   private readonly speechCache = new Map<string, string>();
   private recording: { chunks: Int16Array[]; sampleRate: number } | null = null;
+  /** Speech the browser blocked: said as soon as the page has been clicked. */
+  private pendingSpeech: { voiceId: string | null; text: string } | null = null;
+  private audioUnlocked = false;
+  private readonly unlockHandler = () => this.unlockAudio();
   private mic: {
     stream: MediaStream;
     context: AudioContext;
@@ -260,6 +276,7 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     }
     const state = this.session.state;
     if (state === "started" || state === "starting") return;
+    if (!this.audioUnlocked) this.attachUnlock(); // a reader who starts reading is about to hear speech
     this.store.setState({ interrupted: false });
     this.setSession("starting");
     await wait(this.startDelayMs);
@@ -638,6 +655,49 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     return this.speakWith(this.store.getState().voiceId, text);
   }
 
+  // ---- Browsers block sound until the page has been interacted with ----
+
+  private attachUnlock(): void {
+    if (typeof window === "undefined") return;
+    for (const type of UNLOCK_EVENTS) window.addEventListener(type, this.unlockHandler, true);
+  }
+
+  private detachUnlock(): void {
+    if (typeof window === "undefined") return;
+    for (const type of UNLOCK_EVENTS) window.removeEventListener(type, this.unlockHandler, true);
+  }
+
+  /** The first click, key press or touch: let sound through, and say what was waiting. */
+  private unlockAudio(): void {
+    if (this.audioUnlocked) return;
+    this.audioUnlocked = true;
+    this.detachUnlock();
+    try {
+      const silent = new Audio(SILENT_WAV);
+      silent.volume = 0;
+      void silent.play().catch(() => undefined);
+    } catch {
+      // Best effort: the real playback below tells us if sound is still blocked.
+    }
+    try {
+      window.speechSynthesis?.resume();
+    } catch {
+      // Not every browser has it.
+    }
+    this.store.setState({ audioBlocked: false });
+    const waiting = this.pendingSpeech;
+    this.pendingSpeech = null;
+    if (waiting) void this.speakWith(waiting.voiceId, waiting.text);
+  }
+
+  /** Sound was refused: remember what to say, show it, and wait for the next interaction. */
+  private markBlocked(voiceId: string | null, text: string): void {
+    this.pendingSpeech = { voiceId, text };
+    this.audioUnlocked = false;
+    this.attachUnlock();
+    this.store.setState({ audioBlocked: true });
+  }
+
   // ---- Voices ----
 
   /** The voices on offer, best first (see voices.ts). Empty until the browser has loaded them. */
@@ -673,15 +733,30 @@ export class WebSimulatorAdapter implements GlassesAdapter {
    */
   async speakWith(voiceId: string | null, text: string): Promise<void> {
     if (!text.trim()) return;
+    // Only an adapter that is actually in use listens for the page being clicked (one built and
+    // thrown away, as React StrictMode does in development, must leave nothing behind).
+    if (!this.audioUnlocked) this.attachUnlock();
     const wantsRemote = voiceId === null || voiceId.startsWith(REMOTE_PREFIX);
     if (wantsRemote && Date.now() >= this.remote.downUntil) {
       try {
         await this.speakRemote(voiceId ? voiceId.slice(REMOTE_PREFIX.length) : null, text);
+        this.store.setState({ speechIssue: null });
         return;
-      } catch {
+      } catch (error) {
+        if (error instanceof AudioBlockedError) {
+          this.markBlocked(voiceId, text); // the browser blocks the fallback voice too
+          return;
+        }
         this.remote.downUntil = Date.now() + REMOTE_RETRY_MS;
       }
     }
+    // The fallback is the browser's own voice: say so if it has none, instead of staying silent.
+    const noVoice = typeof window === "undefined" || this.listVoices().length === 0;
+    this.store.setState({
+      speechIssue: noVoice
+        ? "No voice is available right now, so nothing can be read aloud."
+        : null,
+    });
     await this.speakBrowser(voiceId?.startsWith(REMOTE_PREFIX) ? null : voiceId, text);
   }
 
@@ -709,7 +784,18 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     await new Promise<void>((resolve, reject) => {
       audio.onended = () => resolve();
       audio.onerror = () => reject(new Error("The speech could not be played."));
-      audio.play().catch(reject);
+      audio
+        .play()
+        .then(() => {
+          if (this.store.getState().audioBlocked) this.store.setState({ audioBlocked: false });
+        })
+        .catch((error: unknown) =>
+          reject(
+            error instanceof DOMException && error.name === "NotAllowedError"
+              ? new AudioBlockedError()
+              : error,
+          ),
+        );
     });
   }
 
@@ -737,7 +823,10 @@ export class WebSimulatorAdapter implements GlassesAdapter {
       utterance.rate = this.store.getState().speechRate;
       utterance.onend = () => resolve();
       // A failed or cancelled utterance must never break the reading session.
-      utterance.onerror = () => resolve();
+      utterance.onerror = (event) => {
+        if (event.error === "not-allowed") this.markBlocked(voiceId, text);
+        resolve();
+      };
       synth.speak(utterance);
     });
   }
@@ -858,6 +947,7 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   }
 
   dispose(): void {
+    this.detachUnlock();
     this.stopWakeWord();
     this.gestureHandlers.clear();
     this.sessionHandlers.clear();

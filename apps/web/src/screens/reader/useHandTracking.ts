@@ -4,7 +4,7 @@
 import { type RefObject, useEffect, useRef, useState } from "react";
 
 import { useGlasses } from "@/glasses";
-import { useReaderStore } from "@/state";
+import { useReaderStore, useSettings } from "@/state";
 import {
   classifyPose,
   FingerDetector,
@@ -20,6 +20,7 @@ import {
   PointFilter,
 } from "@/vision";
 
+import { pointerClock } from "./pointerSource";
 import type { OverlayHand } from "./VisionOverlay";
 
 /** Detection rate cap. [ASSUMPTION] 20/s keeps the main thread responsive (knob is P1). */
@@ -194,7 +195,12 @@ export function useHandTracking(
       // Lost means nothing hand-like in view for a while, not "not pointing right now".
       if (frame.hands.length || finger) lastSeenAt = now;
 
-      if (tip) {
+      if (pointerClock.mouseIsPointer(useSettings.getState().pointer, now)) {
+        // The mouse is the pointer: the finger only keeps its gestures. Nothing is "lost".
+        lastPointerAt = now;
+        s.setHandLost(false);
+        picker.current = initialPickerState;
+      } else if (tip) {
         lastPointerAt = now;
         s.setHandLost(false);
         const page = s.page;

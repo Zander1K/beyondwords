@@ -34,13 +34,58 @@ export const SPACING_RANGES: Record<
   fontSize: { min: 0.875, max: 1.75, step: 0.0625 },
 };
 
+const POINTER_KEY = "beyondwords.pointer";
+
+function readPointer(): "auto" | "finger" | "mouse" {
+  try {
+    const v = localStorage.getItem(POINTER_KEY);
+    return v === "finger" || v === "mouse" ? v : "auto";
+  } catch {
+    return "auto";
+  }
+}
+
+const AUTO_READ_KEY = "beyondwords.autoRead";
+
+function readAutoRead(): boolean {
+  try {
+    return localStorage.getItem(AUTO_READ_KEY) !== "off"; // on unless the reader switched it off
+  } catch {
+    return true;
+  }
+}
+
 interface SettingsState {
+  /** Who points at the page in camera mode: the finger, the mouse, or whichever was used last. */
+  pointer: "auto" | "finger" | "mouse";
+  setPointer: (p: "auto" | "finger" | "mouse") => void;
+  /** Read cards aloud as they appear (word meanings, answers, page summaries). On by default. */
+  autoRead: boolean;
+  setAutoRead: (on: boolean) => void;
   spacing: SpacingSettings;
   setSpacing: (patch: Partial<SpacingSettings>) => void;
   resetSpacing: () => void;
 }
 
 export const useSettings = create<SettingsState>((set) => ({
+  pointer: readPointer(),
+  setPointer: (pointer) => {
+    try {
+      localStorage.setItem(POINTER_KEY, pointer);
+    } catch {
+      // Not remembered; the choice still applies for this visit.
+    }
+    set({ pointer });
+  },
+  autoRead: readAutoRead(),
+  setAutoRead: (autoRead) => {
+    try {
+      localStorage.setItem(AUTO_READ_KEY, autoRead ? "on" : "off");
+    } catch {
+      // Not remembered; the choice still applies for this visit.
+    }
+    set({ autoRead });
+  },
   spacing: SPACING_DEFAULTS,
   setSpacing: (patch) => set((s) => ({ spacing: { ...s.spacing, ...patch } })),
   resetSpacing: () => set({ spacing: SPACING_DEFAULTS }),

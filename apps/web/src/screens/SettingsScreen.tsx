@@ -22,6 +22,8 @@ const VOICE_SAMPLE = "The old lighthouse stood alone at the edge of the grey cli
 /** The voice library: choose how read-aloud sounds, and how fast. */
 function VoiceSettings() {
   const lib = useVoices();
+  const autoRead = useSettings((s) => s.autoRead);
+  const setAutoRead = useSettings((s) => s.setAutoRead);
   const [allLanguages, setAllLanguages] = useState(false);
   if (!lib.available) return null;
 
@@ -34,6 +36,20 @@ function VoiceSettings() {
   return (
     <section className={styles.card}>
       <h2>Voice</h2>
+      <label className={styles.slider}>
+        <span>
+          <input
+            type="checkbox"
+            checked={autoRead}
+            onChange={(e) => setAutoRead(e.target.checked)}
+          />{" "}
+          Read cards aloud automatically
+        </span>
+        <span className={styles.note}>
+          Word meanings, answers and page summaries are spoken as they appear. You can also switch
+          this on and off in the Reader.
+        </span>
+      </label>
       <p className={styles.note}>
         How read-aloud sounds.{" "}
         {hasRemote

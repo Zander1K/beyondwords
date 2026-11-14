@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import { line, type Page, phrase } from "@/reader";
 
-import { initialPickerState, pickLine, PICK_THRESHOLDS, type PickerState } from "./linePicker";
+import {
+  initialPickerState,
+  MOUSE_THRESHOLDS,
+  pickLine,
+  PICK_THRESHOLDS,
+  type PickerState,
+} from "./linePicker";
 
 // Three lines, baselines at y = 0.20, 0.30, 0.40 from x 0.2 to 0.8, each 0.05 tall.
 function makePage(): Page {
@@ -235,5 +241,30 @@ describe("pickLine on a bowed (curled) page", () => {
       })),
     };
     expect(pickLine(straight, tip, initialPickerState).position?.line).toBe(1);
+  });
+});
+
+describe("pickLine with the mouse thresholds", () => {
+  it("takes the word and line under the cursor at once, with no dwell", () => {
+    const page: Page = {
+      id: "m",
+      lines: [0, 1].map((i) => {
+        const y = 0.3 + i * 0.1;
+        const l = line(phrase("The old lighthouse"));
+        return {
+          ...l,
+          words: [
+            { text: "The", box: { x: 0.2, y: y - 0.04, w: 0.1, h: 0.05 }, start: 0, end: 3 },
+            { text: "old", box: { x: 0.32, y: y - 0.04, w: 0.1, h: 0.05 }, start: 4, end: 7 },
+          ],
+          box: { x: 0.2, y: y - 0.04, w: 0.6, h: 0.05 },
+          baseline: { x0: 0.2, y0: y, x1: 0.8, y1: y },
+        };
+      }),
+    };
+    const first = pickLine(page, { x: 0.25, y: 0.28 }, initialPickerState, MOUSE_THRESHOLDS);
+    expect(first.position).toMatchObject({ line: 0, word: 0 });
+    const next = pickLine(page, { x: 0.37, y: 0.38 }, first, MOUSE_THRESHOLDS);
+    expect(next.position).toMatchObject({ line: 1, word: 1 });
   });
 });

@@ -31,3 +31,4 @@ export {
   useSpeechInput,
 } from "./useSpeechInput";
 export { useWakeWord, type WakeProblem, type WakeWord } from "./useWakeWord";
+export { useSpeechStatus } from "./useSpeechStatus";

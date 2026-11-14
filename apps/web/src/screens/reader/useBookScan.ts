@@ -35,13 +35,17 @@ export function useBookScan(videoRef: RefObject<HTMLVideoElement | null>): BookS
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
 
-  const say = useCallback((text: string, card?: { title: string }) => {
+  const say = useCallback((text: string, card?: { title: string; pending?: boolean }) => {
     clearTimeout(timer.current);
     setNote(text);
     timer.current = setTimeout(() => setNote(null), NOTE_MS);
     // Also on the glasses display, when it is in use.
     if (card && useReaderStore.getState().session === "started") {
-      useReaderStore.getState().showCard({ word: card.title, short: text });
+      useReaderStore.getState().showCard({
+        word: card.title,
+        short: text,
+        ...(card.pending ? { pending: true } : { say: text }),
+      });
     }
   }, []);
 
@@ -51,7 +55,7 @@ export function useBookScan(videoRef: RefObject<HTMLVideoElement | null>): BookS
     if (!video || video.readyState < 2 || !video.videoWidth) return say(SCAN_NEEDS_CAMERA);
     if (userId === null) return say(SCAN_NEEDS_PROFILE);
     setBusy(true);
-    say(SCANNING, { title: "Book scan" });
+    say(SCANNING, { title: "Book scan", pending: true });
     try {
       const book = await scanBook(userId, await frameToJpeg(video));
       added(book); // it becomes the current book: answers now fit it

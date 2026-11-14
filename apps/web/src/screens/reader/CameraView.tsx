@@ -2,11 +2,20 @@
 // The video sits in a box with the camera's aspect ratio, centred, so the vision overlays
 // (children) line up with the image at any screen size. The stream comes from
 // GlassesAdapter.startCamera(), never from navigator.mediaDevices directly.
-import { type CSSProperties, type ReactNode, type RefObject, useEffect, useState } from "react";
+import {
+  type CSSProperties,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import type { GlassesErrorCode } from "@/glasses";
+import type { Point } from "@/vision";
 
 import styles from "./CameraView.module.css";
+import { toImagePoint } from "./pointerSource";
 import type { CameraStatus } from "./useCamera";
 
 const MESSAGES: Record<GlassesErrorCode, string> = {
@@ -28,12 +37,20 @@ interface Props {
   /** Vision overlays drawn over the image (fingertip, line and word boxes). */
   children?: ReactNode;
   onStart: () => void;
+  /** The mouse as a pointer, in image coordinates (0-1). */
+  mouse?: {
+    onMove: (tip: Point) => void;
+    onLeave: () => void;
+    onClick: (tip: Point) => void;
+    onBack: () => void;
+  };
 }
 
 /** 4:3 until the camera reports its real size. */
 const DEFAULT_RATIO = 4 / 3;
 
-export function CameraView({ camera, videoRef, children, onStart }: Props) {
+export function CameraView({ camera, videoRef, children, onStart, mouse }: Props) {
+  const mediaRef = useRef<HTMLDivElement>(null);
   const stream = camera.kind === "on" ? camera.stream : null;
   const live = stream !== null;
   const [ratio, setRatio] = useState(DEFAULT_RATIO);
@@ -53,11 +70,44 @@ export function CameraView({ camera, videoRef, children, onStart }: Props) {
     if (v?.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
   };
 
+  const at = (e: { clientX: number; clientY: number }): Point | null => {
+    const box = mediaRef.current?.getBoundingClientRect();
+    return box ? toImagePoint(e.clientX, e.clientY, box) : null;
+  };
+
   const media: CSSProperties = { ["--ar" as string]: String(ratio) };
 
   return (
     <div className={styles.view}>
-      <div className={styles.media} style={media} hidden={!live}>
+      <div
+        ref={mediaRef}
+        className={styles.media}
+        style={media}
+        hidden={!live}
+        onPointerMove={
+          mouse &&
+          ((e) => {
+            if (e.pointerType !== "mouse") return;
+            const p = at(e);
+            if (p) mouse.onMove(p);
+          })
+        }
+        onPointerLeave={mouse && ((e) => e.pointerType === "mouse" && mouse.onLeave())}
+        onClick={
+          mouse &&
+          ((e) => {
+            const p = at(e);
+            if (p) mouse.onClick(p);
+          })
+        }
+        onContextMenu={
+          mouse &&
+          ((e) => {
+            e.preventDefault();
+            mouse.onBack();
+          })
+        }
+      >
         {/* The video stays mounted so vision can read frames from it. */}
         <video
           ref={videoRef}

@@ -44,6 +44,10 @@ export interface SimulatorState {
   voiceId: string | null;
   /** Speaking speed, 1 = normal. */
   speechRate: number;
+  /** The browser refused to play sound (no click or key press yet on this page). */
+  audioBlocked: boolean;
+  /** Why speech cannot be heard right now (no voice anywhere), or null. */
+  speechIssue: string | null;
 }
 
 export interface GestureLogEntry {
@@ -86,5 +90,7 @@ export function createSimulatorStore() {
     cameraGesturesMirrored: false,
     voiceId: null,
     speechRate: 1,
+    audioBlocked: false,
+    speechIssue: null,
   }));
 }

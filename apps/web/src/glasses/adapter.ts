@@ -56,6 +56,10 @@ export interface WordCard {
   short: string;
   /** The brain says this word can be drawn, so an illustration may follow the definition. */
   illustratable?: boolean;
+  /** A progress message ("Thinking about that…"), not content: it is never read aloud. */
+  pending?: boolean;
+  /** What to read aloud when it differs from "<word>. <short>" (answers, notices). */
+  say?: string;
   /** An illustration of the word, shown under the definition once it has been made. */
   imageUrl?: string;
   /** A picture is being generated: the card shows a loading placeholder where it will appear. */

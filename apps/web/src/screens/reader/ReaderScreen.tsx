@@ -11,9 +11,9 @@
 // some text there is no page, and the display shows nothing.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { GlassesHudLayer, useControlsShortcut } from "@/glasses";
+import { GlassesHudLayer, useControlsShortcut, useSpeechStatus } from "@/glasses";
 import { currentPhrase, EMPTY_PAGE } from "@/reader";
-import { useBooks, useReaderStore } from "@/state";
+import { useBooks, useReaderStore, useSettings } from "@/state";
 
 import { CameraView } from "./CameraView";
 import { EbookView } from "./EbookView";
@@ -26,6 +26,7 @@ import { IssueStack, StatusPills } from "./ReaderStatus";
 import { useCamera } from "./useCamera";
 import { useFullscreen } from "./useFullscreen";
 import { useHandTracking } from "./useHandTracking";
+import { useMousePointer } from "./useMousePointer";
 import { useBookScan } from "./useBookScan";
 import { useLiveScan } from "./useLiveScan";
 import { useReaderController } from "./useReaderController";
@@ -84,7 +85,11 @@ export function ReaderScreen() {
 
   const toggleControls = useCallback(() => setControlsOpen((open) => !open), []);
   const bookScan = useBookScan(videoRef);
+  const speech = useSpeechStatus();
+  const autoRead = useSettings((s) => s.autoRead);
+  const setAutoRead = useSettings((s) => s.setAutoRead);
   const askAboutPage = r.actions.askAboutPage;
+  const mouse = useMousePointer(r.actions.phone);
   const tracking = useHandTracking(videoRef, live, toggleControls, () => void askAboutPage());
 
   // The C key does the same as the hand gesture.
@@ -140,7 +145,12 @@ export function ReaderScreen() {
       {ebook ? (
         <EbookView pageNo={ebookPageNo} onPage={setEbookPageNo} onGesture={r.actions.phone} />
       ) : (
-        <CameraView camera={cam.camera} videoRef={videoRef} onStart={() => void cam.start()}>
+        <CameraView
+          camera={cam.camera}
+          videoRef={videoRef}
+          onStart={() => void cam.start()}
+          mouse={mouse}
+        >
           <VisionOverlay
             page={r.page}
             position={r.reader.position}
@@ -227,6 +237,16 @@ export function ReaderScreen() {
           onAsk={() => void askAboutPage()}
         />
 
+        {speech.blocked && (
+          <p className={styles.wakeNote} role="status">
+            🔇 Your browser is blocking sound. Click anywhere on the page to turn it on.
+          </p>
+        )}
+        {speech.issue && !speech.blocked && (
+          <p className={styles.wakeNote} role="status">
+            {speech.issue}
+          </p>
+        )}
         {bookScan.note && (
           <p className={styles.wakeNote} role="status">
             {bookScan.note}
@@ -305,6 +325,16 @@ export function ReaderScreen() {
               {bookScan.busy ? "Reading book…" : "📚 Scan book"}
             </button>
           )}
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => setAutoRead(!autoRead)}
+            aria-pressed={autoRead}
+            data-on={autoRead}
+            title="Read word meanings, answers and page summaries aloud as they appear."
+          >
+            {autoRead ? "🔊 Read aloud: on" : "🔈 Read aloud"}
+          </button>
           <button
             type="button"
             className={styles.button}
