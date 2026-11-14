@@ -1,0 +1,167 @@
+/* One view: the camera fills it; the glass layers (pills, issues, hint, dock, sheet) and the
+   glasses display float on top. */
+.viewer {
+  position: relative;
+  height: calc(100dvh - 8.5rem);
+  min-height: 24rem;
+  border-radius: 24px;
+  overflow: hidden;
+  background: #05040c;
+  color: var(--glass-text);
+  box-shadow:
+    0 24px 60px rgb(10 6 30 / 0.35),
+    0 0 0 1px rgb(255 255 255 / 0.08);
+}
+
+/* The open controls sheet takes the left side. Everything centred in the view (dock, hint,
+   issues, captions) centres in the room that is left: they read --inset. On narrow screens the
+   sheet is a bottom sheet and takes no width. */
+.viewer[data-controls="open"] {
+  --inset: 28.25rem;
+}
+
+@media (max-width: 640px) {
+  .viewer[data-controls="open"] {
+    --inset: 0px;
+  }
+}
+
+/* On a phone the header's nav wraps onto more lines, so leave room for them. */
+@media (max-width: 640px) {
+  .viewer {
+    height: calc(100dvh - 13.5rem);
+  }
+}
+
+.viewer[data-fullscreen="native"] {
+  height: 100%;
+  border-radius: 0;
+}
+
+/* iPhone Safari cannot fullscreen an element: fill the viewport instead. */
+.viewer[data-fullscreen="css"] {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  height: 100dvh;
+  border-radius: 0;
+}
+
+/* A soft shade at the top and bottom keeps the glass legible over a bright page. */
+.viewer::before,
+.viewer::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  z-index: 1;
+  height: 6rem;
+  pointer-events: none;
+}
+
+.viewer::before {
+  top: 0;
+  background: linear-gradient(rgb(6 4 20 / 0.5), transparent);
+}
+
+.viewer::after {
+  bottom: 0;
+  background: linear-gradient(transparent, rgb(6 4 20 / 0.55));
+}
+
+.topBar {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  right: 0.75rem;
+  z-index: 3;
+  /* The pills keep their tooltips; the empty space does not block the camera view. */
+  pointer-events: none;
+}
+
+.topBar > * {
+  pointer-events: auto;
+}
+
+/* ---- bottom column: issues, the controls hint, then the dock ---- */
+
+.bottom {
+  position: absolute;
+  left: calc(var(--inset, 0px) + (100% - var(--inset, 0px)) / 2);
+  bottom: max(0.9rem, env(safe-area-inset-bottom));
+  z-index: 4;
+  transform: translateX(-50%);
+  transition: left 0.35s cubic-bezier(0.2, 0.8, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  width: calc(100% - var(--inset, 0px) - 1.5rem);
+  /* The column spans the width; only what is in it takes clicks. */
+  pointer-events: none;
+}
+
+.bottom > * {
+  pointer-events: auto;
+}
+
+/* The actions: a floating glass pill. */
+.dock {
+  composes: pill from "../../ui/glass.module.css";
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  justify-content: center;
+  width: max-content;
+  max-width: 100%;
+  padding: 0.35rem;
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
+.button {
+  composes: button from "../../ui/glass.module.css";
+}
+
+.primary {
+  composes: primary from "../../ui/glass.module.css";
+}
+
+/* ---- offline caption: the phrase on the phone while the glasses are away ---- */
+
+.phoneCaption {
+  composes: tinted from "../../ui/glass.module.css";
+  position: absolute;
+  left: calc(var(--inset, 0px) + (100% - var(--inset, 0px)) / 2);
+  top: 3.4rem;
+  z-index: 3;
+  transform: translateX(-50%);
+  width: max-content;
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  max-width: min(32rem, calc(100% - var(--inset, 0px) - 1.5rem));
+  padding: var(--space-2) var(--space-4);
+  border-radius: 22px;
+  font-size: var(--reading-font-size);
+  line-height: var(--reading-line-height);
+  letter-spacing: var(--reading-letter-spacing);
+  word-spacing: var(--reading-word-spacing);
+  text-align: center;
+}
+
+.phoneLabel {
+  color: var(--tone-warn);
+  font-size: 0.75rem;
+  letter-spacing: 0.02em;
+}
+
+.phoneNav {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.phoneButton {
+  composes: button from "../../ui/glass.module.css";
+  min-width: 2.75rem;
+}

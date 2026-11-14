@@ -1,0 +1,79 @@
+.hint {
+  composes: pill from "../../ui/glass.module.css";
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.3rem 0.95rem 0.3rem 0.35rem;
+  font-size: 0.82rem;
+  font-weight: 550;
+  letter-spacing: 0;
+  word-spacing: 0;
+  white-space: nowrap;
+  transition: padding 0.3s ease;
+}
+
+/* The gesture icon, in a ring that fills while it is held. */
+.icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(farthest-side, rgb(30 24 70) 80%, transparent 82%),
+    conic-gradient(
+      #38bdf8,
+      #8b5cf6 calc(var(--p, 0deg) * 0.6),
+      #f0509a var(--p, 0deg),
+      rgb(255 255 255 / 0.18) var(--p, 0deg)
+    );
+  font-size: 1rem;
+  font-style: normal;
+}
+
+.text {
+  display: inline-block;
+  max-width: 20rem;
+  overflow: hidden;
+  transition:
+    max-width 0.35s ease,
+    opacity 0.25s ease;
+}
+
+/* Shrunk to the icon; widens on hover, focus or a hold. */
+.hint[data-compact="true"] {
+  padding-right: 0.35rem;
+}
+
+.hint[data-compact="true"] .text {
+  max-width: 0;
+  opacity: 0;
+}
+
+.hint[data-compact="true"]:hover,
+.hint[data-compact="true"]:focus-visible {
+  padding-right: 0.95rem;
+}
+
+.hint[data-compact="true"]:hover .text,
+.hint[data-compact="true"]:focus-visible .text {
+  max-width: 20rem;
+  opacity: 1;
+}
+
+.hint[data-holding="true"] {
+  border-color: rgb(196 170 255 / 0.7);
+}
+
+.hint:focus-visible {
+  outline: 2px solid #c4b5ff;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hint,
+  .text {
+    transition: none;
+  }
+}

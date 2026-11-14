@@ -1,0 +1,274 @@
+/* The access dialog: ALX Studio's dark card, on a blurred backdrop. The colour tokens come from
+   the page (.page in Landing.module.css), which the dialog still inherits from in the top layer. */
+.dialog {
+  width: min(26rem, calc(100vw - 2rem));
+  max-width: none;
+  margin: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  overflow: visible;
+}
+
+.dialog::backdrop {
+  background: rgb(2 4 9 / 0.72);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.dialog[open] {
+  animation: arrive 0.32s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.dialog[open]::backdrop {
+  animation: fade 0.3s ease both;
+}
+
+.card {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 2rem 1.75rem 1.75rem;
+  border-radius: 28px;
+  background: #070b14;
+  box-shadow:
+    0 0 0 1px #1c2537,
+    inset 0 1px 0 #1b2436,
+    0 40px 100px -30px rgb(21 126 252 / 0.55);
+  font-family:
+    "Geist",
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    "Segoe UI",
+    Roboto,
+    Arial,
+    sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  letter-spacing: 0;
+  word-spacing: 0;
+}
+
+/* The soft blue light from the top, and the hairline above it. */
+.card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(80% 55% at 50% 0%, rgb(21 126 252 / 0.32), transparent 75%);
+}
+
+.card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 3rem;
+  right: 3rem;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgb(81 182 255 / 0.7), transparent);
+}
+
+.close {
+  position: absolute;
+  top: 0.9rem;
+  right: 0.9rem;
+  display: grid;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.06);
+  color: rgb(255 255 255 / 0.75);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.close:hover {
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+
+.close:focus-visible,
+.reveal:focus-visible {
+  outline: 2px solid #51b6ff;
+  outline-offset: 2px;
+}
+
+.eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  color: #51b6ff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.eyebrow::before {
+  content: "";
+  width: 1.75rem;
+  height: 1px;
+  background: #157efc;
+}
+
+.title {
+  margin: 1.1rem 0 0;
+  font-size: 2rem;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+}
+
+.lede {
+  margin: 0.75rem 0 0;
+  color: rgb(255 255 255 / 0.65);
+  font-size: 15.5px;
+}
+
+.form {
+  display: grid;
+  gap: 1.1rem;
+  margin-top: 1.6rem;
+}
+
+.field {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.field label {
+  color: rgb(255 255 255 / 0.8);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.field input {
+  width: 100%;
+  height: 3rem;
+  padding: 0 1rem;
+  border: 0;
+  border-radius: 14px;
+  background: #0f1522;
+  box-shadow:
+    inset 0 1px 0 #1b2436,
+    0 0 0 1px #223049;
+  color: #fff;
+  font: 400 16px/1 inherit;
+  font-family: inherit;
+  transition: box-shadow 0.2s ease;
+}
+
+.field input::placeholder {
+  color: rgb(255 255 255 / 0.35);
+}
+
+.field input:hover {
+  box-shadow:
+    inset 0 1px 0 #1b2436,
+    0 0 0 1px #2f4a7a;
+}
+
+.field input:focus {
+  outline: none;
+  box-shadow:
+    inset 0 1px 0 #1b2436,
+    0 0 0 2px #157efc,
+    0 0 0 6px rgb(21 126 252 / 0.2);
+}
+
+.field input[aria-invalid="true"] {
+  box-shadow:
+    inset 0 1px 0 #1b2436,
+    0 0 0 2px #ff7f8f;
+}
+
+.passwordRow {
+  position: relative;
+}
+
+.passwordRow input {
+  padding-right: 4.5rem;
+}
+
+.passwordRow[data-shake="true"] {
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+.reveal {
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  height: 2.2rem;
+  padding: 0 0.8rem;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgb(255 255 255 / 0.7);
+  font: 500 13px/1 inherit;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.reveal:hover {
+  background: rgb(255 255 255 / 0.08);
+  color: #fff;
+}
+
+.error {
+  margin: 0;
+  color: #ff9aa6;
+  font-size: 13.5px;
+}
+
+.form > :last-child {
+  margin-top: 0.4rem;
+  width: 100%;
+}
+
+@keyframes arrive {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+}
+
+@keyframes fade {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes shake {
+  10%,
+  90% {
+    transform: translateX(-1px);
+  }
+  20%,
+  80% {
+    transform: translateX(3px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-5px);
+  }
+  40%,
+  60% {
+    transform: translateX(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dialog[open],
+  .dialog[open]::backdrop,
+  .passwordRow[data-shake="true"] {
+    animation: none;
+  }
+}

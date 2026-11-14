@@ -1,0 +1,67 @@
+.shell {
+  min-height: 100vh;
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.brand {
+  font-weight: 700;
+}
+
+.nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.nav a {
+  display: inline-block;
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.nav a:hover {
+  background: var(--color-bg);
+}
+
+.nav a.active {
+  background: var(--color-accent);
+  color: #fff;
+}
+
+.account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 0.9rem;
+}
+
+.user {
+  color: var(--color-muted);
+}
+
+.signOut {
+  padding: var(--space-1) var(--space-3);
+  border-radius: 999px;
+  font-size: 0.9rem;
+}
+
+.main {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: var(--space-4);
+}

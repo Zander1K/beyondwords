@@ -33,7 +33,7 @@ def to_asyncpg_url(url: str) -> str:
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(".env", "../../.env"), extra="ignore")
 
-    app_name: str = "Reading Companion"
+    app_name: str = "Beyond Words"
     log_level: str = "INFO"
 
     # Any PostgreSQL URI works: Aiven's postgresql://...?sslmode=require is converted for asyncpg.
@@ -79,6 +79,14 @@ class Settings(BaseSettings):
 
     # Browser origins allowed to call the API (CORS) and open the /live WebSocket.
     # Comma-separated. Default: the web app's Vite dev server. Same as Alex's ui-dat-development.
+    cors_origins: str = "http://localhost:5173"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        return [o.strip().rstrip("/") for o in self.cors_origins.split(",") if o.strip()]
+
+    # Browser origins allowed to call the API (CORS) and open the /live WebSocket.
+    # Comma-separated. Default: the web app's Vite dev server.
     cors_origins: str = "http://localhost:5173"
 
     @property

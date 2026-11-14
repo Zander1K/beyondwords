@@ -41,5 +41,5 @@ The step 1 scaffold machine had no Docker, so these still need a first run:
 - `make migrate` inside Docker. Migration `0001` has been run against a local PostgreSQL 17
   outside Docker (2026-11-14), but not yet through `docker compose`.
 - `/health` reporting `"database": "ok"` against a live DB.
-- The Expo app on a physical phone (only the iOS JS bundle was built).
+- The web app's camera, mic and audio in a real browser, and over an HTTPS tunnel on a phone.
 - Anything on real glasses hardware.

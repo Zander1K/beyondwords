@@ -1,8 +1,8 @@
-.PHONY: help nemotron-check dev down db api migrate test test-api test-mobile lint lint-api lint-mobile format contracts eval install env
+.PHONY: help nemotron-check dev down db api web web-lan migrate test test-api test-web lint lint-api lint-web format contracts eval install env
 .DEFAULT_GOAL := help
 
 API_DIR := apps/api
-MOBILE_DIR := apps/mobile
+WEB_DIR := apps/web
 
 help:               ## List commands
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:[^#]*## /\t/' | column -t -s "$$(printf '\t')"
@@ -23,27 +23,34 @@ db: env             ## Start only postgres in the background (pair with `make ap
 api: env            ## Run the API on the host with auto-reload (no Docker needed; DB optional)
 	cd $(API_DIR) && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
+web:                ## Run the web app dev server on http://localhost:5173 (Vite)
+	pnpm --filter web dev
+
+web-lan:            ## Web app over HTTPS on your network, for phones (self-signed cert)
+	@echo "Open https://$$(ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | cut -d' ' -f1):5173 on your phone (same Wi-Fi) and accept the certificate warning."
+	pnpm --filter web dev:lan
+
 down:               ## Stop the docker compose stack
 	docker compose down
 
 migrate:            ## alembic upgrade head (inside the api container)
 	docker compose run --rm api alembic upgrade head
 
-test: test-api test-mobile   ## pytest (api) + jest (mobile)
+test: test-api test-web   ## pytest (api) + vitest (web)
 
 test-api:
 	cd $(API_DIR) && uv run pytest
 
-test-mobile:
-	pnpm --filter mobile test
+test-web:
+	pnpm --filter web test
 
-lint: lint-api lint-mobile   ## ruff (api) + eslint (mobile)
+lint: lint-api lint-web   ## ruff (api) + eslint/prettier/tsc (web)
 
 lint-api:
 	cd $(API_DIR) && uv run ruff check . && uv run ruff format --check .
 
-lint-mobile:
-	pnpm --filter mobile lint
+lint-web:
+	pnpm --filter web lint
 
 format:             ## Auto-fix API lint and formatting
 	cd $(API_DIR) && uv run ruff check --fix . && uv run ruff format .
