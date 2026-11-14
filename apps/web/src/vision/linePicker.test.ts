@@ -65,3 +65,61 @@ describe("pickLine (SIM-VIS-03)", () => {
     expect(run(page, [{ x: 0.75, y: 0.22 }]).state.position?.phrase).toBe(1);
   });
 });
+
+describe("word under the fingertip", () => {
+  // One line "The old lighthouse stood" with known word boxes, baseline y = 0.2.
+  function wordPage(): Page {
+    const words = [
+      { text: "The", box: { x: 0.2, y: 0.16, w: 0.08, h: 0.05 }, start: 0, end: 3 },
+      { text: "old", box: { x: 0.3, y: 0.16, w: 0.08, h: 0.05 }, start: 4, end: 7 },
+      { text: "lighthouse", box: { x: 0.4, y: 0.16, w: 0.25, h: 0.05 }, start: 8, end: 18 },
+      { text: "stood", box: { x: 0.67, y: 0.16, w: 0.13, h: 0.05 }, start: 19, end: 24 },
+    ];
+    const l = line(phrase("The old lighthouse"), phrase("stood"));
+    return {
+      id: "w",
+      lines: [
+        {
+          ...l,
+          words,
+          box: { x: 0.2, y: 0.16, w: 0.6, h: 0.05 },
+          baseline: { x0: 0.2, y0: 0.2, x1: 0.8, y1: 0.2 },
+        },
+      ],
+    };
+  }
+
+  it("picks the exact word above the fingertip and the phrase containing it", () => {
+    const page = wordPage();
+    expect(run(page, [{ x: 0.5, y: 0.22 }]).state.position).toEqual({
+      line: 0,
+      phrase: 0,
+      word: 2,
+    });
+    expect(run(page, [{ x: 0.33, y: 0.22 }]).state.position).toEqual({
+      line: 0,
+      phrase: 0,
+      word: 1,
+    });
+    expect(run(page, [{ x: 0.72, y: 0.22 }]).state.position).toEqual({
+      line: 0,
+      phrase: 1,
+      word: 3,
+    });
+  });
+
+  it("does not flicker to the neighbouring word right at the edge", () => {
+    const page = wordPage();
+    const start = run(page, [{ x: 0.6, y: 0.22 }]).state; // on "lighthouse"
+    const { state } = run(
+      page,
+      [
+        { x: 0.66, y: 0.22 },
+        { x: 0.665, y: 0.22 },
+      ],
+      start,
+    );
+    expect(state.position?.word).toBe(2);
+    expect(run(page, [{ x: 0.75, y: 0.22 }], state).state.position?.word).toBe(3);
+  });
+});

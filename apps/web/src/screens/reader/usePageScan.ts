@@ -5,12 +5,12 @@ import { useEffect } from "react";
 
 import { analyzePage } from "@/api";
 import { useReaderStore } from "@/state";
-import { TesseractOcr } from "@/vision";
+import { PaddleOcr } from "@/vision";
 
 import type { PageImage } from "./useCamera";
 
 // One OCR worker for the app; it loads its model on first use.
-const ocr = new TesseractOcr();
+const ocr = new PaddleOcr();
 
 export function usePageScan(image: PageImage | null): void {
   useEffect(() => {

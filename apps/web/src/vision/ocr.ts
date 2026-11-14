@@ -1,9 +1,8 @@
-// OCR: text lines with boxes and baselines from a page still (SIM-VIS-02).
-// Tesseract.js runs in its own Web Worker, so the UI thread stays free.
+// OCR: text lines and words with positions from a page still (SIM-VIS-02).
+// PaddleOCR runs in a Web Worker (paddleOcr.worker.ts); this file is the main-thread client and
+// the conversion to our line/word model.
 // OPEN QUESTION: browser OCR vs Nemotron VL OCR; compare in eval/ (SIMULATION_FEATURES.md).
-// HACK: the worker, WASM core and English model load from Tesseract.js's default CDN on first
-// use (~1 s). Vendor them into public/ for an offline demo.
-import type { Worker as TesseractWorker } from "tesseract.js";
+import type { WorkerItem, WorkerRequest, WorkerResponse } from "./paddleOcr.worker";
 
 /** Normalised 0-1 coordinates of the image (top-left origin). */
 export interface Box {
@@ -20,11 +19,20 @@ export interface Baseline {
   y1: number;
 }
 
+export interface OcrWord {
+  text: string;
+  box: Box;
+  /** [start, end) character offsets of the word in its line's text. */
+  start: number;
+  end: number;
+}
+
 export interface OcrLine {
   text: string;
   box: Box;
-  /** The text's baseline: tilted pages make boxes overlap, the baseline does not. */
+  /** Estimated baseline, used to pick the line the fingertip is under. */
   baseline: Baseline;
+  words: OcrWord[];
   /** 0-100 */
   confidence: number;
 }
@@ -34,51 +42,101 @@ export interface OcrResult {
   width: number;
   height: number;
   ms: number;
+  /** The page had to be flattened first (tilted or curled). */
+  unwarped: boolean;
 }
 
 export interface OcrEngine {
   recognize(image: Blob): Promise<OcrResult>;
-  dispose(): Promise<void>;
+  dispose(): void;
 }
-
-/** The raw Tesseract line shape we read (pixels). */
-export interface RawLine {
-  text: string;
-  confidence: number;
-  bbox: { x0: number; y0: number; x1: number; y1: number };
-  baseline: { x0: number; y0: number; x1: number; y1: number };
-}
-
-const MIN_CONFIDENCE = 45;
 
 /**
- * Keep real text lines and normalise to 0-1. Drops low-confidence lines and lines that are mostly
- * not letters (page numbers, noise from the book edge or the table).
+ * Rough relative width of a character in a proportional book font. Paddle returns one box per
+ * line (or word group), so word positions inside it are estimated from character widths.
+ * [ASSUMPTION] Good to a fraction of a word; real per-word boxes would need character timings.
  */
-export function normaliseLines(raw: RawLine[], width: number, height: number): OcrLine[] {
-  return raw
-    .map((l) => ({ ...l, text: l.text.replace(/\s+/g, " ").trim() }))
-    .filter((l) => {
-      const letters = (l.text.match(/\p{L}/gu) ?? []).length;
-      return l.confidence >= MIN_CONFIDENCE && letters >= 3 && letters / l.text.length > 0.5;
-    })
-    .map((l) => ({
-      text: l.text,
-      confidence: l.confidence,
+export function charWidth(ch: string): number {
+  if (ch === " ") return 0.55;
+  if (/[iljtf.,:;'!|()1\-‘’“”"]/.test(ch)) return 0.5;
+  if (/[mwMW]/.test(ch)) return 1.45;
+  if (/[A-Z]/.test(ch)) return 1.2;
+  return 1;
+}
+
+/** Split one recognised item (pixels) into words with estimated boxes (pixels). */
+export function splitItem(item: WorkerItem): { text: string; x: number; w: number }[] {
+  const text = item.text.replace(/\s+/g, " ").trim();
+  if (!text) return [];
+  const total = [...text].reduce((s, ch) => s + charWidth(ch), 0);
+  const scale = item.box.width / total;
+  const words: { text: string; x: number; w: number }[] = [];
+  let offset = 0;
+  for (const token of text.split(" ")) {
+    const width = [...token].reduce((s, ch) => s + charWidth(ch), 0) * scale;
+    words.push({ text: token, x: item.box.x + offset, w: width });
+    offset += width + charWidth(" ") * scale;
+  }
+  return words;
+}
+
+/** Where the baseline sits within a text box, as a fraction of its height. [ASSUMPTION] */
+const BASELINE_AT = 0.78;
+/** Minimum mean confidence (0-1) to keep a line: below it, it is usually noise. */
+const MIN_LINE_CONFIDENCE = 0.5;
+
+/** Paddle lines (pixels, words grouped per line) -> our normalised lines with word boxes. */
+export function toOcrLines(lines: WorkerItem[][], width: number, height: number): OcrLine[] {
+  const out: OcrLine[] = [];
+  for (const items of lines) {
+    const kept = items.filter((i) => i.text.trim());
+    if (!kept.length) continue;
+    const confidence = kept.reduce((s, i) => s + i.confidence, 0) / kept.length;
+    if (confidence < MIN_LINE_CONFIDENCE) continue;
+
+    const left = Math.min(...kept.map((i) => i.box.x));
+    const top = Math.min(...kept.map((i) => i.box.y));
+    const right = Math.max(...kept.map((i) => i.box.x + i.box.width));
+    const bottom = Math.max(...kept.map((i) => i.box.y + i.box.height));
+
+    const words: OcrWord[] = [];
+    let text = "";
+    for (const item of [...kept].sort((a, b) => a.box.x - b.box.x)) {
+      for (const w of splitItem(item)) {
+        if (text) text += " ";
+        const start = text.length;
+        text += w.text;
+        words.push({
+          text: w.text,
+          start,
+          end: text.length,
+          box: {
+            x: w.x / width,
+            y: item.box.y / height,
+            w: w.w / width,
+            h: item.box.height / height,
+          },
+        });
+      }
+    }
+    const letters = (text.match(/\p{L}/gu) ?? []).length;
+    if (letters < 2) continue; // page numbers, specks
+
+    const baseY = (top + (bottom - top) * BASELINE_AT) / height;
+    out.push({
+      text,
+      words,
+      confidence: Math.round(confidence * 100),
       box: {
-        x: l.bbox.x0 / width,
-        y: l.bbox.y0 / height,
-        w: (l.bbox.x1 - l.bbox.x0) / width,
-        h: (l.bbox.y1 - l.bbox.y0) / height,
+        x: left / width,
+        y: top / height,
+        w: (right - left) / width,
+        h: (bottom - top) / height,
       },
-      baseline: {
-        x0: l.baseline.x0 / width,
-        y0: l.baseline.y0 / height,
-        x1: l.baseline.x1 / width,
-        y1: l.baseline.y1 / height,
-      },
-    }))
-    .sort((a, b) => a.box.y - b.box.y);
+      baseline: { x0: left / width, y0: baseY, x1: right / width, y1: baseY },
+    });
+  }
+  return out.sort((a, b) => a.box.y - b.box.y);
 }
 
 async function imageSize(image: Blob): Promise<{ width: number; height: number }> {
@@ -88,31 +146,46 @@ async function imageSize(image: Blob): Promise<{ width: number; height: number }
   return size;
 }
 
-export class TesseractOcr implements OcrEngine {
-  private worker: Promise<TesseractWorker> | null = null;
+/** PaddleOCR in a Web Worker. The worker and its models load on the first scan. */
+export class PaddleOcr implements OcrEngine {
+  private worker: Worker | null = null;
+  private nextId = 1;
+  private readonly pending = new Map<number, (r: WorkerResponse) => void>();
 
-  private getWorker(): Promise<TesseractWorker> {
-    // Loaded on demand so the rest of the app does not pay for the OCR bundle.
-    this.worker ??= import("tesseract.js").then(({ createWorker }) => createWorker("eng"));
+  private getWorker(): Worker {
+    if (!this.worker) {
+      this.worker = new Worker(new URL("./paddleOcr.worker.ts", import.meta.url), {
+        type: "module",
+      });
+      this.worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+        this.pending.get(event.data.id)?.(event.data);
+        this.pending.delete(event.data.id);
+      };
+    }
     return this.worker;
   }
 
   async recognize(image: Blob): Promise<OcrResult> {
-    const started = performance.now();
-    const [worker, { width, height }] = await Promise.all([this.getWorker(), imageSize(image)]);
-    const { data } = await worker.recognize(image, {}, { blocks: true });
-    const raw: RawLine[] = (data.blocks ?? []).flatMap((b) => b.paragraphs.flatMap((p) => p.lines));
+    const [{ width, height }, buffer] = await Promise.all([imageSize(image), image.arrayBuffer()]);
+    const id = this.nextId++;
+    const response = await new Promise<WorkerResponse>((resolve) => {
+      this.pending.set(id, resolve);
+      const request: WorkerRequest = { id, image: buffer };
+      this.getWorker().postMessage(request, [buffer]);
+    });
+    if (!response.ok) throw new Error(`OCR failed: ${response.error}`);
     return {
-      lines: normaliseLines(raw, width, height),
+      lines: toOcrLines(response.lines, width, height),
       width,
       height,
-      ms: Math.round(performance.now() - started),
+      ms: response.ms,
+      unwarped: response.unwarped,
     };
   }
 
-  async dispose(): Promise<void> {
-    const worker = this.worker;
+  dispose(): void {
+    this.worker?.terminate();
     this.worker = null;
-    if (worker) await (await worker).terminate();
+    this.pending.clear();
   }
 }

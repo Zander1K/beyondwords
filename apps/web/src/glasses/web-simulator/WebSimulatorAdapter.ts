@@ -387,7 +387,12 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     try {
       stream = await media.getUserMedia({
         // The glasses camera faces forward like a phone's rear camera. Laptops use their only one.
-        video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 } },
+        // 1920 wide: book text needs pixels for OCR (stills are frames of this stream).
+        video: {
+          facingMode: { ideal: "environment" },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+        },
         audio: false,
       });
     } catch (error) {

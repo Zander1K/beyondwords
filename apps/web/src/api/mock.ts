@@ -1,13 +1,15 @@
 // MOCK RESPONSES for endpoints that do not exist yet. Everything here is a stand-in.
 // TODO(alex, with Matthew): replace with the real POST /pages/analyze and POST /words/define
 // once the brain is wired up (page JSON schema: SOP section 8.1, not in the repo yet).
-import type { Box, Page, PageLine, Phrase } from "@/reader";
+import type { WordCard } from "@/glasses";
+import type { Box, Page, PageLine, PageWord, Phrase } from "@/reader";
 
 /** OCR line as sent to page analysis. */
 export interface AnalyzeLine {
   text: string;
   box: Box;
   baseline: { x0: number; y0: number; x1: number; y1: number };
+  words?: PageWord[];
 }
 
 /** Longest phrase we build. [ASSUMPTION] Phrase-level reading wants ~3-6 words. */
@@ -90,7 +92,21 @@ export async function mockAnalyzePage(lines: AnalyzeLine[]): Promise<Page> {
       phrases,
       box: l.box,
       baseline: l.baseline,
+      // Word offsets stay valid: phrases re-join the line's words with single spaces.
+      words: l.words,
     };
   });
   return { id: `scan-${Date.now()}`, lines: pageLines.filter((l) => l.phrases.length) };
+}
+
+/**
+ * MOCK of POST /words/define: a short definition for a word in context.
+ * TODO(alex, with Matthew): replace with the real endpoint (contextual definition + breakdown).
+ */
+export function mockDefineWord(word: string): WordCard {
+  const clean = word.replace(/^[^\p{L}]+|[^\p{L}]+$/gu, "");
+  const short =
+    MOCK_DEFINITIONS[clean.toLowerCase()] ??
+    "(mock) A definition will come from the reading brain.";
+  return { word: clean || word, short };
 }

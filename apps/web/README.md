@@ -45,12 +45,15 @@ text, overlay options and the glasses simulator (gesture pad and log, system eve
 stats, audio-only mode). Open **Reader**:
 
 1. **Start camera** and aim it down at an open book so the page fills most of the frame. A page
-   still is taken after ~1.5 s (or press **Scan page**): Tesseract.js reads the lines (boxes are
-   drawn over the view) and a **mock** page analysis splits them into phrases and hard words.
-   No camera? **Upload a page photo** instead. Nothing is saved or uploaded.
+   still is taken once the camera settles and your hand is out of view (or press **Scan
+   page**): PaddleOCR reads the lines and words in a Web Worker (boxes are drawn over the view)
+   and a **mock** page analysis splits them into phrases and hard words. Tilted or curled pages
+   are flattened first when the quick read is unsure (slower, ~2 s or more). No camera?
+   **Upload a page photo** instead. Nothing is saved or uploaded.
 2. **Start reading** (the glasses display session needs your go-ahead).
-3. **Point** just under a line: the line and phrase under your fingertip are highlighted on the
-   glasses panel and the camera view. Lift your hand away for 0.7 s: the last line is held, the
+3. **Point** just under a word: the exact word above your fingertip is highlighted on the
+   glasses (inside its phrase) and outlined on the camera view; a pinch (`select`) opens that
+   word's card (definitions are mock). Lift your hand away for 0.7 s: the last line is held, the
    lost-hand cue plays and the panel shows the hand-lost icon.
 4. **Gestures from the camera** (the simulated Neural Band):
 
@@ -69,8 +72,9 @@ stats, audio-only mode). Open **Reader**:
 5. **System events** in **Controls**: Interrupt/Resume, Sleep/Wake, Disconnect/Reconnect,
    Recreate adapter. **Stress test** checks the 5 updates/s display limit.
 
-The first camera start downloads the hand model (~7.8 MB) and the OCR model; this needs an
-internet connection (HACK: vendor them for an offline demo). Word help definitions are mock.
+The first camera start downloads the hand model (~7.8 MB); the first scan downloads the OCR
+models (~6 MB) and ONNX Runtime (~7 MB compressed), plus ~30 MB more the first time a page
+needs flattening. This needs an internet connection (HACK: vendor them for an offline demo). Word help definitions are mock.
 
 ## Config
 

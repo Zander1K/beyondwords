@@ -7,7 +7,9 @@
 import { API_BASE_URL } from "@/config";
 import type { Page } from "@/reader";
 
-import { type AnalyzeLine, mockAnalyzePage } from "./mock";
+import type { WordCard } from "@/glasses";
+
+import { type AnalyzeLine, mockAnalyzePage, mockDefineWord } from "./mock";
 
 /** Mirrors apps/api/app/schemas/health.py:HealthResponse. */
 export interface HealthResponse {
@@ -55,4 +57,13 @@ export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
  */
 export async function analyzePage(lines: AnalyzeLine[]): Promise<Page> {
   return mockAnalyzePage(lines);
+}
+
+/**
+ * Word help: a short definition for the word under the finger.
+ * MOCK: TODO(alex, with Matthew) replace with the real POST /words/define (with the sentence
+ * as context). Synchronous for now so the card opens instantly.
+ */
+export function defineWord(word: string): WordCard {
+  return mockDefineWord(word);
 }

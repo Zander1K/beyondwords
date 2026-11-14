@@ -4,7 +4,9 @@
 import { create } from "zustand";
 
 import type { GlassesGesture, SessionState } from "@/glasses";
+import { defineWord } from "@/api";
 import {
+  currentPhrase,
   DEMO_PAGE,
   initialReaderState,
   moveToLine,
@@ -58,7 +60,15 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   scan: { status: "idle" },
   handLost: false,
   applyGesture: (gesture) => {
-    const step = readerStep(get().page, get().reader, gesture);
+    const page = get().page;
+    let step = readerStep(page, get().reader, gesture);
+    if (step.outcome === "card-opened") {
+      // The word under the finger, else the phrase's hard word.
+      const pos = step.state.position;
+      const pointed = pos.word !== undefined ? page.lines[pos.line]?.words?.[pos.word] : undefined;
+      const card = pointed ? defineWord(pointed.text) : currentPhrase(page, pos)?.hardWord?.card;
+      step = { ...step, state: { ...step.state, card } };
+    }
     if (step.state !== get().reader) set({ reader: step.state });
     return step;
   },
@@ -71,9 +81,13 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   setPosition: (position) =>
     set((s) => {
       const cur = s.reader.position;
-      if (cur.line === position.line && cur.phrase === position.phrase) return {};
+      if (cur.line === position.line && cur.phrase === position.phrase) {
+        // Same phrase: only the pointed word may change; an open card stays open.
+        if (cur.word === position.word) return {};
+        return { reader: { ...s.reader, position } };
+      }
       // Pointing at another phrase closes a word card ([ASSUMPTION]: the finger moved on).
-      return { reader: { ...s.reader, position, view: "phrase", cardFocus: 0 } };
+      return { reader: { ...s.reader, position, view: "phrase", cardFocus: 0, card: undefined } };
     }),
   setHandLost: (handLost) => set((s) => (s.handLost === handLost ? {} : { handLost })),
 }));

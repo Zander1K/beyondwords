@@ -11,7 +11,13 @@ import {
   type StatusKind,
   useGlasses,
 } from "@/glasses";
-import { CARD_ACTIONS, currentPhrase, type Page, type ReaderState } from "@/reader";
+import {
+  CARD_ACTIONS,
+  currentPhrase,
+  type Page,
+  pointedWordInPhrase,
+  type ReaderState,
+} from "@/reader";
 import { type ScanState, useReaderStore } from "@/state";
 
 export interface Notice {
@@ -24,14 +30,19 @@ export function renderReader(glasses: GlassesAdapter, page: Page, reader: Reader
   const phrase = currentPhrase(page, reader.position);
   if (!phrase) {
     glasses.clearDisplay();
-  } else if (reader.view === "card" && phrase.hardWord) {
-    glasses.showWordCard({
-      ...phrase.hardWord.card,
-      actions: [...CARD_ACTIONS],
-      focused: CARD_ACTIONS[reader.cardFocus],
-    });
+  } else if (reader.view === "card" && (reader.card ?? phrase.hardWord)) {
+    const card = reader.card ?? phrase.hardWord?.card;
+    if (card) {
+      glasses.showWordCard({
+        ...card,
+        actions: [...CARD_ACTIONS],
+        focused: CARD_ACTIONS[reader.cardFocus],
+      });
+    }
   } else {
-    glasses.showPhrase(phrase.text, { emphasis: phrase.hardWord?.range });
+    // Highlight the word under the finger; without one, the phrase's hard word.
+    const emphasis = pointedWordInPhrase(page, reader.position) ?? phrase.hardWord?.range;
+    glasses.showPhrase(phrase.text, { emphasis });
   }
 }
 
@@ -148,7 +159,8 @@ export function useReaderController() {
     if (outcome === "boundary" || outcome === "no-word") {
       glasses.playCue("error");
     } else if (typeof outcome === "object" && outcome.action === "hear") {
-      const card = currentPhrase(store().page, step.state.position)?.hardWord?.card;
+      const card =
+        step.state.card ?? currentPhrase(store().page, step.state.position)?.hardWord?.card;
       if (card) void glasses.speak(`${card.word}. ${card.short}`);
     } else if (outcome === "moved" && !glasses.capabilities.display) {
       glasses.playCue("tick");

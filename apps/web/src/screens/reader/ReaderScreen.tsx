@@ -28,6 +28,8 @@ const SESSION_LABEL = {
 
 /** Wait for the camera to settle (exposure, focus) before the first page still. [ASSUMPTION] */
 const FIRST_SCAN_DELAY_MS = 1500;
+/** Wait up to this long for a hand-free view, so fingers do not hide words in the still. */
+const HAND_FREE_WAIT_MS = 4000;
 
 function TrackingReadout({ stats, handLost }: { stats: TrackingStats; handLost: boolean }) {
   if (stats.status === "off") return null;
@@ -75,12 +77,26 @@ export function ReaderScreen() {
   const tracking = useHandTracking(videoRef, live);
   const { line, phrase } = r.reader.position;
 
-  // SIM-CAM-02: take a page still automatically once the camera is running.
-  // TODO(alex): also on page change (SIM-VIS-05, P1).
+  // SIM-CAM-02: take a page still automatically once the camera is running, preferably while
+  // no hand is in view. TODO(alex): also on page change (SIM-VIS-05, P1).
+  const handsInView = useRef(0);
+  useEffect(() => {
+    handsInView.current = tracking.hands.length;
+  }, [tracking.hands]);
   const { stream, capture } = cam;
   useEffect(() => {
     if (!stream) return;
-    const timer = setTimeout(() => void capture(), FIRST_SCAN_DELAY_MS);
+    const started = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+    const attempt = () => {
+      const waited = Date.now() - started;
+      if (handsInView.current > 0 && waited < FIRST_SCAN_DELAY_MS + HAND_FREE_WAIT_MS) {
+        timer = setTimeout(attempt, 250);
+        return;
+      }
+      void capture();
+    };
+    timer = setTimeout(attempt, FIRST_SCAN_DELAY_MS);
     return () => clearTimeout(timer);
   }, [stream, capture]);
 

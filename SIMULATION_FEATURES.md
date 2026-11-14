@@ -58,7 +58,7 @@ The glasses and Neural Band do **not** report where a fingertip is on a page. Fi
 | ID | Priority | Requirement |
 |---|---|---|
 | SIM-VIS-01 | P0 | **Fingertip detection.** Browser hand tracking (`@mediapipe/tasks-vision` HandLandmarker) on the live stream; index fingertip position drawn as a dot, with optional hand skeleton. Runs off the main thread where possible. |
-| SIM-VIS-02 | P0 | **OCR line boxes.** Browser OCR worker (Tesseract.js default) or backend OCR, producing line bounding boxes for the current page; boxes drawn on the camera view, current line outlined. [OPEN: browser vs Nemotron VL OCR, compare in `eval/`] |
+| SIM-VIS-02 | P0 | **OCR line boxes.** Browser OCR worker (PaddleOCR via ONNX Runtime Web; Tesseract.js was replaced after real-camera tests) or backend OCR, producing line and word bounding boxes for the current page; boxes drawn on the camera view, current line outlined. [OPEN: browser vs Nemotron VL OCR, compare in `eval/`] |
 | SIM-VIS-03 | P0 | **Nearest-line picking.** Map the fingertip to the line it is under (not on): choose the nearest line above the fingertip with hysteresis to avoid flicker. Output the current line and the current phrase within it. |
 | SIM-VIS-04 | P0 | **Hand lost handling.** If no hand is detected for ~700 ms (tunable): hold the last line, play the `lost-hand` cue, show the hand-lost status icon on the glasses panel, and allow manual line/phrase movement with gestures. |
 | SIM-VIS-05 | P1 | **Page change detection.** Detect a new page (large change in content) and trigger a fresh still capture and page analysis; keep the cache keyed by image hash. |

@@ -9,13 +9,14 @@ export {
   MediaPipeHandTracker,
   type TrackedHand,
 } from "./handTracking";
-export { initialPickerState, pickLine, type PickerState } from "./linePicker";
+export { initialPickerState, pickLine, type PickerState, wordAt } from "./linePicker";
 export {
   type Baseline,
   type Box,
-  normaliseLines,
   type OcrEngine,
   type OcrLine,
   type OcrResult,
-  TesseractOcr,
+  type OcrWord,
+  PaddleOcr,
+  toOcrLines,
 } from "./ocr";

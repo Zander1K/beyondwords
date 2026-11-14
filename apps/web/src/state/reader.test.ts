@@ -95,3 +95,40 @@ describe("SIM-VIS-04 hand lost", () => {
     });
   });
 });
+
+describe("pointing at a word", () => {
+  it("highlights the pointed word on the glasses and opens its card on select", async () => {
+    const { mockAnalyzePage } = await import("@/api/mock");
+    const words = [
+      { text: "swept", box: { x: 0.2, y: 0.1, w: 0.1, h: 0.05 }, start: 0, end: 5 },
+      { text: "slowly", box: { x: 0.31, y: 0.1, w: 0.12, h: 0.05 }, start: 6, end: 12 },
+      { text: "across", box: { x: 0.44, y: 0.1, w: 0.12, h: 0.05 }, start: 13, end: 19 },
+    ];
+    const page = await mockAnalyzePage([
+      {
+        text: "swept slowly across",
+        box: { x: 0.2, y: 0.1, w: 0.36, h: 0.05 },
+        baseline: { x0: 0.2, y0: 0.14, x1: 0.56, y1: 0.14 },
+        words,
+      },
+    ]);
+    useReaderStore.getState().setPage(page);
+    useReaderStore.getState().setPosition({ line: 0, phrase: 0, word: 1 });
+
+    const adapter = new WebSimulatorAdapter({ keyTarget: new EventTarget(), startDelayMs: 0 });
+    await adapter.session.start();
+    let { reader } = useReaderStore.getState();
+    renderReader(adapter, page, reader);
+    expect(adapter.store.getState().item).toEqual({
+      kind: "phrase",
+      text: "swept slowly across",
+      emphasis: [6, 12],
+    });
+
+    useReaderStore.getState().applyGesture("select");
+    reader = useReaderStore.getState().reader;
+    expect(reader.view).toBe("card");
+    expect(reader.card?.word).toBe("slowly");
+    adapter.dispose();
+  });
+});

@@ -25,6 +25,15 @@ export interface PageLine {
   box?: Box;
   /** The line's baseline (normalised), used to pick the line under the fingertip. */
   baseline?: { x0: number; y0: number; x1: number; y1: number };
+  /** Words with their boxes (normalised) and [start, end) offsets in `text`, from OCR. */
+  words?: PageWord[];
+}
+
+export interface PageWord {
+  text: string;
+  box: Box;
+  start: number;
+  end: number;
 }
 
 export interface Page {

@@ -46,6 +46,15 @@ export function VisionOverlay({ page, position, hands = [], showSkeleton, connec
         ctx.strokeStyle = current ? "#ffd84d" : "rgba(80, 200, 255, 0.8)";
         ctx.strokeRect(box.x * w, box.y * h, box.w * w, box.h * h);
         if (current) {
+          // The exact word under the fingertip.
+          const word = position.word !== undefined ? line.words?.[position.word] : undefined;
+          if (word) {
+            ctx.fillStyle = "rgba(255, 77, 109, 0.35)";
+            ctx.fillRect(word.box.x * w, word.box.y * h, word.box.w * w, word.box.h * h);
+            ctx.lineWidth = 2;
+            ctx.strokeStyle = "#ff4d6d";
+            ctx.strokeRect(word.box.x * w, word.box.y * h, word.box.w * w, word.box.h * h);
+          }
           const span = phraseSpan(page, position);
           if (span) {
             ctx.fillStyle = "rgba(255, 216, 77, 0.35)";

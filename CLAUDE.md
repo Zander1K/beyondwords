@@ -52,7 +52,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 |---|---|
 | Glasses | Meta Ray-Ban Display (full) and Ray-Ban Meta Gen 2 (audio-first) via Meta Wearables DAT 1.0 |
 | Web app | React + Vite (TypeScript, strict), React Router, Zustand, CSS modules, Vitest. The browser simulates the glasses via `WebSimulatorAdapter`; real DAT moves to a later `MetaDatAdapter` |
-| Hand tracking / OCR | In the browser: MediaPipe HandLandmarker (`@mediapipe/tasks-vision`), Tesseract.js in a worker (planned) |
+| Hand tracking / OCR | In the browser: MediaPipe HandLandmarker (`@mediapipe/tasks-vision`); PaddleOCR (`ppu-paddle-ocr`, ONNX Runtime Web) in a Web Worker, with page unwarping for tilted pages |
 | API / middleware | FastAPI (Python 3.11+), async, Pydantic v2 |
 | Database | MariaDB (SQLAlchemy 2.x async + Alembic migrations) |
 | Brain | NVIDIA Nemotron 3.5 Super VL, served with vLLM on **Verda**. NVIDIA Build is the fallback (free tier ~40 req/min/key) |
@@ -88,7 +88,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 │   │       │   ├── web-simulator/   # WebSimulatorAdapter: browser camera, mic, speaker, gesture keys
 │   │       │   ├── simulator-ui/    # 600x600 Ray-Ban Display simulator panel, audio-only toggle
 │   │       │   └── meta-dat/        # MetaDatAdapter stub (real glasses via DAT, later)
-│   │       ├── vision/           # hand tracking (MediaPipe), OCR (Tesseract.js), line picking
+│   │       ├── vision/           # hand tracking (MediaPipe), OCR (PaddleOCR), line and word picking
 │   │       ├── reader/           # highlight state machine, phrase pacing, read-along
 │   │       ├── live/             # Gemini Live session + WebSocket client
 │   │       ├── api/              # typed client generated from packages/contracts
