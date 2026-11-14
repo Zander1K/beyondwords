@@ -27,6 +27,11 @@ make api
 
 Or run everything in Docker with `make dev`.
 
+To use the brain, put the Verda key in `.env` as `NEMOTRON_API_KEY` (ask Matthew) and run
+`make nemotron-check`. To test vision, run `make nemotron-check IMAGE=/absolute/path/page.jpg`.
+In code, always call the model through `get_llm()` in `app/brain/llm.py`. Pass
+`reasoning=False` for fast calls (~0.3 s instead of several seconds).
+
 To call the API from a phone on the same Wi-Fi, use your laptop's LAN IP
 (`ipconfig getifaddr en0`), e.g. `http://192.168.1.20:8000`. `make api` listens on all interfaces.
 

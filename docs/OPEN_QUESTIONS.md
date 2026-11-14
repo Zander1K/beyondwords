@@ -17,7 +17,7 @@ Decisions left open during the step 1 scaffold (2026-11-14). Each one is also ma
 | 9 | Does an Expo community DAT wrapper (e.g. `expo-meta-wearables-dat`) support the display and Neural Band, or do we need a native module? | Alex | `apps/mobile/src/glasses/index.ts` | 5 |
 | 10 | Which on-phone OCR and hand-tracking libraries (MediaPipe Hands vs Apple Vision; OCR lib)? | Alex | `apps/mobile/src/vision/index.ts` | 3–4 |
 | 11 | iOS bundle id and Android package name (needed for DAT development builds). | Alex | `apps/mobile/app.config.ts` | 5 |
-| 12 | What GPU and memory are available on Verda, and does Nemotron 3.5 Super VL fit? NVIDIA Build is the fallback. | Matthew | `infra/verda/README.md` | 3 |
+| 12 | ~~What GPU and memory are available on Verda, and does Nemotron 3.5 Super VL fit?~~ Resolved 2026-11-14: Verda hosts it for Junction (vLLM 0.32, NVFP4 on B300, 1M context) at the `NEMOTRON_BASE_URL` in `.env.example`, so we don't self-host. Still open: rate limits on the shared endpoint. | Matthew | `infra/verda/README.md` | 3 |
 | 13 | Where does the team keep the eval page photos? They are git-ignored and must not be committed. | Matthew | `eval/pages/README.md` | 3 |
 
 ## Not yet verified (environment gaps)

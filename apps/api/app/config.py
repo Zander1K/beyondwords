@@ -20,6 +20,8 @@ class Settings(BaseSettings):
     llm_provider: str = "nemotron"
     nemotron_base_url: str = ""
     nemotron_api_key: str = ""
+    nemotron_model: str = "nemotron-3.5-super-vl"
+    nemotron_timeout_s: float = 60.0
     nvidia_build_api_key: str = ""
     gemini_api_key: str = ""
 

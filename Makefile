@@ -1,4 +1,4 @@
-.PHONY: help dev down db api migrate test test-api test-mobile lint lint-api lint-mobile format contracts eval install env
+.PHONY: help nemotron-check dev down db api migrate test test-api test-mobile lint lint-api lint-mobile format contracts eval install env
 .DEFAULT_GOAL := help
 
 API_DIR := apps/api
@@ -52,6 +52,9 @@ contracts:          ## Regenerate openapi.json and TS types
 	# TODO(Mick Ola): build order step 2. Export FastAPI OpenAPI to packages/contracts/openapi.json
 	# and generate packages/contracts/ts from it. Generator tool not chosen yet (OPEN QUESTION).
 	@echo "make contracts: not implemented yet (build order step 2)" && exit 1
+
+nemotron-check:     ## Ping the Nemotron endpoint from .env (IMAGE=path.jpg to test vision)
+	cd $(API_DIR) && PYTHONPATH=. uv run python ../../infra/scripts/nemotron_check.py $(IMAGE)
 
 eval:               ## Page-analysis + grounding evaluation
 	cd $(API_DIR) && uv run python ../../eval/run_eval.py
