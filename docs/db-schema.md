@@ -1,6 +1,8 @@
 # Database schema (PostgreSQL)
 
-What exists today: migrations `0001` and `0002`, applied to the Aiven PostgreSQL database on 2026-11-14.
+What exists today: migrations `0001` and `0002`, applied to the Aiven PostgreSQL database
+(PostgreSQL 18). Checked against the live database on 2026-11-14: every table, column, unique
+key and foreign key below matches, and all seven tables are still empty.
 Source of truth for the code: `apps/api/app/db/models.py`. Product rules: SOP sections 5 and 10.
 GitHub renders the diagram below; to change the schema, add a new Alembic migration (never edit
 tables by hand) and update this file.
@@ -138,7 +140,7 @@ Never holds book text. Gives the brain context ("Tory" in a 19th-century novel v
 | `current_page`, `current_line` | Saved position, so "continue reading" resumes at the right page and line. |
 | `started_at` | When the reader first opened the book. |
 | `last_read_at` | Last session; used to offer the most recent book. |
-| `finished_at` | Set when the book is done; triggers deletion of that reader's captured pages and lines (privacy rule). |
+| `finished_at` | Set when the book is done. Should trigger deletion of that reader's captured pages and lines (privacy rule). TODO(Mick Ola): not automated yet; no code sets it or deletes the pages. |
 
 ### `pages`: pages the reader has photographed
 Derived data only: the photo itself is never stored.
@@ -199,5 +201,34 @@ independence (share of reading in `solo`). Rows are never edited.
 
 - `books` has no text column: book text is never stored in the shared library.
 - No column stores images or audio (checked by `apps/api/app/tests/test_models.py`).
-- Deleting a user deletes everything of theirs; deleting a page deletes its lines.
-- `word_bank` keeps working after its page is deleted (`page_id` becomes empty).
+- Usernames are unique and stored lowercase (`uq_users_username`), so one name is one reader.
+- One row per reader per book (`user_books`), per reader per word (`word_bank`), per line per
+  page (`lines`), and per reader, book and photo (`pages`, via `image_hash`).
+- What a delete takes with it:
+
+| Deleted | Also deleted | Kept, link emptied |
+|---|---|---|
+| a user | their `user_books`, `pages` (and so `lines`), `word_bank`, `reading_events` | nothing |
+| a book | every reader's `user_books` and `pages` for it (and so `lines`) | `word_bank.book_id`, `reading_events.book_id` |
+| a page | its `lines` | `word_bank.page_id` |
+
+## What writes each table today
+
+| Table | Written by | Status |
+|---|---|---|
+| `users` | `db/repositories/users.py` `get_or_create_user(username)` | Code ready; no endpoint yet (agree `POST /users` with Alex) |
+| `books` | `POST /books/identify` via `db/repositories/books.py` | Live |
+| `user_books`, `pages`, `lines`, `word_bank`, `reading_events` | Nothing yet | Waiting on `POST /page`, the brain's `BrainStore` and `/progress` |
+
+## How the brain's types map onto these tables
+
+Matthew's `brain/core` reads and writes through `BrainStore` (`brain/tools/store.py`). Mick
+implements it on these tables; the store translates the few fields that differ.
+
+| Brain type / call | Tables | Difference to handle in the store |
+|---|---|---|
+| `BookContext` | `books` | Same fields (minus `isbn`, `metadata_source`) |
+| `ReaderProfile` | `users.support_level`, `word_bank.status` | `struggled_words` = `learning`, `owned_words` = `owned` |
+| `CapturedPage` | `pages` + `lines` | Brain `page_id` is text (`"p12"`), ours is a number; brain `page_number` is a number, ours is text (roman numerals) |
+| `add_to_word_bank(...)` | `word_bank` | Brain passes `page_id` as text; bump `times_rescued` on a repeat |
+| `PageAnalysis` (SOP 8.1) | `pages.analysis` | Stored whole as JSONB; bbox is `[x, y, w, h]` from 0 to 1 |
