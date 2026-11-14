@@ -10,6 +10,7 @@ import {
   moveToLine,
   type Page,
   readerStep,
+  type ReaderPosition,
   type ReaderState,
   type ReaderStep,
 } from "@/reader";
@@ -32,9 +33,14 @@ export interface ReaderStore {
   /** The display is asleep: nothing to send until it wakes. */
   asleep: boolean;
   scan: ScanState;
+  /** No pointing hand seen for the hand-lost timeout (SIM-VIS-04). */
+  handLost: boolean;
   /** Apply a glasses gesture; returns what happened so the caller can give feedback. */
   applyGesture: (gesture: GlassesGesture) => ReaderStep;
   goToLine: (line: number) => void;
+  /** Finger tracking put the reader here. Closes the word card if the line changes. */
+  setPosition: (position: ReaderPosition) => void;
+  setHandLost: (lost: boolean) => void;
   setPage: (page: Page) => void;
   setSession: (session: SessionState) => void;
   setOffline: (offline: boolean) => void;
@@ -50,6 +56,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   offline: false,
   asleep: false,
   scan: { status: "idle" },
+  handLost: false,
   applyGesture: (gesture) => {
     const step = readerStep(get().page, get().reader, gesture);
     if (step.state !== get().reader) set({ reader: step.state });
@@ -61,4 +68,12 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   setOffline: (offline) => set({ offline }),
   setAsleep: (asleep) => set({ asleep }),
   setScan: (scan) => set({ scan }),
+  setPosition: (position) =>
+    set((s) => {
+      const cur = s.reader.position;
+      if (cur.line === position.line && cur.phrase === position.phrase) return {};
+      // Pointing at another phrase closes a word card ([ASSUMPTION]: the finger moved on).
+      return { reader: { ...s.reader, position, view: "phrase", cardFocus: 0 } };
+    }),
+  setHandLost: (handLost) => set((s) => (s.handLost === handLost ? {} : { handLost })),
 }));

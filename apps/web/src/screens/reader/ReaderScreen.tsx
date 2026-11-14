@@ -2,7 +2,7 @@
 // display beside it, and the phone view of the page (source of truth) below.
 // The page comes from the camera: still -> OCR -> page analysis (MOCK). A demo page is shown
 // until the first scan (HACK, so the glasses have something before the camera starts).
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { GlassesPanel } from "@/glasses";
 import { type ScanState, useReaderStore } from "@/state";
@@ -10,6 +10,7 @@ import { type ScanState, useReaderStore } from "@/state";
 import { CameraStage } from "./CameraStage";
 import styles from "./ReaderScreen.module.css";
 import { useCamera } from "./useCamera";
+import { type TrackingStats, useHandTracking } from "./useHandTracking";
 import { usePageScan } from "./usePageScan";
 import { useReaderController } from "./useReaderController";
 import { VisionOverlay } from "./VisionOverlay";
@@ -23,6 +24,19 @@ const SESSION_LABEL = {
 
 /** Wait for the camera to settle (exposure, focus) before the first page still. [ASSUMPTION] */
 const FIRST_SCAN_DELAY_MS = 1500;
+
+function TrackingReadout({ stats, handLost }: { stats: TrackingStats; handLost: boolean }) {
+  if (stats.status === "off") return null;
+  if (stats.status === "loading") return <span>Hands: loading model…</span>;
+  if (stats.status === "error") {
+    return <span role="alert">Hands: tracking unavailable (use the gesture pad)</span>;
+  }
+  return (
+    <span>
+      Hands: {stats.fps} fps · {stats.detectMs} ms{handLost && " · hand lost, holding the line"}
+    </span>
+  );
+}
 
 function ScanReadout({ scan }: { scan: ScanState }) {
   switch (scan.status) {
@@ -52,6 +66,9 @@ export function ReaderScreen() {
   const { line, phrase } = r.reader.position;
   const scan = useReaderStore((s) => s.scan);
   usePageScan(cam.still);
+  const [skeleton, setSkeleton] = useState(false);
+  const tracking = useHandTracking(videoRef, cam.stream !== null);
+  const handLost = useReaderStore((s) => s.handLost);
 
   // SIM-CAM-02: take a page still automatically once the camera is running.
   // TODO(alex): also on page change (SIM-VIS-05, P1).
@@ -102,9 +119,28 @@ export function ReaderScreen() {
             onStop={cam.stop}
             onCapture={() => void cam.capture()}
             onUpload={cam.upload}
-            readouts={<ScanReadout scan={scan} />}
+            readouts={
+              <>
+                <ScanReadout scan={scan} />
+                <TrackingReadout stats={tracking.stats} handLost={handLost} />
+                <label>
+                  <input
+                    type="checkbox"
+                    checked={skeleton}
+                    onChange={(e) => setSkeleton(e.target.checked)}
+                  />{" "}
+                  Hand skeleton
+                </label>
+              </>
+            }
           >
-            <VisionOverlay page={r.page} position={r.reader.position} />
+            <VisionOverlay
+              page={r.page}
+              position={r.reader.position}
+              hands={tracking.hands}
+              showSkeleton={skeleton}
+              connections={tracking.connections}
+            />
           </CameraStage>
         </section>
 

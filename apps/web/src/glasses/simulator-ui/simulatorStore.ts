@@ -36,11 +36,15 @@ export interface SimulatorState {
   interrupted: boolean;
   /** SIM-GST-02: gestures received, newest first. */
   gestureLog: GestureLogEntry[];
+  /** Camera hand shapes stand in for the Neural Band (keys and pad stay as fallback). */
+  cameraGestures: boolean;
+  /** Flip left/right camera swipes (camera facing the user). */
+  cameraGesturesMirrored: boolean;
 }
 
 export interface GestureLogEntry {
   gesture: GlassesGesture;
-  /** "pad" or the key that produced it, e.g. "key ArrowRight". */
+  /** "pad", the key ("key ArrowRight") or the camera gesture ("camera index pinch"). */
   source: string;
   result: "delivered" | "woke the display" | "ignored: disconnected";
   at: number;
@@ -74,5 +78,7 @@ export function createSimulatorStore() {
     sleepTimeoutMs: DEFAULT_SLEEP_TIMEOUT_MS,
     interrupted: false,
     gestureLog: [],
+    cameraGestures: true,
+    cameraGesturesMirrored: false,
   }));
 }

@@ -198,3 +198,15 @@
   font-size: 0.8rem;
   color: var(--color-warn);
 }
+
+.cameraGestures {
+  display: grid;
+  gap: var(--space-1);
+  margin-bottom: var(--space-3);
+}
+
+.note {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}

@@ -33,6 +33,9 @@ import {
   type GestureLogEntry,
   type SimulatorStore,
 } from "../simulator-ui/simulatorStore";
+import type { HandsFeed } from "@/vision/handTracking";
+
+import { CameraGestureRecognizer } from "./cameraGestures";
 import { keyToGesture } from "./gestures";
 import { MIC_WORKLET_SOURCE, floatToInt16 } from "./micWorklet";
 
@@ -102,6 +105,15 @@ function assertMediaAvailable(): MediaDevices {
   }
   return navigator.mediaDevices;
 }
+
+const CAMERA_SOURCE: Record<GlassesGesture, string> = {
+  select: "index pinch",
+  back: "middle pinch",
+  left: "palm swipe",
+  right: "palm swipe",
+  up: "palm swipe",
+  down: "palm swipe",
+};
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
@@ -304,6 +316,32 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   }
 
   // ---- Simulator-only controls (control strip, not the app) ----
+
+  /**
+   * Neural Band stand-in from the camera: hand shapes the camera sees become gestures, logged
+   * with source "camera". Returns a detach function.
+   */
+  attachCameraGestures(feed: HandsFeed): () => void {
+    const recognizer = new CameraGestureRecognizer({
+      mirrored: () => this.store.getState().cameraGesturesMirrored,
+    });
+    return feed.subscribe((frame) => {
+      if (!this.store.getState().cameraGestures) return;
+      const gestures = recognizer.update(
+        frame.hands.map((h) => h.landmarks),
+        frame.at,
+      );
+      for (const g of gestures) this.emitGesture(g, `camera ${CAMERA_SOURCE[g]}`);
+    });
+  }
+
+  setCameraGestures(on: boolean): void {
+    this.store.setState({ cameraGestures: on });
+  }
+
+  setCameraGesturesMirrored(mirrored: boolean): void {
+    this.store.setState({ cameraGesturesMirrored: mirrored });
+  }
 
   /** Audio-only mode simulates Ray-Ban Meta Gen 2: no display. */
   setAudioOnly(audioOnly: boolean): void {

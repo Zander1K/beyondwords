@@ -1,20 +1,108 @@
-// Hand tracking: find the reading fingertip in a camera frame.
-// TODO(alex): build order step 4. Intended: MediaPipe HandLandmarker from @mediapipe/tasks-vision
-// (VIDEO running mode, 1 hand, index fingertip = landmark 8). Not installed yet; add it with the
-// implementation. Must keep the highlight update under ~150 ms (CLAUDE.md section 8).
+// Hand tracking on the live camera (SIM-VIS-01): MediaPipe HandLandmarker in VIDEO mode, up to
+// two hands (one pointing at the page, the other free for gestures).
+// HACK: runs on the main thread at a capped frame rate; MediaPipe's GPU delegate does the heavy
+// work. Move to a worker if the UI stutters (spec: "off the main thread where possible").
+// HACK: the WASM runtime and the hand model (~7.8 MB) load from jsDelivr and Google's model
+// bucket on first use. Vendor them into public/ for an offline demo.
+import type { HandLandmarker } from "@mediapipe/tasks-vision";
 
-/** Fingertip position in the frame, normalised 0-1 (top-left origin). */
-export interface Fingertip {
-  x: number;
-  y: number;
-  /** Tracker confidence 0-1. */
+import type { Hand } from "./handPose";
+
+const WASM_BASE = "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@1.2.3/wasm";
+const MODEL_URL =
+  "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task";
+
+export interface TrackedHand {
+  /** 21 landmarks, normalised to the camera image. */
+  landmarks: Hand;
+  /** The subject's hand, as MediaPipe reports it. */
+  handedness: "Left" | "Right" | null;
   score: number;
 }
 
+export interface HandsFrame {
+  hands: TrackedHand[];
+  /** performance.now() of the frame. */
+  at: number;
+  /** Time spent detecting, ms. */
+  detectMs: number;
+}
+
 export interface HandTracker {
-  /** Load the model. Call once before detect(). */
   init(): Promise<void>;
-  /** Fingertip in this frame, or null if no hand (caller keeps the last line: CLAUDE.md 9). */
-  detect(frame: TexImageSource, timestampMs: number): Fingertip | null;
+  detect(video: HTMLVideoElement, timestampMs: number): HandsFrame;
+  /** Landmark pairs for drawing the hand skeleton. */
+  readonly connections: ReadonlyArray<{ start: number; end: number }>;
   dispose(): void;
 }
+
+export class MediaPipeHandTracker implements HandTracker {
+  private landmarker: HandLandmarker | null = null;
+  connections: ReadonlyArray<{ start: number; end: number }> = [];
+
+  async init(): Promise<void> {
+    if (this.landmarker) return;
+    const { FilesetResolver, HandLandmarker } = await import("@mediapipe/tasks-vision");
+    const fileset = await FilesetResolver.forVisionTasks(WASM_BASE);
+    const options = (delegate: "GPU" | "CPU") => ({
+      baseOptions: { modelAssetPath: MODEL_URL, delegate },
+      runningMode: "VIDEO" as const,
+      numHands: 2,
+      minHandDetectionConfidence: 0.5,
+      minHandPresenceConfidence: 0.5,
+      minTrackingConfidence: 0.5,
+    });
+    try {
+      this.landmarker = await HandLandmarker.createFromOptions(fileset, options("GPU"));
+    } catch {
+      // No WebGL / GPU delegate: fall back to the CPU.
+      this.landmarker = await HandLandmarker.createFromOptions(fileset, options("CPU"));
+    }
+    this.connections = HandLandmarker.HAND_CONNECTIONS;
+  }
+
+  detect(video: HTMLVideoElement, timestampMs: number): HandsFrame {
+    const started = performance.now();
+    const landmarker = this.landmarker;
+    if (!landmarker) return { hands: [], at: timestampMs, detectMs: 0 };
+    const result = landmarker.detectForVideo(video, timestampMs);
+    const hands: TrackedHand[] = result.landmarks.map((landmarks, i) => {
+      const category = result.handedness[i]?.[0];
+      const name = category?.categoryName;
+      return {
+        landmarks: landmarks.map(({ x, y }) => ({ x, y })),
+        handedness: name === "Left" || name === "Right" ? name : null,
+        score: category?.score ?? 0,
+      };
+    });
+    return { hands, at: timestampMs, detectMs: performance.now() - started };
+  }
+
+  dispose(): void {
+    this.landmarker?.close();
+    this.landmarker = null;
+  }
+}
+
+/** A tiny feed of hand frames: the reader's cursor and the simulated band both listen. */
+export type HandsListener = (frame: HandsFrame) => void;
+
+export interface HandsFeed {
+  subscribe(listener: HandsListener): () => void;
+}
+
+export function createHandsFeed(): HandsFeed & { publish(frame: HandsFrame): void } {
+  const listeners = new Set<HandsListener>();
+  return {
+    subscribe(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+    publish(frame) {
+      for (const listener of [...listeners]) listener(frame);
+    },
+  };
+}
+
+/** The app's one feed of hand frames from the camera. */
+export const handsFeed = createHandsFeed();

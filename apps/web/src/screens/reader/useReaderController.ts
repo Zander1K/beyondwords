@@ -36,7 +36,8 @@ export function renderReader(glasses: GlassesAdapter, page: Page, reader: Reader
 }
 
 /** The small status icon on the glasses for the current reading state. */
-export function statusFor(scan: ScanState): StatusKind | null {
+export function statusFor(scan: ScanState, handLost = false): StatusKind | null {
+  if (handLost) return "hand-lost";
   if (scan.status === "scanning") return "thinking";
   if (scan.status === "empty" || scan.status === "error") return "no-page";
   return null;
@@ -63,6 +64,7 @@ export function useReaderController() {
   const offline = useReaderStore((s) => s.offline);
   const asleep = useReaderStore((s) => s.asleep);
   const scan = useReaderStore((s) => s.scan);
+  const handLost = useReaderStore((s) => s.handLost);
   const [notice, setNotice] = useState<Notice | null>(null);
 
   const store = useReaderStore.getState;
@@ -134,8 +136,8 @@ export function useReaderController() {
   useEffect(() => {
     if (session !== "started" || asleep) return;
     renderReader(glasses, page, reader);
-    glasses.showStatus(statusFor(scan));
-  }, [glasses, page, reader, session, asleep, scan]);
+    glasses.showStatus(statusFor(scan, handLost));
+  }, [glasses, page, reader, session, asleep, scan, handLost]);
 
   // ---- gestures ----
 

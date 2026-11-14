@@ -1,6 +1,15 @@
 // Vision runs in the browser on frames from GlassesAdapter.startCamera() (never the browser
-// camera directly): OCR line boxes, hand tracking and nearest-line picking.
-export type { HandTracker, Fingertip } from "./handTracking";
+// camera directly): OCR line boxes, hand tracking, hand poses and nearest-line picking.
+export { classifyPose, type Hand, LM, type Point, type Pose } from "./handPose";
+export {
+  handsFeed,
+  type HandsFeed,
+  type HandsFrame,
+  type HandTracker,
+  MediaPipeHandTracker,
+  type TrackedHand,
+} from "./handTracking";
+export { initialPickerState, pickLine, type PickerState } from "./linePicker";
 export {
   type Baseline,
   type Box,
@@ -10,4 +19,3 @@ export {
   type OcrResult,
   TesseractOcr,
 } from "./ocr";
-export type { LinePicker } from "./linePicker";

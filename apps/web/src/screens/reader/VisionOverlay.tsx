@@ -7,7 +7,7 @@ import { type Page, phraseSpan, type ReaderPosition } from "@/reader";
 
 export interface OverlayHand {
   /** 21 normalised landmarks (MediaPipe hand model). */
-  landmarks: { x: number; y: number }[];
+  landmarks: readonly { x: number; y: number }[];
   role: "pointer" | "gesture" | "other";
 }
 

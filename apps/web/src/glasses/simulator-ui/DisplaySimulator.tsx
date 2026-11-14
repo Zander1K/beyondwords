@@ -34,6 +34,37 @@ interface Props {
   onRecreate: () => void;
 }
 
+function CameraGestureToggles({ adapter }: { adapter: WebSimulatorAdapter }) {
+  const on = useStore(adapter.store, (s) => s.cameraGestures);
+  const mirrored = useStore(adapter.store, (s) => s.cameraGesturesMirrored);
+  return (
+    <div className={styles.cameraGestures}>
+      <p className={styles.note}>
+        From the camera: <strong>thumb + index pinch</strong> = select,{" "}
+        <strong>thumb + middle pinch</strong> = back, <strong>open-palm swipe</strong> = left /
+        right / up / down. A pointing finger is the reading cursor. Keys and the pad below are a
+        fallback.
+      </p>
+      <label className={styles.toggle}>
+        <input
+          type="checkbox"
+          checked={on}
+          onChange={(e) => adapter.setCameraGestures(e.target.checked)}
+        />
+        Camera gestures
+      </label>
+      <label className={styles.toggle}>
+        <input
+          type="checkbox"
+          checked={mirrored}
+          onChange={(e) => adapter.setCameraGesturesMirrored(e.target.checked)}
+        />
+        Mirror swipes (camera facing me)
+      </label>
+    </div>
+  );
+}
+
 export function DisplaySimulator({ adapter, onRecreate }: Props) {
   const session = useStore(adapter.store, (s) => s.session);
   const scene = useStore(adapter.store, (s) => s.scene);
@@ -79,6 +110,7 @@ export function DisplaySimulator({ adapter, onRecreate }: Props) {
       <div className={styles.controls}>
         <fieldset className={styles.group}>
           <legend>Gestures (Neural Band / touchpad)</legend>
+          <CameraGestureToggles adapter={adapter} />
           <GesturePad adapter={adapter} />
         </fieldset>
         <fieldset className={styles.group}>
