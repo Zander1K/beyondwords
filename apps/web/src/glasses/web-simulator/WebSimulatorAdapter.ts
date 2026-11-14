@@ -40,7 +40,14 @@ export interface WebSimulatorOptions {
   stopDelayMs?: number;
   /** Log ignored calls etc. Defaults to console.warn. */
   warn?: (message: string) => void;
+  /** No-input time before the display dims (SIM-SES-04, default 30 s, tunable). */
+  sleepTimeoutMs?: number;
 }
+
+/** Dim phase before the display blanks. [ASSUMPTION] Meta documents "dims then sleeps", no time. */
+export const DIM_BEFORE_SLEEP_MS = 3000;
+/** Simulated time to re-establish the link on Reconnect. [ASSUMPTION] */
+const RECONNECT_DELAY_MS = 800;
 
 // Short, distinct, quiet tones per cue: [frequency Hz, duration s] steps.
 const CUE_TONES: Record<Cue, ReadonlyArray<[number, number]>> = {
@@ -101,6 +108,10 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   private readonly startDelayMs: number;
   private readonly stopDelayMs: number;
   private readonly gestureHandlers = new Set<(g: GlassesGesture) => void>();
+  private idleTimer: ReturnType<typeof setTimeout> | null = null;
+  private sleepTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Session was running when the link dropped, so Reconnect restarts it. */
+  private restartOnReconnect = false;
   private readonly sessionHandlers = new Set<(e: SessionEvent) => void>();
   private keyListenerAttached = false;
   private readonly streams = new Set<MediaStream>();
@@ -118,6 +129,9 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     this.startDelayMs = options.startDelayMs ?? 1200;
     this.stopDelayMs = options.stopDelayMs ?? 300;
     this.warn = options.warn ?? ((m) => console.warn(`[glasses] ${m}`));
+    if (options.sleepTimeoutMs !== undefined) {
+      this.store.setState({ sleepTimeoutMs: options.sleepTimeoutMs });
+    }
     // eslint-disable-next-line @typescript-eslint/no-this-alias
     const adapter = this;
     this.session = {
@@ -151,23 +165,123 @@ export class WebSimulatorAdapter implements GlassesAdapter {
   }
 
   private async startSession(): Promise<void> {
+    if (!this.store.getState().connected) {
+      throw new GlassesError("session-inactive", "The glasses are not connected.");
+    }
     const state = this.session.state;
     if (state === "started" || state === "starting") return;
+    this.store.setState({ interrupted: false });
     this.setSession("starting");
     await wait(this.startDelayMs);
-    // Stopped while starting (e.g. dispose): stay stopped.
+    // Stopped while starting (e.g. dispose or disconnect): stay stopped.
     if (this.session.state !== "starting") return;
     this.setSession("started");
+    this.wakeDisplay();
   }
 
   private async stopSession(): Promise<void> {
     const state = this.session.state;
     if (state === "stopped" || state === "stopping") return;
     this.setSession("stopping");
-    this.store.setState({ content: null, status: null });
-    this.stopSpeaking();
+    this.endDisplay();
     await wait(this.stopDelayMs);
     this.setSession("stopped");
+  }
+
+  /** Clear the display and its timers; the glasses keep no app state. */
+  private endDisplay(): void {
+    this.clearSleepTimers();
+    this.store.setState({ content: null, status: null, sleep: "awake" });
+    this.stopSpeaking();
+  }
+
+  // ---- Simulated system events (control strip) ----
+
+  /** SIM-SES-03: an incoming call or notification takes the display. Audio ducks (stops). */
+  async interrupt(): Promise<void> {
+    if (this.session.state !== "started") return;
+    this.store.setState({ interrupted: true });
+    this.setSession("stopping");
+    // HACK: speechSynthesis cannot lower volume mid-utterance, so "ducking" stops speech.
+    this.endDisplay();
+    this.emitSession("interrupted");
+    await wait(this.stopDelayMs);
+    this.setSession("stopped");
+  }
+
+  /** SIM-SES-03: the interruption ends; the session comes back and the app restores itself. */
+  async resume(): Promise<void> {
+    if (!this.store.getState().interrupted) return;
+    await this.startSession();
+    if (this.session.state === "started") this.emitSession("resumed");
+  }
+
+  /** SIM-SES-04: the system sleep/wake gesture (double tap middle finger on thumb). */
+  sleepNow(): void {
+    if (this.session.state !== "started" || this.store.getState().sleep === "asleep") return;
+    this.clearSleepTimers();
+    this.store.setState({ sleep: "asleep" });
+    this.emitSession("slept");
+  }
+
+  wake(): void {
+    if (this.session.state !== "started") return;
+    const wasAsleep = this.store.getState().sleep === "asleep";
+    this.wakeDisplay();
+    if (wasAsleep) this.emitSession("woke");
+  }
+
+  setSleepTimeout(ms: number): void {
+    this.store.setState({ sleepTimeoutMs: ms });
+    if (this.session.state === "started" && this.store.getState().sleep === "awake") {
+      this.armIdleTimer();
+    }
+  }
+
+  /** SIM-SES-05: the glasses drop off (out of range, battery). */
+  disconnect(): void {
+    if (!this.store.getState().connected) return;
+    this.restartOnReconnect = this.session.state === "started" || this.session.state === "starting";
+    this.store.setState({ connected: false, interrupted: false });
+    this.endDisplay();
+    this.setSession("stopped");
+    this.emitSession("disconnected");
+  }
+
+  async reconnect(): Promise<void> {
+    const s = this.store.getState();
+    if (s.connected || s.reconnecting) return;
+    this.store.setState({ reconnecting: true });
+    await wait(RECONNECT_DELAY_MS);
+    this.store.setState({ connected: true, reconnecting: false });
+    if (this.restartOnReconnect) {
+      this.restartOnReconnect = false;
+      await this.startSession();
+    }
+    this.emitSession("reconnected");
+  }
+
+  // ---- Sleep timers ----
+
+  private wakeDisplay(): void {
+    this.store.setState({ sleep: "awake" });
+    this.armIdleTimer();
+  }
+
+  private armIdleTimer(): void {
+    this.clearSleepTimers();
+    this.idleTimer = setTimeout(() => {
+      if (this.session.state !== "started") return;
+      this.store.setState({ sleep: "dimmed" });
+      this.sleepTimer = setTimeout(() => this.sleepNow(), DIM_BEFORE_SLEEP_MS);
+    }, this.store.getState().sleepTimeoutMs);
+  }
+
+  private clearSleepTimers(): void {
+    if (this.idleTimer) clearTimeout(this.idleTimer);
+    if (this.sleepTimer) clearTimeout(this.sleepTimer);
+    this.idleTimer = null;
+    this.sleepTimer = null;
   }
 
   onSessionEvent(handler: (e: SessionEvent) => void): () => void {
@@ -182,8 +296,24 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     this.store.setState({ audioOnly });
   }
 
-  /** On-screen gesture pad buttons call this, like a Neural Band / touchpad gesture would. */
+  /**
+   * A gesture from the pad or a key. While disconnected nothing arrives. While the display is
+   * asleep the gesture only wakes it ([ASSUMPTION] the waking gesture is consumed); while dimmed
+   * it undims and is delivered. Any gesture resets the idle timer.
+   */
   emitGesture(gesture: GlassesGesture): void {
+    const s = this.store.getState();
+    if (!s.connected) {
+      this.warn(`gesture "${gesture}" ignored: glasses disconnected`);
+      return;
+    }
+    if (s.session === "started") {
+      if (s.sleep === "asleep") {
+        this.wake();
+        return;
+      }
+      this.wakeDisplay();
+    }
     for (const handler of [...this.gestureHandlers]) handler(gesture);
   }
 
@@ -386,7 +516,8 @@ export class WebSimulatorAdapter implements GlassesAdapter {
       this.cueContext = null;
     }
     this.stopSpeaking();
-    this.store.setState({ session: "stopped", content: null, status: null });
+    this.clearSleepTimers();
+    this.store.setState({ session: "stopped", content: null, status: null, sleep: "awake" });
   }
 
   // ---- Internals ----

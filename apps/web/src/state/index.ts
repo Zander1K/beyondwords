@@ -5,3 +5,4 @@ export {
   useSettings,
   type SpacingSettings,
 } from "./settings";
+export { type ReaderStore, useReaderStore } from "./reader";

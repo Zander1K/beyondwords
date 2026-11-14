@@ -1,68 +1,112 @@
-// Reader state machine: which phrase is current and what the glasses should show.
+// Reader state machine: where the reader is on the page and what the glasses show.
 // Phrase-level, not word-by-word (CLAUDE.md section 8). No React, no browser APIs.
-// TODO(alex): build order step 3-4: drive this from page JSON and finger tracking instead of
-// demo phrases and gestures; add pacing and fading support.
-import type { GlassesGesture } from "@/glasses";
+//
+// Gestures (SIMULATION_FEATURES.md section 2.5):
+//   right / left  next / previous phrase (crossing lines)
+//   down / up     next / previous line (first phrase)
+//   select        open the word card; on a card, activate the focused action
+//   back          close the card. Back on the root screen ending the session is P1 (not built).
+import type { GlassesGesture, WordCardAction } from "@/glasses";
 
-/** Reader-level navigation. Step 2 replaces this with line/phrase navigation. */
-export type NavGesture = "next" | "prev" | "select" | "dismiss";
+import type { Page } from "./page";
 
-const NAV: Record<GlassesGesture, NavGesture> = {
-  right: "next",
-  down: "next",
-  left: "prev",
-  up: "prev",
-  select: "select",
-  back: "dismiss",
-};
+export type ReaderView = "phrase" | "card";
 
-export function toNavGesture(g: GlassesGesture): NavGesture {
-  return NAV[g];
+export interface ReaderPosition {
+  line: number;
+  phrase: number;
 }
-
-export type ReaderView = "phrase" | "word" | "cleared";
 
 export interface ReaderState {
-  index: number;
+  position: ReaderPosition;
   view: ReaderView;
+  /** Focused word-card action while the card is open. */
+  cardFocus: number;
 }
+
+export type ReaderOutcome =
+  | "moved"
+  | "boundary"
+  | "card-opened"
+  | "card-closed"
+  | "card-focus"
+  | "no-word"
+  | "root"
+  | { action: WordCardAction };
 
 export interface ReaderStep {
   state: ReaderState;
-  /** What happened, so the UI can pick a cue (audio-only) and decide what to show. */
-  outcome: "moved" | "word" | "cleared" | "restored" | "boundary" | "no-word";
+  outcome: ReaderOutcome;
 }
 
-export const initialReaderState: ReaderState = { index: 0, view: "phrase" };
+export const initialReaderState: ReaderState = {
+  position: { line: 0, phrase: 0 },
+  view: "phrase",
+  cardFocus: 0,
+};
 
-/**
- * Apply a gesture. `phraseCount` is the number of phrases; `hasWord(i)` says whether phrase i has
- * a hard word to explain.
- */
-export function readerStep(
-  state: ReaderState,
-  gesture: NavGesture,
-  phraseCount: number,
-  hasWord: (index: number) => boolean,
-): ReaderStep {
-  const last = phraseCount - 1;
+/** Word-card actions offered on the glasses. "picture" (illustration) is P1 and not offered. */
+export const CARD_ACTIONS: readonly WordCardAction[] = ["hear"];
+
+export function currentPhrase(page: Page, position: ReaderPosition) {
+  return page.lines[position.line]?.phrases[position.phrase];
+}
+
+function step(page: Page, pos: ReaderPosition, delta: 1 | -1): ReaderPosition | null {
+  const phrases = page.lines[pos.line]?.phrases.length ?? 0;
+  const next = pos.phrase + delta;
+  if (next >= 0 && next < phrases) return { line: pos.line, phrase: next };
+  const line = pos.line + delta;
+  const target = page.lines[line];
+  if (!target || target.phrases.length === 0) return null;
+  return { line, phrase: delta === 1 ? 0 : target.phrases.length - 1 };
+}
+
+export function readerStep(page: Page, state: ReaderState, gesture: GlassesGesture): ReaderStep {
+  if (state.view === "card") {
+    switch (gesture) {
+      case "back":
+        return { state: { ...state, view: "phrase", cardFocus: 0 }, outcome: "card-closed" };
+      case "left":
+      case "right": {
+        const focus = state.cardFocus + (gesture === "right" ? 1 : -1);
+        if (focus < 0 || focus >= CARD_ACTIONS.length) return { state, outcome: "boundary" };
+        return { state: { ...state, cardFocus: focus }, outcome: "card-focus" };
+      }
+      case "select": {
+        const action = CARD_ACTIONS[state.cardFocus];
+        return action ? { state, outcome: { action } } : { state, outcome: "boundary" };
+      }
+      case "up":
+      case "down":
+        // Definitions are short enough to need no scrolling (display limits).
+        return { state, outcome: "boundary" };
+    }
+  }
+
   switch (gesture) {
-    case "next":
-    case "prev": {
-      const index = state.index + (gesture === "next" ? 1 : -1);
-      if (index < 0 || index > last) return { state, outcome: "boundary" };
-      return { state: { index, view: "phrase" }, outcome: "moved" };
+    case "right":
+    case "left": {
+      const position = step(page, state.position, gesture === "right" ? 1 : -1);
+      if (!position) return { state, outcome: "boundary" };
+      return { state: { ...state, position }, outcome: "moved" };
+    }
+    case "down":
+    case "up": {
+      const line = state.position.line + (gesture === "down" ? 1 : -1);
+      if (!page.lines[line]?.phrases.length) return { state, outcome: "boundary" };
+      return { state: { ...state, position: { line, phrase: 0 } }, outcome: "moved" };
     }
     case "select":
-      if (state.view === "cleared") {
-        return { state: { ...state, view: "phrase" }, outcome: "restored" };
-      }
-      if (!hasWord(state.index)) return { state, outcome: "no-word" };
-      return { state: { ...state, view: "word" }, outcome: "word" };
-    case "dismiss":
-      // Dismissing a word card goes back to the phrase; dismissing the phrase clears the display.
-      if (state.view === "word")
-        return { state: { ...state, view: "phrase" }, outcome: "restored" };
-      return { state: { ...state, view: "cleared" }, outcome: "cleared" };
+      if (!currentPhrase(page, state.position)?.hardWord) return { state, outcome: "no-word" };
+      return { state: { ...state, view: "card", cardFocus: 0 }, outcome: "card-opened" };
+    case "back":
+      return { state, outcome: "root" };
   }
+}
+
+/** Put the reader on a specific line (finger tracking), starting at its first phrase. */
+export function moveToLine(page: Page, state: ReaderState, line: number): ReaderState {
+  if (!page.lines[line] || line === state.position.line) return state;
+  return { ...state, position: { line, phrase: 0 }, view: "phrase", cardFocus: 0 };
 }

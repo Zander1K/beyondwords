@@ -1,27 +1,43 @@
 import { describe, expect, it } from "vitest";
 
-import { initialReaderState, readerStep } from "./readerMachine";
+import { DEMO_PAGE } from "./demoPhrases";
+import { initialReaderState, readerStep, type ReaderState } from "./readerMachine";
 
-const hasWord = (i: number) => i !== 1;
+const at = (line: number, phrase: number): ReaderState => ({
+  ...initialReaderState,
+  position: { line, phrase },
+});
 
 describe("readerStep", () => {
-  it("moves between phrases and stops at both ends", () => {
-    expect(readerStep(initialReaderState, "prev", 3, hasWord).outcome).toBe("boundary");
-    const step = readerStep(initialReaderState, "next", 3, hasWord);
-    expect(step).toEqual({ state: { index: 1, view: "phrase" }, outcome: "moved" });
-    expect(readerStep({ index: 2, view: "phrase" }, "next", 3, hasWord).outcome).toBe("boundary");
+  it("moves phrase by phrase across lines with right/left", () => {
+    const a = readerStep(DEMO_PAGE, initialReaderState, "right");
+    expect(a.state.position).toEqual({ line: 0, phrase: 1 });
+    const b = readerStep(DEMO_PAGE, a.state, "right");
+    expect(b.state.position).toEqual({ line: 1, phrase: 0 });
+    expect(readerStep(DEMO_PAGE, b.state, "left").state.position).toEqual({ line: 0, phrase: 1 });
   });
 
-  it("opens a word card on select and returns to the phrase on dismiss", () => {
-    const word = readerStep(initialReaderState, "select", 3, hasWord);
-    expect(word.state.view).toBe("word");
-    expect(readerStep(word.state, "dismiss", 3, hasWord).state.view).toBe("phrase");
-    expect(readerStep({ index: 1, view: "phrase" }, "select", 3, hasWord).outcome).toBe("no-word");
+  it("moves line by line with down/up and stops at both ends", () => {
+    expect(readerStep(DEMO_PAGE, at(0, 1), "down").state.position).toEqual({ line: 1, phrase: 0 });
+    expect(readerStep(DEMO_PAGE, initialReaderState, "up").outcome).toBe("boundary");
+    expect(readerStep(DEMO_PAGE, at(3, 1), "right").outcome).toBe("boundary");
+    expect(readerStep(DEMO_PAGE, at(3, 0), "down").outcome).toBe("boundary");
   });
 
-  it("clears on dismiss and restores on select", () => {
-    const cleared = readerStep(initialReaderState, "dismiss", 3, hasWord);
-    expect(cleared.state.view).toBe("cleared");
-    expect(readerStep(cleared.state, "select", 3, hasWord).state.view).toBe("phrase");
+  it("opens the word card on select, activates its action, closes on back", () => {
+    const opened = readerStep(DEMO_PAGE, initialReaderState, "select");
+    expect(opened.outcome).toBe("card-opened");
+    expect(opened.state.view).toBe("card");
+    expect(readerStep(DEMO_PAGE, opened.state, "select").outcome).toEqual({ action: "hear" });
+    // Navigation is frozen while the card is open.
+    expect(readerStep(DEMO_PAGE, opened.state, "down").outcome).toBe("boundary");
+    const closed = readerStep(DEMO_PAGE, opened.state, "back");
+    expect(closed.state.view).toBe("phrase");
+    expect(closed.state.position).toEqual({ line: 0, phrase: 0 });
+  });
+
+  it("reports phrases without a hard word and back on the root", () => {
+    expect(readerStep(DEMO_PAGE, at(0, 1), "select").outcome).toBe("no-word");
+    expect(readerStep(DEMO_PAGE, initialReaderState, "back").outcome).toBe("root");
   });
 });

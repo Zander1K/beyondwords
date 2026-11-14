@@ -1,9 +1,13 @@
-// Reader logic: highlight state machine, phrase pacing, read-along (phrase-level).
-export { DEMO_PHRASES, type DemoPhrase } from "./demoPhrases";
+// Reader logic: page model, highlight state machine (phrase-level), demo page.
+export { DEMO_PAGE } from "./demoPhrases";
+export { type Box, line, type Page, type PageLine, phrase, type Phrase } from "./page";
 export {
+  CARD_ACTIONS,
+  currentPhrase,
   initialReaderState,
-  toNavGesture,
-  type NavGesture,
+  moveToLine,
+  type ReaderOutcome,
+  type ReaderPosition,
   readerStep,
   type ReaderState,
   type ReaderStep,

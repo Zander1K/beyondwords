@@ -11,13 +11,23 @@ export function createGlassesAdapter(): GlassesAdapter {
   return new WebSimulatorAdapter();
 }
 
-// One adapter for the whole app session (the glasses are a single device). Created at module
-// load so React StrictMode's double mount does not create or dispose a second one.
-export const glasses: GlassesAdapter = createGlassesAdapter();
+export interface GlassesContextValue {
+  adapter: GlassesAdapter;
+  /** Tear the adapter down and create a fresh one (SIM-SES-07 test). */
+  recreate: () => void;
+}
 
-export const GlassesContext = createContext<GlassesAdapter>(glasses);
+export const GlassesContext = createContext<GlassesContextValue | null>(null);
 
-/** The glasses, as the app sees them. Tests can swap in a fake via GlassesContext. */
+/** The glasses, as the app sees them. */
 export function useGlasses(): GlassesAdapter {
-  return useContext(GlassesContext);
+  const value = useContext(GlassesContext);
+  if (!value) throw new Error("useGlasses must be used inside <GlassesProvider>");
+  return value.adapter;
+}
+
+export function useRecreateGlasses(): () => void {
+  const value = useContext(GlassesContext);
+  if (!value) throw new Error("useRecreateGlasses must be used inside <GlassesProvider>");
+  return value.recreate;
 }

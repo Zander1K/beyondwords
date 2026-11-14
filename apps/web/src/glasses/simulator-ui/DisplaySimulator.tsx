@@ -36,22 +36,43 @@ function Content({ content }: { content: DisplayContent }) {
   }
 }
 
-export function DisplaySimulator({ adapter }: { adapter: WebSimulatorAdapter }) {
+interface Props {
+  adapter: WebSimulatorAdapter;
+  /** Tear down and recreate the adapter (SIM-SES-07: reading position must survive). */
+  onRecreate: () => void;
+}
+
+export function DisplaySimulator({ adapter, onRecreate }: Props) {
   const session = useStore(adapter.store, (s) => s.session);
   const content = useStore(adapter.store, (s) => s.content);
   const audioOnly = useStore(adapter.store, (s) => s.audioOnly);
   const lastCue = useStore(adapter.store, (s) => s.lastCue);
+  const connected = useStore(adapter.store, (s) => s.connected);
+  const reconnecting = useStore(adapter.store, (s) => s.reconnecting);
+  const sleep = useStore(adapter.store, (s) => s.sleep);
+  const interrupted = useStore(adapter.store, (s) => s.interrupted);
+  const sleepTimeoutMs = useStore(adapter.store, (s) => s.sleepTimeoutMs);
+  const started = session === "started";
 
   return (
     <section className={styles.simulator} aria-label="Glasses simulator">
       <div className={styles.frameBar}>
         <span className={styles.frameText}>Session: {session}</span>
+        <span className={styles.frameText}>
+          {reconnecting ? "Reconnecting…" : connected ? "Connected" : "Disconnected"}
+        </span>
+        <span className={styles.frameText}>Display: {sleep}</span>
       </div>
 
       <div className={styles.lens}>
         <span className={styles.lensLabel}>Right lens · 600×600</span>
-        <div className={styles.display} data-testid="glasses-display" aria-live="polite">
-          {!audioOnly && content && <Content content={content} />}
+        <div
+          className={styles.display}
+          data-testid="glasses-display"
+          data-sleep={sleep}
+          aria-live="polite"
+        >
+          {!audioOnly && sleep !== "asleep" && content && <Content content={content} />}
         </div>
         {lastCue && (
           <span key={lastCue.at} className={styles.cue} role="status">
@@ -75,6 +96,56 @@ export function DisplaySimulator({ adapter }: { adapter: WebSimulatorAdapter }) 
               </button>
             ))}
           </div>
+        </fieldset>
+        <fieldset className={styles.group}>
+          <legend>System events</legend>
+          <div className={styles.toggles}>
+            {interrupted ? (
+              <button type="button" onClick={() => void adapter.resume()}>
+                Resume
+              </button>
+            ) : (
+              <button type="button" onClick={() => void adapter.interrupt()} disabled={!started}>
+                Interrupt (call)
+              </button>
+            )}
+            {sleep === "asleep" ? (
+              <button type="button" onClick={() => adapter.wake()}>
+                Wake
+              </button>
+            ) : (
+              <button type="button" onClick={() => adapter.sleepNow()} disabled={!started}>
+                Sleep
+              </button>
+            )}
+            {connected ? (
+              <button type="button" onClick={() => adapter.disconnect()}>
+                Disconnect
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void adapter.reconnect()}
+                disabled={reconnecting}
+              >
+                Reconnect
+              </button>
+            )}
+          </div>
+          <label className={styles.slider}>
+            Sleep after {Math.round(sleepTimeoutMs / 1000)} s without input
+            <input
+              type="range"
+              min={10}
+              max={120}
+              step={5}
+              value={Math.round(sleepTimeoutMs / 1000)}
+              onChange={(e) => adapter.setSleepTimeout(Number(e.target.value) * 1000)}
+            />
+          </label>
+          <button type="button" onClick={onRecreate}>
+            Recreate adapter (test)
+          </button>
         </fieldset>
         <fieldset className={styles.group}>
           <legend>Mode</legend>

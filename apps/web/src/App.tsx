@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from "react-router";
 
 import { APP_NAME } from "@/config";
+import { GlassesProvider } from "@/glasses";
 import { LibraryScreen, ReaderScreen, SettingsScreen, WordBankScreen } from "@/screens";
 import { SpacingVars } from "@/ui";
 
@@ -45,15 +46,17 @@ export function App() {
   return (
     <BrowserRouter>
       <SpacingVars />
-      <Routes>
-        <Route element={<Layout />}>
-          <Route index element={<LibraryScreen />} />
-          <Route path="reader" element={<ReaderScreen />} />
-          <Route path="words" element={<WordBankScreen />} />
-          <Route path="settings" element={<SettingsScreen />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Route>
-      </Routes>
+      <GlassesProvider>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route index element={<LibraryScreen />} />
+            <Route path="reader" element={<ReaderScreen />} />
+            <Route path="words" element={<WordBankScreen />} />
+            <Route path="settings" element={<SettingsScreen />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
+        </Routes>
+      </GlassesProvider>
     </BrowserRouter>
   );
 }
