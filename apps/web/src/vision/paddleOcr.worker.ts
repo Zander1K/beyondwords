@@ -2,18 +2,26 @@
 // Uses ppu-paddle-ocr (PaddleOCR PP-OCRv6 via ONNX Runtime Web; WebGPU when available, else
 // WASM).
 //
-// Two passes. Measured with the same library and settings on synthetic 1280x720 page photos
-// (word recall: clean / 3.5 deg tilt / perspective + glare):
-//   1. fast: PP-OCRv6 tiny, ~0.1 s on a laptop CPU: 100 / 6 / 97 %. Tilted pages fail, but the
-//      confidence shows it (0.61 on the tilted page vs 0.97+ on good reads).
-//   2. unwarp: if the fast pass is unsure, flatten the page first: 100 / 97 / 100 %, ~2 s on a
-//      laptop CPU (slower on phones), plus a ~30 MB model loaded on first need.
+// Laptop-first: PP-OCRv6 small (31 MB, downloaded once). Chosen over tiny (6 MB) on synthetic
+// 1280x720 pages with the same library and settings: on a webcam-like page (small, faint, noisy
+// text) small read 95% of words vs 75%, and pointing picked the right word 59/65 vs 48/65;
+// ~0.25 s per read vs ~0.1 s on a laptop CPU. v6 medium was no better and 4x slower.
+//
+// Two passes (word recall with small: clean / 3.5 deg tilt / perspective + glare / webcam):
+//   1. fast: 100 / 5 / 89 / 95 %. Tilted pages fail, but the confidence shows it (0.51 on the
+//      tilted page vs 0.96+ on good reads).
+//   2. unwarp: if the fast pass is unsure, flatten the page first (UVDoc, ~30 MB, loaded on first
+//      need): 100 / 100 / 100 / 94 %, ~1.3-1.8 s per read on a laptop CPU.
 // HACK: models load from the library's model repos (GitHub / Hugging Face) on first use and are
 // cached by the browser. Vendor them for an offline demo.
-import { PaddleOcrService, type PaddleOcrResult, V6_TINY_MODEL } from "ppu-paddle-ocr/web";
+import { PaddleOcrService, type PaddleOcrResult, V6_SMALL_MODEL } from "ppu-paddle-ocr/web";
 
-/** Below this mean confidence the fast pass is retried with unwarping. [ASSUMPTION] */
-const UNWARP_BELOW_CONFIDENCE = 0.85;
+/**
+ * Below this mean confidence the fast pass is retried with unwarping. Set from the measurements
+ * above: 0.97 catches the tilted (0.51) and glare (0.956, 89% -> 100%) pages without flattening
+ * clean ones (0.98-0.996). The live loop runs this pass at most every 10 s. [ASSUMPTION]
+ */
+const UNWARP_BELOW_CONFIDENCE = 0.97;
 
 export interface WorkerRequest {
   id: number;
@@ -43,7 +51,7 @@ export type WorkerResponse =
   | { id: number; ok: false; error: string };
 
 const options = {
-  model: V6_TINY_MODEL,
+  model: V6_SMALL_MODEL,
   // The web build has no OpenCV image processor; canvas-native is what runs in the browser
   // (an "opencv" setting silently falls back to it).
   processing: { engine: "canvas-native" as const },

@@ -75,7 +75,7 @@ stats, audio-only mode). Open **Reader**:
    Recreate adapter. **Stress test** checks the 5 updates/s display limit.
 
 The first camera start downloads the hand model (~7.8 MB); the first read downloads the OCR
-models (~6 MB) and ONNX Runtime (~7 MB compressed), plus ~30 MB more the first time a page
+models (PP-OCRv6 small, ~31 MB) and ONNX Runtime (~7 MB compressed), plus ~30 MB more the first time a page
 needs flattening. This needs an internet connection (HACK: vendor them for an offline demo). Word help definitions are mock.
 
 ## Config
