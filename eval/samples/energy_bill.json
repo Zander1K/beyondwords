@@ -1,0 +1,14 @@
+{
+  "kind": "document",
+  "page_id": "doc",
+  "note": "Invented bill for the eval. Not a real company or customer.",
+  "ocr_lines": [
+    {"id": "L1", "text": "Northside Energy", "bbox": [0.05, 0.05, 0.4, 0.04]},
+    {"id": "L2", "text": "Electricity bill - account 000000", "bbox": [0.05, 0.12, 0.6, 0.04]},
+    {"id": "L3", "text": "Previous balance: €0.00", "bbox": [0.05, 0.30, 0.5, 0.04]},
+    {"id": "L4", "text": "Charges this period: €84.20", "bbox": [0.05, 0.35, 0.5, 0.04]},
+    {"id": "L5", "text": "Total to pay: €84.20", "bbox": [0.05, 0.40, 0.5, 0.04]},
+    {"id": "L6", "text": "Please pay by 28 November 2026 to avoid a late fee.", "bbox": [0.05, 0.50, 0.9, 0.04]}
+  ],
+  "expected": {"deadline_iso": "2026-11-28", "amount_text": "€84.20", "action_keywords": ["pay"]}
+}

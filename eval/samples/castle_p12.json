@@ -1,0 +1,22 @@
+{
+  "kind": "book",
+  "page_id": "p12",
+  "page_number": 12,
+  "note": "Original sample text written for the eval (not from any book). Text-only: no photo.",
+  "book": {"title": "The Grey Knight (eval sample)", "author": "Team", "genre": "historical adventure", "setting_era": "medieval England", "language": "en-GB"},
+  "ocr_lines": [
+    {"id": "L1", "text": "Sir Bors was exhausted when he reached the", "bbox": [0.10, 0.10, 0.80, 0.04]},
+    {"id": "L2", "text": "castle at dusk. Above the gatehouse, the", "bbox": [0.10, 0.15, 0.80, 0.04]},
+    {"id": "L3", "text": "portcullis groaned upward on its rusted chains,", "bbox": [0.10, 0.20, 0.80, 0.04]},
+    {"id": "L4", "text": "and a sentry in a battered surcoat waved him", "bbox": [0.10, 0.25, 0.80, 0.04]},
+    {"id": "L5", "text": "through without a word.", "bbox": [0.10, 0.30, 0.50, 0.04]},
+    {"id": "caption_1", "text": "12", "bbox": [0.48, 0.95, 0.04, 0.02]}
+  ],
+  "reading_order": ["L1", "L2", "L3", "L4", "L5", "caption_1"],
+  "hard_words": ["exhausted", "gatehouse", "portcullis", "sentry", "battered", "surcoat"],
+  "questions": [
+    {"question": "What is a portcullis?", "answer_lines": ["p12:L3"]},
+    {"question": "How did Sir Bors feel when he arrived?", "answer_lines": ["p12:L1"]},
+    {"question": "Who let him in?", "answer_lines": ["p12:L4", "p12:L5"]}
+  ]
+}
