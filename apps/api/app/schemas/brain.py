@@ -7,11 +7,22 @@ These are what routers pass into, and get back from, `app.brain`:
 - TraceEvent: one agent step, for WS /trace.
 """
 
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, BeforeValidator, Field
 
 from app.schemas.page import Line
+
+
+def _page_label(value: object) -> object:
+    # Printed page labels are text ("12", "xiv"); accept ints from older callers and the model.
+    if isinstance(value, int) and not isinstance(value, bool):
+        return str(value)
+    return value.strip() if isinstance(value, str) else value
+
+
+# Printed page label, matching `pages.page_number` (varchar, roman numerals allowed).
+PageLabel = Annotated[str, BeforeValidator(_page_label)]
 
 
 class BookContext(BaseModel):
@@ -41,7 +52,7 @@ class CapturedPage(BaseModel):
     """A page this reader has captured: the grounding source for answers (no spoilers)."""
 
     page_id: str
-    page_number: int | None = None
+    page_number: PageLabel | None = None
     lines: list[Line]
 
 

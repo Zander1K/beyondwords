@@ -13,10 +13,6 @@ Fields:
   - "meaning": a plain-language meaning of the word as it is used in this sentence and this book, at most 15 words, no jargon, never the word itself
   - "illustratable": true only for a concrete, picturable thing (an object, animal, place, piece of clothing); false for abstract words, verbs of feeling and names
   - "confidence": 0 to 1, how sure you are of the syllables, pronunciation and meaning together
-- "conversation_plan": a short, optional chat for the end of the page, never a test:
-  - "questions": one or two friendly questions, each {"type": "predict" | "clarify" | "summarise", "text", "cites": [line ids that the question is about]}. Ask only about what is on this page.
-  - "revisit_word": one hard word from this page worth coming back to, or null
-  - "recap": {"text": one or two plain sentences saying what happened on this page, "cites": [line ids]}, or null for a page with no story (e.g. contents)
 
 Rules:
 - Use only the text on this page and the book metadata. Never mention events, characters or facts from later in the book, even if you know the book.

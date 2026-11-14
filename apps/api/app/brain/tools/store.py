@@ -16,11 +16,12 @@ class BrainStore(Protocol):
         ...
 
     async def get_captured_pages(
-        self, user_id: int, book_id: int, page_numbers: list[int] | None = None
+        self, user_id: int, book_id: int, page_numbers: list[str] | None = None
     ) -> list[CapturedPage]:
         """Pages this reader has captured in this book, from `pages` + `lines`.
 
-        `page_numbers=None` means all captured pages. Must never return pages the reader has
+        `page_numbers` are printed labels matching `pages.page_number` ("12", "xiv");
+        `None` means all captured pages. Must never return pages the reader has
         not captured: that is what keeps answers spoiler-free.
         """
         ...
@@ -59,12 +60,13 @@ class InMemoryStore:
         return self.books.get(book_id)
 
     async def get_captured_pages(
-        self, user_id: int, book_id: int, page_numbers: list[int] | None = None
+        self, user_id: int, book_id: int, page_numbers: list[str] | None = None
     ) -> list[CapturedPage]:
         pages = self.pages.get((user_id, book_id), [])
         if page_numbers is None:
             return pages
-        return [p for p in pages if p.page_number in page_numbers]
+        wanted = {n.strip().lower() for n in page_numbers}
+        return [p for p in pages if (p.page_number or "").lower() in wanted]
 
     async def add_to_word_bank(
         self,

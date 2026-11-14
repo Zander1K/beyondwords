@@ -122,7 +122,6 @@ async def eval_document(spec: dict, image: bytes | None, llm) -> dict:
     started = time.perf_counter()
     card = await document_reasoner.read_document(ocr_lines=ocr, image=image, llm=llm)
     seconds = time.perf_counter() - started
-    document_reasoner.forget_document(card.doc_id)
     deadline_ok = card.deadline_iso == expected.get("deadline_iso")
     amount_ok = (card.how_much.text if card.how_much else None) == expected.get("amount_text")
     action_ok = any(k in card.what_to_do.lower() for k in expected.get("action_keywords", []))

@@ -11,7 +11,8 @@ checked and repaired deterministically, so what reaches the phone is always vali
 - each line's chunks rejoin to its text; otherwise that line is re-chunked locally
 - hard words must be on their line, above the confidence floor, not already owned by the
   reader; syllables that do not rejoin to the word are replaced by the dictionary split
-- conversation-plan citations must name lines on this page
+
+No conversation plan: conversation is Gemini's job, not Nemotron's (differs from SOP 8.1).
 
 If Nemotron is unavailable, `fallback_page()` gives reading order + phrase chunks with no
 hard words, so reading never stops (SOP 9). The API decides when to use it.
@@ -40,19 +41,16 @@ from app.brain.text_utils import (
 from app.schemas.brain import BookContext, ReaderProfile
 from app.schemas.page import (
     Chunk,
-    ConversationPlan,
     HardWord,
     Line,
     OcrDisagreement,
     OcrLine,
     PageAnalysis,
-    PlanQuestion,
-    Recap,
 )
 
 logger = logging.getLogger(__name__)
 
-PROMPT_VERSION = "page_analyzer.v1"
+PROMPT_VERSION = "page_analyzer.v2"
 # Below this similarity, phone OCR and Nemotron are reading different words on a line.
 DISAGREEMENT_THRESHOLD = 0.9
 
@@ -69,7 +67,6 @@ class PageDraft(BaseModel):
     lines: list[_DraftLine] = Field(default_factory=list)
     chunks: list[Chunk] = Field(default_factory=list)
     hard_words: list[HardWord] = Field(default_factory=list)
-    conversation_plan: ConversationPlan = Field(default_factory=ConversationPlan)
 
 
 _cache: OrderedDict[str, PageAnalysis] = OrderedDict()
@@ -118,7 +115,6 @@ def fallback_page(page_id: str, ocr_lines: list[OcrLine]) -> PageAnalysis:
             for piece in split_phrases(by_id[line_id].text)
         ],
         hard_words=[],
-        conversation_plan=ConversationPlan(),
     )
 
 
@@ -215,31 +211,12 @@ def repair(
         seen.add(key)
         hard_words.append(hw)
 
-    # Conversation plan: citations must be lines on this page.
-    plan = draft.conversation_plan
-    questions = [
-        q.model_copy(update={"cites": [c for c in q.cites if c in by_id]}) for q in plan.questions
-    ]
-    questions = [q for q in questions if q.cites][:2]
-    recap = plan.recap
-    if recap:
-        cites = [c for c in recap.cites if c in by_id]
-        recap = Recap(text=recap.text, cites=cites) if cites else None
-    revisit = plan.revisit_word
-    if revisit and letters(revisit) not in {letters(hw.word) for hw in hard_words}:
-        revisit = None
-
     return PageAnalysis(
         page_id=page_id,
         reading_order=order,
         lines=[Line(id=line.id, text=line.text, bbox=line.bbox) for line in ocr_lines],
         chunks=chunks,
         hard_words=hard_words,
-        conversation_plan=ConversationPlan(
-            questions=[PlanQuestion(**q.model_dump()) for q in questions],
-            revisit_word=revisit,
-            recap=recap,
-        ),
         ocr_disagreements=disagreements,
     )
 

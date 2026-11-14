@@ -124,3 +124,26 @@ async def test_tool_loop_is_capped() -> None:
     assert result.tool_steps == 4
     assert llm.calls[-1].get("tools") is None
     assert result.answer == "A gate."
+
+
+def test_page_order_sorts_front_matter_before_body() -> None:
+    from app.brain.text_utils import page_order
+
+    assert page_order("xiv") < page_order("1") < page_order("12") < page_order(13)
+    assert page_order("iv") == (0, 4)
+    assert page_order("Plate 3") is None
+    assert CapturedPage(page_id="p1", page_number=12, lines=[]).page_number == "12"
+
+
+async def test_captured_pages_never_beyond_current_page_label() -> None:
+    from app.brain.tools import ToolContext, get_captured_pages
+
+    preface = CapturedPage(page_id="p0", page_number="xii", lines=[])
+    odd = CapturedPage(page_id="p9", page_number="Plate 3", lines=[])
+    store = InMemoryStore(pages={(1, 7): [preface, P11, P12, P13, odd]})
+    ctx = ToolContext(user_id=1, book_id=7, store=store, llm=FakeLLM(), current_page_number="12")
+    result = await get_captured_pages(ctx)
+    assert [p["page_id"] for p in result["pages"]] == ["p0", "p11", "p12", "p9"]
+
+    only = await get_captured_pages(ctx, page_numbers=["XII", 11])
+    assert [p["page_id"] for p in only["pages"]] == ["p0", "p11"]

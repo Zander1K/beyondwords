@@ -36,11 +36,6 @@ def _draft(**overrides):
                 "confidence": 0.93,
             }
         ],
-        "conversation_plan": {
-            "questions": [{"type": "predict", "text": "What waits inside?", "cites": ["L2"]}],
-            "revisit_word": "portcullis",
-            "recap": {"text": "A knight arrives at a castle.", "cites": ["L1", "L2"]},
-        },
     }
     draft.update(overrides)
     return draft

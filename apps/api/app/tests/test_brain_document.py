@@ -32,7 +32,7 @@ async def test_bill_becomes_three_line_action_card() -> None:
     assert card.summary == ["Pay the electricity bill.", "By 28 November 2026.", "Amount: €84.20."]
     assert card.cites == ["L2", "L3"]  # unknown L9 dropped
     assert not card.needs_recapture
-    assert document_page(card.doc_id).lines[1].text == "Total to pay: €84.20"
+    assert document_page(BILL).lines[1].text == "Total to pay: €84.20"
 
 
 async def test_amount_not_on_the_page_is_never_read_out() -> None:

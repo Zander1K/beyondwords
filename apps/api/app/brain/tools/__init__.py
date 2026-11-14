@@ -12,6 +12,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.brain.llm import LLMClient
+from app.brain.text_utils import page_order
 from app.brain.text_utils import syllabify as _syllabify
 from app.brain.tools.define import define_word
 from app.brain.tools.store import BrainStore, Illustrator, NoIllustrator
@@ -26,15 +27,13 @@ class ToolContext:
     book_id: int | None
     store: BrainStore
     llm: LLMClient
-    # Highest page number the reader has reached; nothing beyond it is ever fetched.
-    current_page_number: int | None = None
+    # Printed label of the furthest page reached ("12", "xiv"); nothing beyond it is fetched.
+    current_page_number: str | None = None
     illustrator: Illustrator = field(default_factory=NoIllustrator)
     book: BookContext | None = None
     # "page_id:line_id" -> text for every line the answer may cite. Grows as tools fetch pages.
     known_lines: dict[str, str] = field(default_factory=dict)
     image_url: str | None = None
-    # Everyday mode: document lines held in memory for follow-ups (never stored).
-    document_id: str | None = None
 
     def remember(self, pages: list[CapturedPage]) -> None:
         for page in pages:
@@ -50,14 +49,20 @@ def _page_view(page: CapturedPage) -> dict[str, Any]:
     }
 
 
-async def get_captured_pages(ctx: ToolContext, page_numbers: list[int] | None = None) -> dict:
+def _not_beyond(page: CapturedPage, limit: tuple[int, int] | None) -> bool:
+    # Unknown labels are kept: the store only returns captured pages, which is the real guard.
+    order = page_order(page.page_number)
+    return limit is None or order is None or order <= limit
+
+
+async def get_captured_pages(ctx: ToolContext, page_numbers: list[str | int] | None = None) -> dict:
     if ctx.book_id is None:
         return {"pages": [], "note": "No book is set for this session."}
-    pages = await ctx.store.get_captured_pages(ctx.user_id, ctx.book_id, page_numbers)
-    if ctx.current_page_number is not None:  # no spoilers, even if the store returns more
-        pages = [
-            p for p in pages if p.page_number is None or p.page_number <= ctx.current_page_number
-        ]
+    labels = [str(n).strip() for n in page_numbers] if page_numbers is not None else None
+    pages = await ctx.store.get_captured_pages(ctx.user_id, ctx.book_id, labels)
+    # No spoilers, even if the store returns more.
+    limit = page_order(ctx.current_page_number)
+    pages = [p for p in pages if _not_beyond(p, limit)]
     ctx.remember(pages)
     return {"pages": [_page_view(p) for p in pages[-10:]]}
 
@@ -92,15 +97,6 @@ async def add_to_word_bank(ctx: ToolContext, word: str, sentence: str | None = N
     return {"saved": word}
 
 
-async def extract_action(ctx: ToolContext, doc_id: str | None = None) -> dict:
-    from app.brain.document_reasoner import action_for_cached_document
-
-    card = await action_for_cached_document(doc_id or ctx.document_id or "", llm=ctx.llm)
-    if card is None:
-        return {"error": "That document is no longer in memory. Pinch on it again."}
-    return card.model_dump()
-
-
 ToolFn = Callable[..., Awaitable[dict]]
 
 TOOLS: dict[str, ToolFn] = {
@@ -110,7 +106,6 @@ TOOLS: dict[str, ToolFn] = {
     "define": define,
     "illustrate": illustrate,
     "add_to_word_bank": add_to_word_bank,
-    "extract_action": extract_action,
 }
 
 
@@ -135,8 +130,8 @@ TOOL_SPECS: list[dict] = [
         {
             "page_numbers": {
                 "type": "array",
-                "items": {"type": "integer"},
-                "description": "Page numbers to fetch; omit for all captured pages",
+                "items": {"type": "string"},
+                "description": 'Printed page numbers to fetch, e.g. ["11", "12"]; omit for all',
             }
         },
         [],
@@ -160,12 +155,6 @@ TOOL_SPECS: list[dict] = [
         "Save a word the reader found hard.",
         {"word": _WORD, "sentence": _SENTENCE},
         ["word"],
-    ),
-    _spec(
-        "extract_action",
-        "For a bill or letter: what to do, by when and how much.",
-        {"doc_id": {"type": "string"}},
-        [],
     ),
 ]
 

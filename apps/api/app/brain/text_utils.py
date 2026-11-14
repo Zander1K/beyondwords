@@ -100,3 +100,31 @@ def split_phrases(text: str, max_words: int = 5) -> list[str]:
 def sentences(text: str) -> list[str]:
     parts = re.split(r"(?<=[.!?])\s+(?=[A-Z\"“(])", text.strip())
     return [p.strip() for p in parts if p.strip()]
+
+
+_ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100, "d": 500, "m": 1000}
+
+
+def _roman_value(label: str) -> int | None:
+    if not label or any(ch not in _ROMAN for ch in label):
+        return None
+    total = 0
+    for ch, nxt in zip(label, label[1:] + " ", strict=True):
+        value = _ROMAN[ch]
+        total += -value if nxt in _ROMAN and _ROMAN[nxt] > value else value
+    return total if total > 0 else None
+
+
+def page_order(label: str | int | None) -> tuple[int, int] | None:
+    """Sort key for a printed page label: roman front matter ("xiv") before arabic ("3").
+
+    Returns None for labels it cannot place (e.g. "Plate 3"); callers must then keep the page,
+    never drop it, since it was captured by the reader.
+    """
+    if label is None:
+        return None
+    text = str(label).strip().lower()
+    if text.isdigit():
+        return (1, int(text))
+    roman = _roman_value(text)
+    return (0, roman) if roman is not None else None

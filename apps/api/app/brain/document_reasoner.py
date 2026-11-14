@@ -3,10 +3,13 @@
     card = await read_document(ocr_lines=lines, image=jpeg_bytes)
     card.summary   # three short lines to read aloud
 
-Privacy (SOP 10): nothing is stored. The document's lines stay in process memory for
-DOCUMENT_TTL_S so the reader can ask follow-ups (`document_page()` feeds them to the agent),
-then they are dropped. Callers must not write the request, lines or card to MariaDB or logs;
-this module only logs counts.
+Privacy (SOP 10): nothing is stored, not even in memory: the lines and card are returned and
+forgotten. Callers must not write the request, lines or card to MariaDB or logs; this module
+only logs counts.
+
+Follow-ups: the phone keeps the document's OCR lines and sends them back with the question;
+the router passes `document_page(lines)` to `agent.ask(current_page=...)`, so answers cite
+"doc:L3" without the server holding the document.
 
 Checks after the model (SOP 11): cited lines must exist; the deadline and amount must
 appear in the printed text, otherwise they are dropped and the reader is asked to re-capture
@@ -15,7 +18,6 @@ rather than told a wrong date or sum.
 
 import json
 import logging
-import time
 import uuid
 from datetime import date
 
@@ -32,7 +34,6 @@ from app.schemas.page import Line, OcrLine
 logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "document_reasoner.v1"
-DOCUMENT_TTL_S = 600
 RECAPTURE_BELOW = 0.5
 
 
@@ -46,28 +47,10 @@ class _Draft(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
-# doc_id -> (expires_at, lines, card). In memory only.
-_documents: dict[str, tuple[float, list[OcrLine], ActionCard | None]] = {}
-
-
-def _purge() -> None:
-    now = time.monotonic()
-    for doc_id in [d for d, (expires, _, _) in _documents.items() if expires < now]:
-        del _documents[doc_id]
-
-
-def forget_document(doc_id: str) -> None:
-    _documents.pop(doc_id, None)
-
-
-def document_page(doc_id: str) -> CapturedPage | None:
-    """The document as a page the agent can cite (ids "doc:L1"), for follow-up questions."""
-    _purge()
-    entry = _documents.get(doc_id)
-    if not entry:
-        return None
+def document_page(ocr_lines: list[OcrLine]) -> CapturedPage:
+    """The document as a page the agent can cite ("doc:L1"), for follow-up questions."""
     return CapturedPage(
-        page_id="doc", lines=[Line(id=ln.id, text=ln.text, bbox=ln.bbox) for ln in entry[1]]
+        page_id="doc", lines=[Line(id=ln.id, text=ln.text, bbox=ln.bbox) for ln in ocr_lines]
     )
 
 
@@ -126,7 +109,6 @@ async def read_document(
     llm: LLMClient | None = None,
 ) -> ActionCard:
     """Raises LLMError if Nemotron is unreachable; the API should say Everyday mode is paused."""
-    _purge()
     settings = get_brain_settings()
     doc_id = uuid.uuid4().hex
     payload = {"ocr_lines": [{"id": ln.id, "text": ln.text} for ln in ocr_lines]}
@@ -145,7 +127,6 @@ async def read_document(
         timeout_s=settings.document_timeout_s,
     )
     card = check_card(doc_id, draft, ocr_lines)
-    _documents[doc_id] = (time.monotonic() + DOCUMENT_TTL_S, ocr_lines, card)
     logger.info(
         "Document read lines=%d confidence=%.2f recapture=%s",
         len(ocr_lines),
@@ -153,11 +134,3 @@ async def read_document(
         card.needs_recapture,
     )
     return card
-
-
-async def action_for_cached_document(
-    doc_id: str, llm: LLMClient | None = None
-) -> ActionCard | None:
-    _purge()
-    entry = _documents.get(doc_id)
-    return entry[2] if entry else None

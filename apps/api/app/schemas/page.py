@@ -1,16 +1,15 @@
 """Page JSON schema (SOP section 8.1): output of POST /page, produced by brain/page_analyzer.py.
 
 Shared contract: the phone (Alex) renders from it and the API (Mick Ola) returns and stores
-it. Field names follow SOP 8.1 exactly. Changes need a note to both owners.
+it. Field names follow SOP 8.1, except `conversation_plan`, which is left out: conversation is
+Gemini's job, not Nemotron's (team decision 2026-11-14, differs from the SOP). Changes need a
+note to both owners.
 
 Decisions recorded here (see docs/BRAIN.md):
 - bbox is [x, y, width, height] normalised to 0-1 of the page photo (top-left origin), so
   it is independent of camera resolution. Resolves OPEN QUESTION 3 (proposal, confirm with Alex).
-- Line ids are per page ("L1", "L2", ..., "caption_1"). Across pages a line is cited as
-  "<page_id>:<line_id>", e.g. "p12:L2".
+- Line ids are per page ("L1", "L2", ..., "caption_1").
 """
-
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -49,23 +48,6 @@ class HardWord(BaseModel):
     confidence: float = Field(ge=0, le=1)
 
 
-class PlanQuestion(BaseModel):
-    type: Literal["predict", "clarify", "summarise"]
-    text: str
-    cites: list[str]
-
-
-class Recap(BaseModel):
-    text: str
-    cites: list[str]
-
-
-class ConversationPlan(BaseModel):
-    questions: list[PlanQuestion] = Field(default_factory=list)
-    revisit_word: str | None = None
-    recap: Recap | None = None
-
-
 class OcrDisagreement(BaseModel):
     """A line where phone OCR and Nemotron read different words (SOP 9: ask to re-capture)."""
 
@@ -81,5 +63,4 @@ class PageAnalysis(BaseModel):
     lines: list[Line]
     chunks: list[Chunk]
     hard_words: list[HardWord]
-    conversation_plan: ConversationPlan
     ocr_disagreements: list[OcrDisagreement] = Field(default_factory=list)
