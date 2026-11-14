@@ -4,8 +4,30 @@ Owner: Mick Ola (architecture). `APP_NAME` is the single place to rename the app
 """
 
 from functools import lru_cache
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# libpq query options asyncpg does not understand. Aiven Runtime's injected DATABASE_URL adds them.
+_LIBPQ_ONLY_PARAMS = {"uselibpqcompat"}
+
+
+def to_asyncpg_url(url: str) -> str:
+    """Accept a plain PostgreSQL URI (e.g. Aiven's) and return the SQLAlchemy asyncpg form.
+
+    `postgres://` / `postgresql://` become `postgresql+asyncpg://`, `sslmode=` becomes asyncpg's
+    `ssl=`, and libpq-only options are dropped. Other URLs (e.g. sqlite in tests) pass through.
+    """
+    parts = urlsplit(url)
+    if parts.scheme not in ("postgres", "postgresql", "postgresql+asyncpg"):
+        return url
+    query = []
+    for key, value in parse_qsl(parts.query, keep_blank_values=True):
+        if key in _LIBPQ_ONLY_PARAMS:
+            continue
+        query.append(("ssl" if key == "sslmode" else key, value))
+    return urlunsplit(parts._replace(scheme="postgresql+asyncpg", query=urlencode(query)))
 
 
 class Settings(BaseSettings):
@@ -14,7 +36,13 @@ class Settings(BaseSettings):
     app_name: str = "Reading Companion"
     log_level: str = "INFO"
 
+    # Any PostgreSQL URI works: Aiven's postgresql://...?sslmode=require is converted for asyncpg.
     database_url: str = "postgresql+asyncpg://reading:reading@127.0.0.1:5432/reading_companion"
+
+    @field_validator("database_url")
+    @classmethod
+    def _asyncpg_database_url(cls, value: str) -> str:
+        return to_asyncpg_url(value)
 
     # OPEN QUESTION: final set of provider names accepted by brain/llm.py.
     llm_provider: str = "nemotron"
