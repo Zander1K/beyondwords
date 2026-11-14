@@ -14,11 +14,11 @@ install: env        ## Install API (uv) and JS (pnpm) dependencies
 	cd $(API_DIR) && uv sync
 	pnpm install
 
-dev: env            ## Start api + mariadb (mobile dev server: `pnpm mobile` in another terminal)
+dev: env            ## Start api + postgres (mobile dev server: `pnpm mobile` in another terminal)
 	docker compose up --build
 
-db: env             ## Start only mariadb in the background (pair with `make api`)
-	docker compose up -d mariadb
+db: env             ## Start only postgres in the background (pair with `make api`)
+	docker compose up -d postgres
 
 api: env            ## Run the API on the host with auto-reload (no Docker needed; DB optional)
 	cd $(API_DIR) && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -49,9 +49,10 @@ format:             ## Auto-fix API lint and formatting
 	cd $(API_DIR) && uv run ruff check --fix . && uv run ruff format .
 
 contracts:          ## Regenerate openapi.json and TS types
-	# TODO(Mick Ola): build order step 2. Export FastAPI OpenAPI to packages/contracts/openapi.json
-	# and generate packages/contracts/ts from it. Generator tool not chosen yet (OPEN QUESTION).
-	@echo "make contracts: not implemented yet (build order step 2)" && exit 1
+	# FastAPI -> packages/contracts/openapi.json -> packages/contracts/ts/schema.ts
+	# (openapi-typescript). Commit both files; the app imports from @reading-companion/contracts.
+	cd $(API_DIR) && uv run python -m scripts.export_openapi
+	pnpm --filter @reading-companion/contracts generate
 
 nemotron-check:     ## Ping the Nemotron endpoint from .env (IMAGE=path.jpg to test vision)
 	cd $(API_DIR) && PYTHONPATH=. uv run python ../../infra/scripts/nemotron_check.py $(IMAGE)

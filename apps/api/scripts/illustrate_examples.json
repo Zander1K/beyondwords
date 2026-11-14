@@ -1,0 +1,39 @@
+{
+  "about": "Real words, phrases and sentences from public-domain novels (Project Gutenberg) that are hard to picture without help. Used by scripts/illustrate_showcase.py to test POST /illustrate. Quotes are exact; only public-domain books, never copyrighted text (CLAUDE.md).",
+  "books": {
+    "moby-dick": {"title": "Moby-Dick", "author": "Herman Melville", "year": 1851, "gutenberg_id": 2701, "setting_era": "an 1840s American whaling ship"},
+    "dracula": {"title": "Dracula", "author": "Bram Stoker", "year": 1897, "gutenberg_id": 345, "setting_era": "1890s Transylvania"},
+    "two-cities": {"title": "A Tale of Two Cities", "author": "Charles Dickens", "year": 1859, "gutenberg_id": 98, "setting_era": "revolutionary Paris in the 1790s"},
+    "alice": {"title": "Alice's Adventures in Wonderland", "author": "Lewis Carroll", "year": 1865, "gutenberg_id": 11, "setting_era": "a Victorian fantasy world"},
+    "pride": {"title": "Pride and Prejudice", "author": "Jane Austen", "year": 1813, "gutenberg_id": 1342, "setting_era": "Regency England, about 1810"},
+    "hound": {"title": "The Hound of the Baskervilles", "author": "Arthur Conan Doyle", "year": 1902, "gutenberg_id": 2852, "setting_era": "late-Victorian England"},
+    "holmes": {"title": "The Adventures of Sherlock Holmes", "author": "Arthur Conan Doyle", "year": 1892, "gutenberg_id": 1661, "setting_era": "Victorian London in the 1890s"},
+    "expectations": {"title": "Great Expectations", "author": "Charles Dickens", "year": 1861, "gutenberg_id": 1400, "setting_era": "the Kent marshes, England, in the 1810s"},
+    "eyre": {"title": "Jane Eyre", "author": "Charlotte Brontë", "year": 1847, "gutenberg_id": 1260, "setting_era": "1820s northern England"},
+    "treasure": {"title": "Treasure Island", "author": "Robert Louis Stevenson", "year": 1883, "gutenberg_id": 120, "setting_era": "18th-century England and the sea"}
+  },
+  "examples": [
+    {"group": "word", "book": "moby-dick", "text": "spermaceti", "why_hard": "Latin-looking word for the waxy oil from a sperm whale's head, once used for candles."},
+    {"group": "word", "book": "moby-dick", "text": "binnacle", "why_hard": "Ship's term: the stand that holds the compass near the wheel."},
+    {"group": "word", "book": "dracula", "text": "calèche", "why_hard": "French word with an accent for a light horse-drawn carriage with a folding hood."},
+    {"group": "word", "book": "two-cities", "text": "tumbril", "why_hard": "Rough cart that carried prisoners to the guillotine; grim, so the picture must stay calm."},
+    {"group": "word", "book": "alice", "text": "hookah", "why_hard": "Water pipe for smoking; the Caterpillar's, but readers may not know the object."},
+    {"group": "word", "book": "pride", "text": "phaeton", "why_hard": "Also a Greek myth name; here a light open carriage pulled by ponies."},
+    {"group": "phrase", "book": "hound", "text": "Penang lawyer", "why_hard": "Misleading: it is a heavy walking stick, not a lawyer. Without context a picture is likely to get this wrong."},
+    {"group": "phrase", "book": "holmes", "text": "hansom cab", "why_hard": "A two-wheeled horse-drawn cab with the driver sitting high at the back."},
+    {"group": "phrase", "book": "expectations", "text": "convict's leg-iron", "why_hard": "Possessive plus a hyphenated object few readers have seen: a shackle for a prisoner's ankle."},
+    {"group": "phrase", "book": "eyre", "text": "red moreen curtain", "why_hard": "Moreen is an old heavy ribbed fabric; the colour and material both have to show."},
+    {"group": "sentence", "book": "hound", "text": "It was a fine, thick piece of wood, bulbous-headed, of the sort which is known as a “Penang lawyer.”", "why_hard": "Same phrase as above, now with its sentence: does the context turn the lawyer into a walking stick?"},
+    {"group": "sentence", "book": "moby-dick", "text": "Lighting the pipe at the binnacle lamp and planting the stool on the weather side of the deck, he sat and smoked.", "why_hard": "Two ship terms (binnacle, weather side) and a long opening clause before the action."},
+    {"group": "sentence", "book": "moby-dick", "text": "The try-works are planted between the foremast and mainmast, the most roomy part of the deck.", "why_hard": "Describes a thing almost nobody has seen: brick furnaces on deck for boiling whale blubber."},
+    {"group": "sentence", "book": "dracula", "text": "When the calèche stopped, the driver jumped down and held out his hand to assist me to alight.", "why_hard": "Accented foreign word plus the old-fashioned verb 'alight' (to get down)."},
+    {"group": "sentence", "book": "eyre", "text": "I mounted into the window-seat: gathering up my feet, I sat cross-legged, like a Turk; and, having drawn the red moreen curtain nearly close, I was shrined in double retirement.", "why_hard": "30 words, heavy punctuation, and 'shrined in double retirement' means hidden away, not a shrine."},
+    {"group": "sentence", "book": "expectations", "text": "And on the ground beside her, when Joe picked her up, was a convict’s leg-iron which had been filed asunder.", "why_hard": "The scene follows an attack; 'filed asunder' means cut in two. The picture must stay calm."},
+    {"group": "sentence", "book": "two-cities", "text": "Six tumbrils carry the day’s wine to La Guillotine.", "why_hard": "A metaphor: the 'wine' is the condemned prisoners. Read literally, it means barrels of wine."},
+    {"group": "sentence", "book": "pride", "text": "In a moment they were all out of the chaise, rejoicing at the sight of each other.", "why_hard": "'Chaise' (a small closed carriage) is easy to read as 'chase' or a chair."},
+    {"group": "cache", "book": "moby-dick", "text": "Spermaceti", "why_hard": "Repeat of the first word with a capital letter: should come back instantly from the cache."},
+    {"group": "rejected", "book": "moby-dick", "text": "Besides her hoisted boats, an American whaler is outwardly distinguished by her try-works. The try-works are planted between the foremast and mainmast, the most roomy part of the deck.", "why_hard": "Two sentences from the page at once: the app should send one at a time."},
+    {"group": "rejected", "book": "treasure", "text": "THE SEA-CHEST . . . . . . . . . . . . . . . 30 V.", "why_hard": "A line from the table of contents, as OCR would read it."},
+    {"group": "rejected", "book": "moby-dick", "text": "Call me Ishmael. Some years ago—never mind how long precisely—having little or no money in my purse, and nothing particular to interest me on shore, I thought I would sail about a little and see the watery part of the world.", "why_hard": "The famous opening: more than one sentence and over 200 characters."}
+  ]
+}

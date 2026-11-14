@@ -2,7 +2,7 @@
 
 Every request gets an `X-Request-ID` (taken from the client if sent, else generated). It is
 returned in the response headers, added to every log line, and included in error bodies so a
-failure seen on the phone can be found in the API logs.
+failure seen in the web app can be found in the API logs.
 """
 
 import logging
@@ -10,6 +10,7 @@ import uuid
 from contextvars import ContextVar
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 from starlette.responses import Response
@@ -67,6 +68,27 @@ def configure_logging(level: str) -> None:
     logging.basicConfig(level=level.upper(), handlers=[handler], force=True)
 
 
-def install(app: FastAPI) -> None:
+def is_origin_allowed(origin: str | None, allowed: list[str]) -> bool:
+    """Origin check for WebSockets, which CORSMiddleware does not cover.
+
+    Browsers send `Origin` on WebSocket handshakes but do not enforce CORS on them, so `/live`
+    must check it itself. A missing Origin means a non-browser client (tests, scripts): allow it.
+    """
+    if origin is None:
+        return True
+    return origin.rstrip("/") in allowed
+
+
+def install(app: FastAPI, cors_origins: list[str] | None = None) -> None:
     app.add_middleware(RequestIdMiddleware)
+    if cors_origins:
+        # Added last, so it runs first: preflight requests are answered before anything else.
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_origins,
+            allow_methods=["*"],
+            allow_headers=["*"],
+            # Lets the web app read the request id for error reports (CLAUDE.md section 9).
+            expose_headers=[REQUEST_ID_HEADER],
+        )
     app.add_exception_handler(Exception, unhandled_exception_handler)

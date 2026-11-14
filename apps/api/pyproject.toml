@@ -10,11 +10,15 @@ dependencies = [
     # Settings from env vars (config.py). Pydantic v2 moved BaseSettings into this package.
     "pydantic-settings>=2.3",
     "sqlalchemy[asyncio]>=2.0",
-    # Async MariaDB/MySQL driver for SQLAlchemy (pure Python, no native build needed).
-    "aiomysql>=0.2",
+    # Async PostgreSQL driver for SQLAlchemy (fast, prebuilt wheels for macOS and Linux).
+    "asyncpg>=0.30",
     "alembic>=1.13",
-    # HTTP client for the Nemotron (Verda vLLM) API; also used by FastAPI's async test client.
+    # Google's official Gemini SDK (image generation). docs/gemini.md.
+    "google-genai>=3.3",
+    # HTTP client for Nemotron (Verda vLLM) and Google Books / Open Library; also FastAPI's
+    # async test client.
     "httpx>=0.27",
+    # Dictionary syllable check and offline syllable fallback (brain/text_utils.py).
     "pyphen>=0.18.1",
 ]
 

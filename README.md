@@ -32,7 +32,7 @@ Full stack:
 ```sh
 cp .env.example .env     # make dev does this for you if missing
 make install             # uv sync (api) + pnpm install (mobile)
-make dev                 # api on http://localhost:8000 + mariadb on :3306
+make dev                 # api on http://localhost:8000 + postgres on :5432
 make migrate             # in another terminal: create the tables
 curl localhost:8000/health
 pnpm mobile              # Expo dev server, scan the QR code with Expo Go
@@ -42,9 +42,9 @@ pnpm mobile              # Expo dev server, scan the QR code with Expo Go
 
 | Command | Does |
 |---|---|
-| `make dev` | `docker compose up` (api + mariadb) |
+| `make dev` | `docker compose up` (api + postgres) |
 | `make api` | Run the API on the host with reload (no Docker) |
-| `make db` | Start only MariaDB in Docker (pair with `make api`) |
+| `make db` | Start only PostgreSQL in Docker (pair with `make api`) |
 | `make format` | Auto-fix API lint and formatting |
 | `make migrate` | `alembic upgrade head` in the api container |
 | `make test` | pytest (api) + jest (mobile) |

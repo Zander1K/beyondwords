@@ -1,19 +1,17 @@
-# Local dev stack: FastAPI + MariaDB. Mobile dev server runs separately (see README).
+# Local dev stack: FastAPI + PostgreSQL. Mobile dev server runs separately (see README).
 services:
-  mariadb:
-    image: mariadb:11.4
+  postgres:
+    image: postgres:17
     environment:
-      MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:-root}
-      MARIADB_DATABASE: ${MARIADB_DATABASE:-reading_companion}
-      MARIADB_USER: ${MARIADB_USER:-reading}
-      MARIADB_PASSWORD: ${MARIADB_PASSWORD:-reading}
-    command: ["--character-set-server=utf8mb4", "--collation-server=utf8mb4_unicode_ci"]
+      POSTGRES_DB: ${POSTGRES_DB:-reading_companion}
+      POSTGRES_USER: ${POSTGRES_USER:-reading}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-reading}
     ports:
-      - "3306:3306"
+      - "5432:5432"
     volumes:
-      - mariadb_data:/var/lib/mysql
+      - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -27,11 +25,11 @@ services:
         required: false
     environment:
       # Inside compose the DB host is the service name, not localhost.
-      DATABASE_URL: mysql+aiomysql://${MARIADB_USER:-reading}:${MARIADB_PASSWORD:-reading}@mariadb:3306/${MARIADB_DATABASE:-reading_companion}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-reading}:${POSTGRES_PASSWORD:-reading}@postgres:5432/${POSTGRES_DB:-reading_companion}
     ports:
       - "8000:8000"
     depends_on:
-      mariadb:
+      postgres:
         condition: service_healthy
     volumes:
       # Live reload of API code and migrations during development.
@@ -40,4 +38,4 @@ services:
     command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
 
 volumes:
-  mariadb_data:
+  postgres_data:
