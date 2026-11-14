@@ -18,7 +18,9 @@ export default defineConfig(({ mode }) => {
   // warning once on the phone). Normal dev stays on localhost, which needs no HTTPS.
   const lan = process.env.LAN === "1";
   // Where the dev server forwards /api (the FastAPI server on this machine).
-  const apiTarget = env.API_PROXY_TARGET || "http://localhost:8000";
+  const apiPort = env.API_PORT || "38417";
+  const webPort = Number(env.WEB_PORT || 41263);
+  const apiTarget = env.API_PROXY_TARGET || `http://localhost:${apiPort}`;
 
   return {
     envDir: repoRoot,
@@ -41,7 +43,7 @@ export default defineConfig(({ mode }) => {
     server: {
       // localhost counts as a secure context, so getUserMedia works without HTTPS.
       host: lan ? true : "localhost",
-      port: 5173,
+      port: webPort,
       strictPort: true,
       // Same-origin API calls: /api/... -> FastAPI. Works from a phone, where "localhost" would
       // be the phone itself, and avoids mixed HTTPS/HTTP content. ws: true for /live later.

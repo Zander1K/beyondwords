@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useNavigate } from "react-router";
 
 import { RequireAccess, useAccess } from "@/access";
+import { useApiStatus } from "@/api";
 import { APP_NAME } from "@/config";
 import { Landing } from "@/landing";
 import { LibraryScreen, ReaderScreen, SettingsScreen, WordBankScreen } from "@/screens";
@@ -20,6 +21,15 @@ function Layout() {
   const user = useAccess((s) => s.user);
   const signOut = useAccess((s) => s.signOut);
   const navigate = useNavigate();
+  const api = useApiStatus();
+  const apiLabel =
+    api.state === "checking"
+      ? "Checking the API"
+      : api.state === "offline"
+        ? "API offline"
+        : api.database === "ok"
+          ? "API connected"
+          : "API connected, database unavailable";
   return (
     <div className={styles.shell}>
       <header className={styles.header}>
@@ -40,6 +50,10 @@ function Layout() {
           </ul>
         </nav>
         <div className={styles.account}>
+          <span className={styles.api} data-state={api.state} role="status">
+            <span className={styles.apiDot} aria-hidden="true" />
+            {apiLabel}
+          </span>
           {user && <span className={styles.user}>Signed in as {user}</span>}
           <button
             type="button"

@@ -10,10 +10,10 @@ optional: it is only needed for a local PostgreSQL.
 ```sh
 # from the repo root
 make install        # creates .env from .env.example, installs deps
-make api            # http://localhost:8000  (auto-reloads on save)
+make api            # http://localhost:38417  (auto-reloads on save)
 ```
 
-Open http://localhost:8000. It redirects to the interactive docs (`/docs`), where you can call
+Open http://localhost:38417. It redirects to the interactive docs (`/docs`), where you can call
 every endpoint from the browser. `GET /health` works without a database and reports
 `"database": "unavailable"`.
 
@@ -41,7 +41,7 @@ In code, always call the model through `get_llm()` in `app/brain/llm.py`. Pass
 `reasoning=False` for fast calls (~0.3 s instead of several seconds).
 
 To call the API from a phone on the same Wi-Fi, use your laptop's LAN IP
-(`ipconfig getifaddr en0`), e.g. `http://192.168.1.20:8000`. `make api` listens on all interfaces.
+(`ipconfig getifaddr en0`), e.g. `http://192.168.1.20:38417`. `make api` listens on all interfaces.
 
 ## Everyday commands
 

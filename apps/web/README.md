@@ -9,7 +9,7 @@ ESLint + Prettier.
 
 ```sh
 pnpm install                 # from the repo root (pnpm workspace)
-pnpm --filter web dev        # http://localhost:5173  (or `make web`)
+pnpm --filter web dev        # http://localhost:41263  (or `make web`)
 pnpm --filter web lint       # eslint + prettier --check + tsc
 pnpm --filter web test       # vitest
 pnpm --filter web build      # production build into dist/
@@ -105,12 +105,12 @@ The app reads the root `.env` (see `.env.example`). Only `VITE_*` variables reac
 and they are public: never put an API key in one.
 
 - `VITE_API_BASE_URL`: API base URL as seen from the browser. Default `/api`, which the dev
-  server forwards to FastAPI (`API_PROXY_TARGET`, default `http://localhost:8000`).
+  server forwards to FastAPI (`API_PROXY_TARGET`, default `http://localhost:38417`).
 - `APP_NAME`: injected at build time as the app's display name.
 
 Through the `/api` proxy the browser sees one origin, so CORS is not involved. If you point
 `VITE_API_BASE_URL` straight at the API, it must allow the web app's origin: `CORS_ORIGINS`
-(default `http://localhost:5173`).
+(default `http://localhost:41263`).
 
 ## Testing on a phone (same Wi-Fi)
 
@@ -118,29 +118,29 @@ Phones only allow the camera and mic over HTTPS, so LAN mode serves a self-signe
 
 ```sh
 make api        # FastAPI on this machine (or make dev)
-make web-lan    # prints https://<your-ip>:5173
+make web-lan    # prints https://<your-ip>:41263
 ```
 
 1. Connect the phone to the **same Wi-Fi** as this computer.
-2. Open the printed `https://<your-ip>:5173` address. The browser warns that the certificate is
+2. Open the printed `https://<your-ip>:41263` address. The browser warns that the certificate is
    not trusted (it is self-signed): choose _Advanced_ → _Proceed_ (Chrome) or _Show Details_ →
    _visit this website_ (Safari). This is needed once per browser.
 3. Start the camera and allow access. The rear camera is used.
 
 API calls go to `/api` on the same address and the dev server forwards them to FastAPI, so the
-phone never needs to reach port 8000. If the page does not load, check the computer's firewall
-allows incoming connections on port 5173.
+phone never needs to reach port 38417. If the page does not load, check the computer's firewall
+allows incoming connections on port 41263.
 
 ## Testing from outside your network (HTTPS tunnel)
 
 Browsers only allow the camera and mic in a secure context: `localhost` or HTTPS. A phone on
-your network reaching `http://<laptop-ip>:5173` is **not** secure, so the camera will be blocked.
-Use an HTTPS tunnel instead, for example `cloudflared tunnel --url http://localhost:5173` or
-`ngrok http 5173` (neither is a project dependency; install one yourself). Then:
+your network reaching `http://<laptop-ip>:41263` is **not** secure, so the camera will be blocked.
+Use an HTTPS tunnel instead, for example `cloudflared tunnel --url http://localhost:41263` or
+`ngrok http 41263` (neither is a project dependency; install one yourself). Then:
 
 1. Allow the tunnel's host in Vite: `server.allowedHosts` in `vite.config.ts` (Vite blocks unknown
    hosts by default).
-2. The API also needs to be reachable over HTTPS from the phone: tunnel port 8000 too, set
+2. The API also needs to be reachable over HTTPS from the phone: tunnel port 38417 too, set
    `VITE_API_BASE_URL` to that URL, and add the web tunnel URL to `CORS_ORIGINS`.
 3. Open the web tunnel URL on the phone.
 

@@ -27,7 +27,7 @@ services:
       # Inside compose the DB host is the service name, not localhost.
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-reading}:${POSTGRES_PASSWORD:-reading}@postgres:5432/${POSTGRES_DB:-reading_companion}
     ports:
-      - "8000:8000"
+      - "${API_PORT:-38417}:8000"
     depends_on:
       postgres:
         condition: service_healthy

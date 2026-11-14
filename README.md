@@ -30,7 +30,7 @@ Docker (with Compose v2.24+), Python 3.11 + [uv](https://docs.astral.sh/uv/), No
 
 ## Quick start
 
-API only, no Docker (fastest): `make install && make api`, then open http://localhost:8000.
+API only, no Docker (fastest): `make install && make api`, then open http://localhost:38417.
 Details in [`apps/api/README.md`](apps/api/README.md).
 
 Full stack:
@@ -38,10 +38,11 @@ Full stack:
 ```sh
 cp .env.example .env     # make dev does this for you if missing
 make install             # uv sync (api) + pnpm install (web)
-make dev                 # api on http://localhost:8000 + mariadb on :3306
+make dev                 # api on http://localhost:38417 + mariadb on :3306
 make migrate             # in another terminal: create the tables
-curl localhost:8000/health
-make web                 # web app on http://localhost:5173 (same as `pnpm --filter web dev`)
+curl localhost:38417/health
+make local               # api on :38417 + web app on :41263 together (ports: API_PORT / WEB_PORT in .env)
+make web                 # web app on http://localhost:41263 (same as `pnpm --filter web dev`)
 ```
 
 ## Commands
@@ -49,7 +50,7 @@ make web                 # web app on http://localhost:5173 (same as `pnpm --fil
 | Command | Does |
 |---|---|
 | `make dev` | `docker compose up` (api + mariadb) |
-| `make web` | Web app dev server (Vite) on http://localhost:5173 |
+| `make web` | Web app dev server (Vite) on http://localhost:41263 |
 | `make api` | Run the API on the host with reload (no Docker) |
 | `make db` | Start only PostgreSQL in Docker (pair with `make api`) |
 | `make format` | Auto-fix API lint and formatting |
