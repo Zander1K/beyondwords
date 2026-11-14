@@ -1,0 +1,248 @@
+{
+  "_note": "Dummy readers for testing (scripts/seed_demo.py). Books are public-domain titles, metadata only. Context sentences are written for this file, not quoted from the books. Usernames all start with demo_ so they can be removed with --reset.",
+  "books": [
+    {
+      "key": "treasure_island",
+      "title": "Treasure Island",
+      "author": "Robert Louis Stevenson",
+      "publication_year": 1883,
+      "language": "en-GB",
+      "genre": "Adventure",
+      "setting_era": "18th-century England and the Caribbean",
+      "description_spoiler_free": "A boy from a seaside inn finds an old sea chart and joins a voyage in search of buried treasure."
+    },
+    {
+      "key": "secret_garden",
+      "title": "The Secret Garden",
+      "author": "Frances Hodgson Burnett",
+      "publication_year": 1911,
+      "language": "en-GB",
+      "genre": "Children's fiction",
+      "setting_era": "Edwardian Yorkshire, England",
+      "description_spoiler_free": "An orphaned girl is sent to live in a large house on the Yorkshire moors and hears about a garden nobody visits."
+    },
+    {
+      "key": "black_beauty",
+      "title": "Black Beauty",
+      "author": "Anna Sewell",
+      "publication_year": 1877,
+      "language": "en-GB",
+      "genre": "Children's fiction",
+      "setting_era": "Victorian England",
+      "description_spoiler_free": "A horse tells the story of his life, from a peaceful meadow to the busy streets of London."
+    },
+    {
+      "key": "wind_willows",
+      "title": "The Wind in the Willows",
+      "author": "Kenneth Grahame",
+      "publication_year": 1908,
+      "language": "en-GB",
+      "genre": "Children's fiction",
+      "setting_era": "Edwardian English countryside",
+      "description_spoiler_free": "Mole leaves his spring cleaning behind and meets Rat, Badger and the boastful Toad by the river."
+    },
+    {
+      "key": "alice",
+      "title": "Alice's Adventures in Wonderland",
+      "author": "Lewis Carroll",
+      "publication_year": 1865,
+      "language": "en-GB",
+      "genre": "Fantasy",
+      "setting_era": "Victorian England (a dream world)",
+      "description_spoiler_free": "A bored girl follows a white rabbit down a hole into a world where nothing behaves as expected."
+    },
+    {
+      "key": "sherlock",
+      "title": "The Adventures of Sherlock Holmes",
+      "author": "Arthur Conan Doyle",
+      "publication_year": 1892,
+      "language": "en-GB",
+      "genre": "Mystery",
+      "setting_era": "Victorian London",
+      "description_spoiler_free": "Twelve short cases solved by the detective Sherlock Holmes, told by his friend Dr Watson."
+    }
+  ],
+  "users": [
+    {
+      "username": "demo_amara",
+      "display_name": "Amara",
+      "support_level": "listen",
+      "voice": "en-GB-female-1",
+      "glasses_type": "display",
+      "settings": {"spacing": {"letterSpacing": 0.12, "wordSpacing": 0.3, "lineHeight": 2.0, "fontSize": 1.375}},
+      "joined_days_ago": 26,
+      "sessions": 9,
+      "books": [
+        {"book": "secret_garden", "current_page": "14", "current_line": "L6", "started_days_ago": 24, "last_read_days_ago": 1}
+      ],
+      "words": [
+        {"word": "moor", "book": "secret_garden", "times_rescued": 4, "solo_reads": 1, "status": "learning", "context_sentence": "The wind came across the moor and rattled the tall windows."},
+        {"word": "contrary", "book": "secret_garden", "times_rescued": 3, "solo_reads": 0, "status": "learning", "context_sentence": "She was so contrary that she said no before anyone asked."},
+        {"word": "orphan", "book": "secret_garden", "times_rescued": 2, "solo_reads": 3, "status": "owned", "context_sentence": "The orphan girl had never seen a garden like it."}
+      ]
+    },
+    {
+      "username": "demo_ben",
+      "display_name": "Ben",
+      "support_level": "read_along",
+      "voice": "en-GB-male-1",
+      "glasses_type": "display",
+      "settings": {"spacing": {"letterSpacing": 0.08, "wordSpacing": 0.24, "lineHeight": 1.85, "fontSize": 1.25}},
+      "joined_days_ago": 20,
+      "sessions": 12,
+      "books": [
+        {"book": "treasure_island", "current_page": "57", "current_line": "L3", "started_days_ago": 19, "last_read_days_ago": 0},
+        {"book": "black_beauty", "current_page": "212", "current_line": "L18", "started_days_ago": 40, "last_read_days_ago": 21, "finished_days_ago": 21}
+      ],
+      "words": [
+        {"word": "buccaneer", "book": "treasure_island", "times_rescued": 3, "solo_reads": 1, "status": "learning", "context_sentence": "The old buccaneer kept a cutlass under his bed."},
+        {"word": "schooner", "book": "treasure_island", "times_rescued": 2, "solo_reads": 0, "status": "learning", "context_sentence": "A schooner rocked gently at the end of the harbour wall."},
+        {"word": "coxswain", "book": "treasure_island", "times_rescued": 5, "solo_reads": 2, "status": "learning", "context_sentence": "The coxswain shouted orders as the boat swung round."},
+        {"word": "bridle", "book": "black_beauty", "times_rescued": 1, "solo_reads": 4, "status": "owned", "context_sentence": "The groom slipped the bridle over the horse's ears."}
+      ]
+    },
+    {
+      "username": "demo_chloe",
+      "display_name": "Chloé",
+      "support_level": "solo",
+      "voice": "en-GB-female-2",
+      "glasses_type": "display",
+      "settings": {"spacing": {"letterSpacing": 0.05, "wordSpacing": 0.16, "lineHeight": 1.7, "fontSize": 1.125}},
+      "joined_days_ago": 30,
+      "sessions": 15,
+      "books": [
+        {"book": "sherlock", "current_page": "143", "current_line": "L11", "started_days_ago": 28, "last_read_days_ago": 2},
+        {"book": "alice", "current_page": "98", "current_line": "L22", "started_days_ago": 45, "last_read_days_ago": 29, "finished_days_ago": 29}
+      ],
+      "words": [
+        {"word": "deduction", "book": "sherlock", "times_rescued": 2, "solo_reads": 5, "status": "owned", "context_sentence": "Holmes reached the answer by deduction, not by guessing."},
+        {"word": "hansom", "book": "sherlock", "times_rescued": 2, "solo_reads": 1, "status": "learning", "context_sentence": "A hansom rattled up the street and stopped at the door."},
+        {"word": "peculiar", "book": "alice", "times_rescued": 1, "solo_reads": 6, "status": "owned", "context_sentence": "Everything in the hall looked a little peculiar."}
+      ]
+    },
+    {
+      "username": "demo_dev",
+      "display_name": "Dev",
+      "support_level": "read_along",
+      "voice": "en-IN-male-1",
+      "glasses_type": "gen2",
+      "settings": {"spacing": {"letterSpacing": 0.1, "wordSpacing": 0.28, "lineHeight": 1.9, "fontSize": 1.25}},
+      "joined_days_ago": 14,
+      "sessions": 6,
+      "books": [
+        {"book": "wind_willows", "current_page": "31", "current_line": "L9", "started_days_ago": 13, "last_read_days_ago": 3}
+      ],
+      "words": [
+        {"word": "burrow", "book": "wind_willows", "times_rescued": 2, "solo_reads": 0, "status": "learning", "context_sentence": "Mole climbed out of his burrow and blinked in the sunshine."},
+        {"word": "conceited", "book": "wind_willows", "times_rescued": 3, "solo_reads": 0, "status": "learning", "context_sentence": "Toad was so conceited that he sang songs about himself."}
+      ]
+    },
+    {
+      "username": "demo_eilidh",
+      "display_name": "Eilidh",
+      "support_level": "listen",
+      "voice": "en-GB-female-1",
+      "glasses_type": "gen2",
+      "settings": {"spacing": {"letterSpacing": 0.15, "wordSpacing": 0.4, "lineHeight": 2.2, "fontSize": 1.5}},
+      "joined_days_ago": 7,
+      "sessions": 4,
+      "books": [
+        {"book": "alice", "current_page": "9", "current_line": "L2", "started_days_ago": 6, "last_read_days_ago": 1}
+      ],
+      "words": [
+        {"word": "curious", "book": "alice", "times_rescued": 3, "solo_reads": 0, "status": "learning", "context_sentence": "Alice felt curious about the tiny golden key."},
+        {"word": "waistcoat", "book": "alice", "times_rescued": 2, "solo_reads": 0, "status": "learning", "context_sentence": "The rabbit pulled a watch out of his waistcoat pocket."}
+      ]
+    },
+    {
+      "username": "demo_felix",
+      "display_name": "Felix",
+      "support_level": "read_along",
+      "voice": "en-US-male-1",
+      "glasses_type": "display",
+      "settings": {"spacing": {"letterSpacing": 0.07, "wordSpacing": 0.2, "lineHeight": 1.8, "fontSize": 1.125}},
+      "joined_days_ago": 18,
+      "sessions": 10,
+      "books": [
+        {"book": "sherlock", "current_page": "22", "current_line": "L14", "started_days_ago": 10, "last_read_days_ago": 0},
+        {"book": "treasure_island", "current_page": "88", "current_line": "L5", "started_days_ago": 17, "last_read_days_ago": 11}
+      ],
+      "words": [
+        {"word": "inquiry", "book": "sherlock", "times_rescued": 2, "solo_reads": 2, "status": "learning", "context_sentence": "The inspector began his inquiry at the bank."},
+        {"word": "mutiny", "book": "treasure_island", "times_rescued": 4, "solo_reads": 1, "status": "learning", "context_sentence": "The captain feared a mutiny among the crew."},
+        {"word": "doubloon", "book": "treasure_island", "times_rescued": 1, "solo_reads": 3, "status": "owned", "context_sentence": "A single gold doubloon glinted in the sand."}
+      ]
+    },
+    {
+      "username": "demo_grace",
+      "display_name": "Grace",
+      "support_level": "solo",
+      "voice": "en-GB-female-2",
+      "glasses_type": "display",
+      "settings": {"spacing": {"letterSpacing": 0.04, "wordSpacing": 0.14, "lineHeight": 1.6, "fontSize": 1.0}},
+      "joined_days_ago": 35,
+      "sessions": 18,
+      "books": [
+        {"book": "black_beauty", "current_page": "176", "current_line": "L7", "started_days_ago": 15, "last_read_days_ago": 1},
+        {"book": "wind_willows", "current_page": "240", "current_line": "L20", "started_days_ago": 34, "last_read_days_ago": 16, "finished_days_ago": 16}
+      ],
+      "words": [
+        {"word": "harness", "book": "black_beauty", "times_rescued": 1, "solo_reads": 5, "status": "owned", "context_sentence": "The new harness was stiff and pinched at the shoulders."},
+        {"word": "ostler", "book": "black_beauty", "times_rescued": 2, "solo_reads": 1, "status": "learning", "context_sentence": "The ostler led the tired horses into the stable yard."},
+        {"word": "weasel", "book": "wind_willows", "times_rescued": 1, "solo_reads": 4, "status": "owned", "context_sentence": "A weasel peered out from behind the hedge."}
+      ]
+    },
+    {
+      "username": "demo_hiro",
+      "display_name": "Hiro",
+      "support_level": "read_along",
+      "voice": "en-GB-male-2",
+      "glasses_type": "gen2",
+      "settings": {"spacing": {"letterSpacing": 0.09, "wordSpacing": 0.26, "lineHeight": 1.95, "fontSize": 1.3125}},
+      "joined_days_ago": 10,
+      "sessions": 7,
+      "books": [
+        {"book": "treasure_island", "current_page": "12", "current_line": "L1", "started_days_ago": 9, "last_read_days_ago": 2}
+      ],
+      "words": [
+        {"word": "cutlass", "book": "treasure_island", "times_rescued": 3, "solo_reads": 0, "status": "learning", "context_sentence": "He waved his cutlass and shouted at the gulls."},
+        {"word": "inn", "book": "treasure_island", "times_rescued": 1, "solo_reads": 3, "status": "owned", "context_sentence": "Travellers stopped at the inn to warm their hands."}
+      ]
+    },
+    {
+      "username": "demo_isla",
+      "display_name": "Isla",
+      "support_level": "listen",
+      "voice": "en-AU-female-1",
+      "glasses_type": "display",
+      "settings": {"spacing": {"letterSpacing": 0.14, "wordSpacing": 0.36, "lineHeight": 2.1, "fontSize": 1.5}},
+      "joined_days_ago": 3,
+      "sessions": 2,
+      "books": [
+        {"book": "secret_garden", "current_page": "3", "current_line": "L4", "started_days_ago": 3, "last_read_days_ago": 0}
+      ],
+      "words": [
+        {"word": "ayah", "book": "secret_garden", "times_rescued": 2, "solo_reads": 0, "status": "learning", "context_sentence": "Her ayah had always dressed her and brushed her hair."}
+      ]
+    },
+    {
+      "username": "demo_jonas",
+      "display_name": "Jonas",
+      "support_level": "solo",
+      "voice": "en-GB-male-1",
+      "glasses_type": "display",
+      "settings": {"spacing": {"letterSpacing": 0.06, "wordSpacing": 0.18, "lineHeight": 1.75, "fontSize": 1.125}},
+      "joined_days_ago": 22,
+      "sessions": 13,
+      "books": [
+        {"book": "alice", "current_page": "61", "current_line": "L8", "started_days_ago": 8, "last_read_days_ago": 0},
+        {"book": "sherlock", "current_page": "305", "current_line": "L16", "started_days_ago": 21, "last_read_days_ago": 9, "finished_days_ago": 9}
+      ],
+      "words": [
+        {"word": "croquet", "book": "alice", "times_rescued": 2, "solo_reads": 1, "status": "learning", "context_sentence": "The Queen invited everyone to a game of croquet."},
+        {"word": "magistrate", "book": "sherlock", "times_rescued": 1, "solo_reads": 4, "status": "owned", "context_sentence": "The magistrate listened to both sides before he spoke."},
+        {"word": "singular", "book": "sherlock", "times_rescued": 2, "solo_reads": 3, "status": "owned", "context_sentence": "It was a singular case, unlike any he had seen."}
+      ]
+    }
+  ]
+}
