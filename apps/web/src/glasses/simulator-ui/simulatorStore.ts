@@ -3,7 +3,7 @@
 // (SIM-SES-07, phone is the source of truth).
 import { createStore } from "zustand/vanilla";
 
-import type { Cue, SessionState, StatusKind } from "../adapter";
+import type { Cue, GlassesGesture, SessionState, StatusKind } from "../adapter";
 import type { DisplayContent } from "./displayModel";
 import type { Scene } from "./scene";
 
@@ -34,7 +34,19 @@ export interface SimulatorState {
   sleepTimeoutMs: number;
   /** The session was taken by a simulated call/notification (SIM-SES-03). */
   interrupted: boolean;
+  /** SIM-GST-02: gestures received, newest first. */
+  gestureLog: GestureLogEntry[];
 }
+
+export interface GestureLogEntry {
+  gesture: GlassesGesture;
+  /** "pad" or the key that produced it, e.g. "key ArrowRight". */
+  source: string;
+  result: "delivered" | "woke the display" | "ignored: disconnected";
+  at: number;
+}
+
+export const GESTURE_LOG_SIZE = 20;
 
 /** SIM-DSP-04 default. [ASSUMPTION] our estimate. */
 export const DEFAULT_MAX_UPDATES_PER_SECOND = 5;
@@ -61,5 +73,6 @@ export function createSimulatorStore() {
     sleep: "awake",
     sleepTimeoutMs: DEFAULT_SLEEP_TIMEOUT_MS,
     interrupted: false,
+    gestureLog: [],
   }));
 }

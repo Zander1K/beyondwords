@@ -1,15 +1,12 @@
 // Glasses simulator panel: the Ray-Ban Display (600x600 in a right-lens frame), session controls,
-// the six-action gesture pad and audio-only mode.
+// the six-action gesture pad with its log, display stats and audio-only mode.
 // HACK: the lens frame proportions and the display's offset inside it are illustrative only.
 import { useStore } from "zustand";
 
-import type { GlassesGesture } from "../adapter";
-import { GESTURE_KEYS } from "../web-simulator/gestures";
 import type { WebSimulatorAdapter } from "../web-simulator/WebSimulatorAdapter";
 import styles from "./DisplaySimulator.module.css";
+import { GesturePad } from "./GesturePad";
 import { ScenePanel } from "./ScenePanel";
-
-const PAD: readonly GlassesGesture[] = ["left", "select", "right", "up", "back", "down"];
 
 /** SIM-DSP-04 stress test: 50 phrase updates per second for 2 s. */
 function stressTest(adapter: WebSimulatorAdapter): void {
@@ -82,18 +79,7 @@ export function DisplaySimulator({ adapter, onRecreate }: Props) {
       <div className={styles.controls}>
         <fieldset className={styles.group}>
           <legend>Gestures (Neural Band / touchpad)</legend>
-          <div className={styles.inputs}>
-            {PAD.map((g) => (
-              <button
-                key={g}
-                type="button"
-                className={styles.inputButton}
-                onClick={() => adapter.emitGesture(g)}
-              >
-                {g} <kbd>{GESTURE_KEYS[g]}</kbd>
-              </button>
-            ))}
-          </div>
+          <GesturePad adapter={adapter} />
         </fieldset>
         <fieldset className={styles.group}>
           <legend>System events</legend>

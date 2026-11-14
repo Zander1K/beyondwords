@@ -27,7 +27,12 @@ import {
   makeWordCard,
 } from "../simulator-ui/displayModel";
 import { buildScene } from "../simulator-ui/scene";
-import { createSimulatorStore, type SimulatorStore } from "../simulator-ui/simulatorStore";
+import {
+  createSimulatorStore,
+  GESTURE_LOG_SIZE,
+  type GestureLogEntry,
+  type SimulatorStore,
+} from "../simulator-ui/simulatorStore";
 import { keyToGesture } from "./gestures";
 import { MIC_WORKLET_SOURCE, floatToInt16 } from "./micWorklet";
 
@@ -310,20 +315,30 @@ export class WebSimulatorAdapter implements GlassesAdapter {
    * asleep the gesture only wakes it ([ASSUMPTION] the waking gesture is consumed); while dimmed
    * it undims and is delivered. Any gesture resets the idle timer.
    */
-  emitGesture(gesture: GlassesGesture): void {
+  emitGesture(gesture: GlassesGesture, source = "pad"): void {
     const s = this.store.getState();
     if (!s.connected) {
+      this.logGesture(gesture, source, "ignored: disconnected");
       this.warn(`gesture "${gesture}" ignored: glasses disconnected`);
       return;
     }
     if (s.session === "started") {
       if (s.sleep === "asleep") {
+        this.logGesture(gesture, source, "woke the display");
         this.wake();
         return;
       }
       this.wakeDisplay();
     }
+    this.logGesture(gesture, source, "delivered");
     for (const handler of [...this.gestureHandlers]) handler(gesture);
+  }
+
+  /** SIM-GST-02: rolling log of gestures received. */
+  private logGesture(gesture: GlassesGesture, source: string, result: GestureLogEntry["result"]) {
+    const entry: GestureLogEntry = { gesture, source, result, at: Date.now() };
+    const log = [entry, ...this.store.getState().gestureLog].slice(0, GESTURE_LOG_SIZE);
+    this.store.setState({ gestureLog: log });
   }
 
   // ---- Input ----
@@ -583,7 +598,8 @@ export class WebSimulatorAdapter implements GlassesAdapter {
     const gesture = keyToGesture(event as KeyboardEvent);
     if (!gesture) return;
     event.preventDefault();
-    this.emitGesture(gesture);
+    const key = (event as KeyboardEvent).key;
+    this.emitGesture(gesture, `key ${key === " " ? "Space" : key}`);
   };
 
   private attachKeys(): void {

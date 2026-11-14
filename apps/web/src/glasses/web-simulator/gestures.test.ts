@@ -98,3 +98,44 @@ describe("WebSimulatorAdapter session", () => {
     adapter.dispose();
   });
 });
+
+describe("SIM-GST-02 gesture log", () => {
+  it("records time, action, source and result, newest first", async () => {
+    const target = new EventTarget();
+    const adapter = new WebSimulatorAdapter({
+      keyTarget: target,
+      startDelayMs: 0,
+      warn: () => {},
+    });
+    adapter.onGesture(() => {});
+    await adapter.session.start();
+
+    pressKey(target, "ArrowDown");
+    adapter.emitGesture("select", "pad");
+    adapter.sleepNow();
+    adapter.emitGesture("right", "pad");
+    adapter.disconnect();
+    pressKey(target, "Escape");
+
+    const log = adapter.store.getState().gestureLog.map(({ gesture, source, result }) => ({
+      gesture,
+      source,
+      result,
+    }));
+    expect(log).toEqual([
+      { gesture: "back", source: "key Escape", result: "ignored: disconnected" },
+      { gesture: "right", source: "pad", result: "woke the display" },
+      { gesture: "select", source: "pad", result: "delivered" },
+      { gesture: "down", source: "key ArrowDown", result: "delivered" },
+    ]);
+    expect(adapter.store.getState().gestureLog[0]?.at).toEqual(expect.any(Number));
+    adapter.dispose();
+  });
+
+  it("keeps a rolling window", () => {
+    const adapter = new WebSimulatorAdapter({ keyTarget: new EventTarget() });
+    for (let i = 0; i < 30; i++) adapter.emitGesture("right");
+    expect(adapter.store.getState().gestureLog).toHaveLength(20);
+    adapter.dispose();
+  });
+});

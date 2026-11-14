@@ -62,5 +62,25 @@ export default defineConfig([
       "no-restricted-properties": ["error", ...BROWSER_MEDIA_PROPERTIES],
     },
   },
+  {
+    files: ["src/**/*.{ts,tsx}"],
+    // Tests may simulate key presses; the web simulator owns the real key listener.
+    ignores: ["src/glasses/web-simulator/**", "src/**/*.test.ts"],
+    rules: {
+      // SIM-GST-03: gestures reach the app only through GlassesAdapter.onGesture. Raw key
+      // listeners live in the web simulator. Form fields keep their normal keyboard behaviour.
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: "Literal[value=/^key(down|up|press)$/]",
+          message: "Listen for glasses gestures with GlassesAdapter.onGesture, not raw key events.",
+        },
+        {
+          selector: "JSXAttribute[name.name=/^onKey(Down|Up|Press)$/]",
+          message: "Listen for glasses gestures with GlassesAdapter.onGesture, not raw key events.",
+        },
+      ],
+    },
+  },
   prettierConfig,
 ]);
