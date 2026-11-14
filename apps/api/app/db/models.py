@@ -1,4 +1,7 @@
-"""ORM models for the MariaDB tables in SOP section 5 ("Data model (MariaDB)").
+"""ORM models for the PostgreSQL tables in SOP section 5 ("Data model").
+
+OPEN QUESTION: the SOP names MariaDB; the team switched to PostgreSQL (2026-11-14). Update the
+SOP so it stays the source of truth.
 
 The SOP is the source of truth for column names. Columns the SOP does not list are kept only
 where CLAUDE.md asks for them, and are commented as such. Remaining gaps are marked
@@ -27,7 +30,11 @@ from sqlalchemy import (
     UniqueConstraint,
     func,
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+# JSONB on PostgreSQL (binary, indexable); plain JSON elsewhere (the SQLite structure test).
+JSONType = JSON().with_variant(JSONB(), "postgresql")
 
 
 class Base(DeclarativeBase):
@@ -35,7 +42,9 @@ class Base(DeclarativeBase):
 
 
 def _now_column(*, nullable: bool = False) -> Any:
-    return mapped_column(DateTime, server_default=func.current_timestamp(), nullable=nullable)
+    return mapped_column(
+        DateTime(timezone=True), server_default=func.current_timestamp(), nullable=nullable
+    )
 
 
 # Enum-like values are stored as plain strings so adding a value never needs a migration.
@@ -88,7 +97,7 @@ class User(Base):
     voice: Mapped[str | None] = mapped_column(String(64))
     glasses_type: Mapped[str | None] = mapped_column(String(16))
     # Not in the SOP table. Kept for adjustable letter/word/line spacing (CLAUDE.md section 8).
-    settings: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    settings: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
     created_at: Mapped[datetime] = _now_column()
 
 
@@ -131,9 +140,9 @@ class UserBook(Base):
     current_page: Mapped[str | None] = mapped_column(String(32))
     current_line: Mapped[str | None] = mapped_column(String(32))
     started_at: Mapped[datetime] = _now_column()
-    last_read_at: Mapped[datetime | None] = mapped_column(DateTime)
+    last_read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Setting this triggers deletion of the reader's captured pages/lines for the book.
-    finished_at: Mapped[datetime | None] = mapped_column(DateTime)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class Page(Base):
@@ -157,7 +166,7 @@ class Page(Base):
     image_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     # Not in the SOP table. The validated page JSON from SOP 8.1, so a repeat capture is served
     # from cache without another Nemotron call.
-    analysis: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    analysis: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
     captured_at: Mapped[datetime] = _now_column()
 
 
@@ -178,7 +187,7 @@ class Line(Base):
     text: Mapped[str] = mapped_column(Text, nullable=False)
     # As in the page JSON: a list of 4 numbers. OPEN QUESTION: [x, y, w, h] or [x1, y1, x2, y2],
     # and pixels or normalised 0..1.
-    bbox: Mapped[list[float] | None] = mapped_column(JSON)
+    bbox: Mapped[list[float] | None] = mapped_column(JSONType)
 
 
 class WordBankEntry(Base):
@@ -232,5 +241,5 @@ class ReadingEvent(Base):
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
     # Not in the SOP table. Small event details (e.g. the word rescued, old/new mode).
     # Never put page images, audio or Everyday-mode document content here.
-    payload: Mapped[dict[str, Any] | None] = mapped_column(JSON)
+    payload: Mapped[dict[str, Any] | None] = mapped_column(JSONType)
     created_at: Mapped[datetime] = _now_column()

@@ -16,7 +16,7 @@ Built for the Junction 2026 hackathon (Meta "AI Glasses for Everyone, Everyday" 
 2. Phone captures the frame, runs OCR + hand tracking, backend analyses the page.
 3. User runs a finger under a line; the current phrase is highlighted on the glasses display and read aloud (read-along).
 4. User asks questions by voice ("what does *aloof* mean here?", "why did he do that?"); Gemini Live answers, grounded by the backend brain.
-5. Progress and a personal word bank are saved to MariaDB.
+5. Progress and a personal word bank are saved to PostgreSQL.
 
 ## 2. Team and ownership
 
@@ -24,7 +24,7 @@ Built for the Junction 2026 hackathon (Meta "AI Glasses for Everyone, Everyday" 
 |---|---|---|
 | Matthew | Brain of the app (NVIDIA Nemotron) | `apps/api/app/brain/` |
 | Alex | Frontend, Meta Wearables Device Access Toolkit (DAT) | `apps/mobile/` |
-| Mick Ola | Architecture, MariaDB, Gemini integration | `apps/api/app/db/`, `apps/api/app/gemini/`, `infra/`, `db/` |
+| Mick Ola | Architecture, PostgreSQL, Gemini integration | `apps/api/app/db/`, `apps/api/app/gemini/`, `infra/`, `db/` |
 
 Cross-boundary changes (API contracts, schema, shared types) need a note in the PR description tagging the other owner. Do not silently change a contract.
 
@@ -35,7 +35,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 | Glasses | Meta Ray-Ban Display (full) and Ray-Ban Meta Gen 2 (audio-first) via Meta Wearables DAT 1.0 |
 | Mobile app | React Native + Expo (TypeScript). Community wrappers for DAT (e.g. `expo-meta-wearables-dat`); a native module is likely needed for display / Neural Band |
 | API / middleware | FastAPI (Python 3.11+), async, Pydantic v2 |
-| Database | MariaDB (SQLAlchemy 2.x async + Alembic migrations) |
+| Database | PostgreSQL (SQLAlchemy 2.x async + asyncpg + Alembic migrations). Switched from MariaDB on 2026-11-14; the SOP still says MariaDB and needs updating. |
 | Brain | NVIDIA Nemotron 3.5 Super VL, served with vLLM on **Verda**. NVIDIA Build is the fallback (free tier ~40 req/min/key) |
 | Voice / conversation | Gemini Live, which calls our `ask_brain()` tool |
 | Illustrations | Gemini image generation via the `illustrate()` tool |
@@ -48,7 +48,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 ├── CLAUDE.md
 ├── README.md
 ├── .env.example
-├── docker-compose.yml            # api + mariadb for local dev
+├── docker-compose.yml            # api + postgres for local dev
 ├── Makefile                      # make dev, make test, make migrate, make lint
 ├── docs/
 │   ├── SOP.md                    # export of the SOP doc (reference only)
@@ -105,7 +105,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 
 Use a workspace tool for JS (pnpm workspaces) and keep Python deps in `apps/api` with `uv` or `pip-tools`. Do not add a monorepo build system (Nx, Turborepo) unless asked; a Makefile is enough for a hackathon.
 
-## 5. Data model (MariaDB)
+## 5. Data model (PostgreSQL)
 
 Tables: `users`, `books`, `user_books`, `pages`, `lines`, `word_bank`, `reading_events`.
 
@@ -187,7 +187,7 @@ Required env vars (names only): `DATABASE_URL`, `NEMOTRON_BASE_URL`, `NEMOTRON_A
 ## 12. Commands (create these in the Makefile)
 
 ```
-make dev        # docker compose up (api + mariadb), run mobile dev server separately
+make dev        # docker compose up (api + postgres), run mobile dev server separately
 make migrate    # alembic upgrade head
 make test       # pytest (api) + jest (mobile)
 make lint       # ruff + eslint

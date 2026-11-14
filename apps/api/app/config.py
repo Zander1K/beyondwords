@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     app_name: str = "Reading Companion"
     log_level: str = "INFO"
 
-    database_url: str = "mysql+aiomysql://reading:reading@127.0.0.1:3306/reading_companion"
+    database_url: str = "postgresql+asyncpg://reading:reading@127.0.0.1:5432/reading_companion"
 
     # OPEN QUESTION: final set of provider names accepted by brain/llm.py.
     llm_provider: str = "nemotron"

@@ -57,7 +57,7 @@ def test_initial_migration_matches_models() -> None:
     assert spec and spec.loader
     module = importlib.util.module_from_spec(spec)
 
-    # SQLite in-memory is only a structural check (tables/columns/indexes), not MariaDB DDL.
+    # SQLite in-memory is only a structural check (tables/columns/indexes), not PostgreSQL DDL.
     engine = create_engine("sqlite://")
     with engine.begin() as conn:
         ctx = MigrationContext.configure(conn)

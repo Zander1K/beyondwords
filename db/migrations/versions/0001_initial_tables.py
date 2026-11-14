@@ -1,6 +1,6 @@
 """Initial tables: users, books, user_books, pages, lines, word_bank, reading_events.
 
-Columns follow SOP section 5 ("Data model (MariaDB)"). See app/db/models.py for what each
+Columns follow SOP section 5 ("Data model"), on PostgreSQL. See app/db/models.py for what each
 column means and which ones go beyond the SOP table.
 
 HACK: this revision was rewritten in place (2026-11-14) to match the SOP, because it had never
@@ -17,18 +17,23 @@ from collections.abc import Sequence
 
 import sqlalchemy as sa
 from alembic import op
+from sqlalchemy.dialects import postgresql
 
 revision: str = "0001"
 down_revision: str | None = None
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
-MYSQL_OPTS = {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_unicode_ci"}
+# Must match app.db.models.JSONType: JSONB on PostgreSQL, JSON elsewhere.
+JSON_TYPE = sa.JSON().with_variant(postgresql.JSONB(), "postgresql")
 
 
 def _now(name: str, *, nullable: bool = False) -> sa.Column:
     return sa.Column(
-        name, sa.DateTime(), server_default=sa.func.current_timestamp(), nullable=nullable
+        name,
+        sa.DateTime(timezone=True),
+        server_default=sa.func.current_timestamp(),
+        nullable=nullable,
     )
 
 
@@ -46,9 +51,8 @@ def upgrade() -> None:
         sa.Column("support_level", sa.String(16), server_default="read_along", nullable=False),
         sa.Column("voice", sa.String(64), nullable=True),
         sa.Column("glasses_type", sa.String(16), nullable=True),
-        sa.Column("settings", sa.JSON(), nullable=True),
+        sa.Column("settings", JSON_TYPE, nullable=True),
         _now("created_at"),
-        **MYSQL_OPTS,
     )
 
     op.create_table(
@@ -65,7 +69,6 @@ def upgrade() -> None:
         sa.Column("metadata_source", sa.String(64), nullable=True),
         _now("created_at"),
         sa.UniqueConstraint("isbn", name="uq_books_isbn"),
-        **MYSQL_OPTS,
     )
 
     op.create_table(
@@ -76,10 +79,9 @@ def upgrade() -> None:
         sa.Column("current_page", sa.String(32), nullable=True),
         sa.Column("current_line", sa.String(32), nullable=True),
         _now("started_at"),
-        sa.Column("last_read_at", sa.DateTime(), nullable=True),
-        sa.Column("finished_at", sa.DateTime(), nullable=True),
+        sa.Column("last_read_at", sa.DateTime(timezone=True), nullable=True),
+        sa.Column("finished_at", sa.DateTime(timezone=True), nullable=True),
         sa.UniqueConstraint("user_id", "book_id", name="uq_user_books_user_book"),
-        **MYSQL_OPTS,
     )
     op.create_index("ix_user_books_user_id", "user_books", ["user_id"])
     op.create_index("ix_user_books_book_id", "user_books", ["book_id"])
@@ -91,10 +93,9 @@ def upgrade() -> None:
         _fk("book_id", "books.id", "CASCADE", nullable=False),
         sa.Column("page_number", sa.String(32), nullable=True),
         sa.Column("image_hash", sa.String(64), nullable=False),
-        sa.Column("analysis", sa.JSON(), nullable=True),
+        sa.Column("analysis", JSON_TYPE, nullable=True),
         _now("captured_at"),
         sa.UniqueConstraint("user_id", "book_id", "image_hash", name="uq_pages_user_book_image"),
-        **MYSQL_OPTS,
     )
     op.create_index("ix_pages_user_id", "pages", ["user_id"])
     op.create_index("ix_pages_book_id", "pages", ["book_id"])
@@ -106,9 +107,8 @@ def upgrade() -> None:
         sa.Column("line_id", sa.String(32), nullable=False),
         sa.Column("line_index", sa.Integer(), nullable=False),
         sa.Column("text", sa.Text(), nullable=False),
-        sa.Column("bbox", sa.JSON(), nullable=True),
+        sa.Column("bbox", JSON_TYPE, nullable=True),
         sa.UniqueConstraint("page_id", "line_id", name="uq_lines_page_line"),
-        **MYSQL_OPTS,
     )
     op.create_index("ix_lines_page_id", "lines", ["page_id"])
 
@@ -126,7 +126,6 @@ def upgrade() -> None:
         sa.Column("context_sentence", sa.Text(), nullable=True),
         _now("created_at"),
         sa.UniqueConstraint("user_id", "word", name="uq_word_bank_user_word"),
-        **MYSQL_OPTS,
     )
     op.create_index("ix_word_bank_user_id", "word_bank", ["user_id"])
     op.create_index("ix_word_bank_book_id", "word_bank", ["book_id"])
@@ -140,9 +139,8 @@ def upgrade() -> None:
         sa.Column("event_type", sa.String(64), nullable=False),
         sa.Column("mode", sa.String(16), nullable=True),
         sa.Column("duration_seconds", sa.Integer(), nullable=True),
-        sa.Column("payload", sa.JSON(), nullable=True),
+        sa.Column("payload", JSON_TYPE, nullable=True),
         _now("created_at"),
-        **MYSQL_OPTS,
     )
     op.create_index("ix_reading_events_user_id", "reading_events", ["user_id"])
     op.create_index("ix_reading_events_book_id", "reading_events", ["book_id"])

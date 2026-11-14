@@ -7,7 +7,7 @@ install:            ## Install API (uv) and JS (pnpm) dependencies
 	cd $(API_DIR) && uv sync
 	pnpm install
 
-dev:                ## Start api + mariadb (mobile dev server: `pnpm mobile` in another terminal)
+dev:                ## Start api + postgres (mobile dev server: `pnpm mobile` in another terminal)
 	@[ -f .env ] || (cp .env.example .env && echo "Created .env from .env.example")
 	docker compose up --build
 

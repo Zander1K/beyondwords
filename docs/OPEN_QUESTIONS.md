@@ -19,14 +19,15 @@ Decisions left open during the step 1 scaffold (2026-11-14). Each one is also ma
 | 11 | iOS bundle id and Android package name (needed for DAT development builds). | Alex | `apps/mobile/app.config.ts` | 5 |
 | 12 | What GPU and memory are available on Verda, and does Nemotron 3.5 Super VL fit? NVIDIA Build is the fallback. | Matthew | `infra/verda/README.md` | 3 |
 | 13 | Where does the team keep the eval page photos? They are git-ignored and must not be committed. | Matthew | `eval/pages/README.md` | 3 |
+| 14 | The database is now PostgreSQL instead of MariaDB (decided by Mick Ola, 2026-11-14). The SOP still says MariaDB in sections 5, 10 and 12, and it is the source of truth: update it, and confirm with Matthew and Alex. | Mick Ola | `docs/SOP.md`, CLAUDE.md section 3 | 3 |
 
 ## Not yet verified (environment gaps)
 
 The step 1 scaffold machine had no Docker, so these still need a first run:
 
 - `make dev` (docker compose up) and the Docker image build for `apps/api`.
-- `make migrate` against a real MariaDB. Migration `0001` was hand-written and checked only
-  structurally (SQLite test) and by rendering MariaDB SQL offline (`alembic upgrade head --sql`).
+- `make migrate` inside Docker. Migration `0001` has been run against a local PostgreSQL 17
+  outside Docker (2026-11-14), but not yet through `docker compose`.
 - `/health` reporting `"database": "ok"` against a live DB.
 - The Expo app on a physical phone (only the iOS JS bundle was built).
 - Anything on real glasses hardware.
