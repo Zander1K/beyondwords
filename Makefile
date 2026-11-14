@@ -1,7 +1,11 @@
-.PHONY: dev down db api migrate test test-api test-mobile lint lint-api lint-mobile format contracts eval install env
+.PHONY: help dev down db api migrate test test-api test-mobile lint lint-api lint-mobile format contracts eval install env
+.DEFAULT_GOAL := help
 
 API_DIR := apps/api
 MOBILE_DIR := apps/mobile
+
+help:               ## List commands
+	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | sed -E 's/:[^#]*## /\t/' | column -t -s "$$(printf '\t')"
 
 env:
 	@[ -f .env ] || (cp .env.example .env && echo "Created .env from .env.example")
@@ -19,13 +23,13 @@ db: env             ## Start only mariadb in the background (pair with `make api
 api: env            ## Run the API on the host with auto-reload (no Docker needed; DB optional)
 	cd $(API_DIR) && uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-down:
+down:               ## Stop the docker compose stack
 	docker compose down
 
 migrate:            ## alembic upgrade head (inside the api container)
 	docker compose run --rm api alembic upgrade head
 
-test: test-api test-mobile
+test: test-api test-mobile   ## pytest (api) + jest (mobile)
 
 test-api:
 	cd $(API_DIR) && uv run pytest
@@ -33,7 +37,7 @@ test-api:
 test-mobile:
 	pnpm --filter mobile test
 
-lint: lint-api lint-mobile
+lint: lint-api lint-mobile   ## ruff (api) + eslint (mobile)
 
 lint-api:
 	cd $(API_DIR) && uv run ruff check . && uv run ruff format --check .
