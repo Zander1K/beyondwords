@@ -376,6 +376,46 @@ async def main() -> int:
         "Answer a question",
     )
 
+    # 5b. The same kind of question through the real HTTP route, as the phone calls it.
+    try:
+        from httpx import ASGITransport, AsyncClient
+
+        from app.books.library import Library
+        from app.db.models import Book
+        from app.main import app
+        from app.routers.books import get_library
+    except ModuleNotFoundError as exc:  # e.g. .env still has the old MariaDB DATABASE_URL
+        check("POST /ask through the API", False, f"could not load the API: {exc}", None, "API")
+    else:
+
+        class _Books:
+            async def get(self, book_id: int) -> Book | None:
+                return Book(id=book_id, title=BOOK.title, setting_era=BOOK.setting_era)
+
+        app.dependency_overrides[get_library] = lambda: Library(_Books(), None)  # type: ignore[arg-type]
+        body = {
+            "question": "what does this word mean",
+            "book_id": 1,
+            "page_lines": [{"id": ln.id, "text": ln.text} for ln in ocr],
+            "current_line_id": "L4",
+            "pointed_word": "surcoat",
+        }
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as client:
+            started = time.perf_counter()
+            res = await client.post("/ask", json=body)
+            s = time.perf_counter() - started
+        app.dependency_overrides.clear()
+        data = res.json() if res.status_code == 200 else {}
+        check(
+            "POST /ask through the API",
+            res.status_code == 200
+            and "surcoat" in data.get("answer", "").lower()
+            and data.get("cited_lines") == ["L4"],
+            f"HTTP {res.status_code}: '{data.get('answer')}' cites {data.get('cited_lines')}",
+            s,
+            "API",
+        )
+
     # 6. Everyday mode
     bill = json.loads((ROOT / "samples" / "energy_bill.json").read_text())
     card, s = await timed(

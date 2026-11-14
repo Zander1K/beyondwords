@@ -75,7 +75,9 @@ The cover-photo path (Nemotron reads the title or ISBN off the cover, SOP 8.5) i
 
 The reader's question, already turned into text by the phone. The phone reads `answer` aloud
 through the glasses with its own text-to-speech, and shows `image_url` on the display if set.
-Gemini runs the conversation and asks the book expert (Nemotron) when needed.
+Nemotron's reading-coach agent answers (`app/brain/qa.py`): every claim cites a page line, and
+uncited claims are removed before the reader hears them. Misheard page words ("port cullis")
+are fixed first. Gemini draws a picture when the agent asks for one.
 
 Request:
 
@@ -85,7 +87,8 @@ Request:
   "session_id": null,
   "book_id": 1,
   "page_lines": [{"id": "L4", "text": "Mr. Darcy was aloof and proud."}],
-  "current_line_id": "L4"
+  "current_line_id": "L4",
+  "pointed_word": "aloof"
 }
 ```
 
@@ -93,6 +96,8 @@ Request:
   for follow-ups ("why did he do that?"). Conversations are forgotten after 30 minutes idle.
 - `book_id`: from `POST /books/identify`. Optional; an unknown id is ignored, not an error.
 - `page_lines`: HACK, the current page's lines until the backend stores pages (`POST /page`).
+- `current_line_id`, `pointed_word`: optional; where the reader's finger is and the word the
+  phone picked, so "what does this mean?" is about that word.
 
 Response `200`:
 
@@ -100,20 +105,21 @@ Response `200`:
 {
   "session_id": "4f1c...",
   "answer": "Here it means cold and distant. Mr. Darcy keeps away from people and seems proud.",
-  "cited_lines": [],
+  "cited_lines": ["L4"],
   "image_url": null,
-  "used_brain": false,
+  "used_brain": true,
   "tool_steps": []
 }
 ```
 
 - `answer` is two or three short sentences, written to be spoken.
-- `cited_lines` are line ids the book expert used; `used_brain` says whether it was asked.
-- `image_url` is set when Gemini showed a picture (`GET` it from the API).
-- `tool_steps` lists the tools Gemini called, for the trace screen.
+- `cited_lines` are the line ids the answer is based on. `used_brain` is always `true` (kept
+  for compatibility).
+- `image_url` is set when a picture was made (`GET` it from the API).
+- `tool_steps` lists the tools Nemotron called, for the trace screen.
 
-Errors: `503` with `{"detail": "Explanations are paused. Reading continues."}` when Gemini is
-unavailable; the app can speak the message as is (SOP 9). `422` for an empty or oversized request.
+Errors: `503` with `{"detail": "Explanations are paused. Reading continues."}` when Nemotron is
+unavailable or takes longer than 8 s; the app can speak the message as is (SOP 9). `422` for an empty or oversized request.
 
 ## `POST /illustrate` and `GET /illustrations/{id}`
 

@@ -10,10 +10,11 @@ Nemotron does page analysis, word meanings, Everyday-mode document reading, and 
 which word the reader is pointing at are the phone's job (CLAUDE.md section 7, SOP 6); the phone
 sends the brain the word.
 
-Questions can come **straight from the phone's speech-to-text** to `POST /ask` as text, with no
-Gemini involved: misheard page words are fixed in code first (see "Questions from
-speech-to-text"), and `answer` is plain text for the phone's TTS. If the team also uses Gemini
-for conversation (Talk About It, small talk), it calls the same agent through `ask_brain()`.
+Questions come **straight from the phone's speech-to-text** to `POST /ask` (Mick's route),
+which calls `qa.QuestionService` -> `agent.ask`: Nemotron answers every question, misheard page
+words are fixed in code first (see "Questions from speech-to-text"), and `answer` is plain text
+for the phone's TTS. Gemini only draws pictures, when the agent calls `illustrate`. If the team
+also wants a Gemini chat (Talk About It), it can call the same agent through `ask_brain()`.
 
 The brain is plain async Python with no FastAPI or DB imports. Routers (Mick Ola) call these
 functions and map the results to HTTP. Nothing here touches `app/db`, `app/gemini` or `routers/`.
@@ -24,8 +25,8 @@ functions and map the results to HTTP. Nothing here touches `app/db`, `app/gemin
 |---|---|---|---|
 | `POST /page` | `page_analyzer.analyze_page(page_id=, ocr_lines=, image=, book=, profile=)` | `PageAnalysis` (`schemas/page.py`) | return `page_analyzer.fallback_page(page_id, ocr_lines)`; phone says "Explanations are paused. Reading continues." |
 | `POST /words/define` (proposed, not in the SOP) | `tools.define.define_word(word, sentence, book)` | `WordBreakdown` (word, syllables, say_as, meaning, illustratable) | use `text_utils.syllabify(word)` only |
-| `POST /ask` | `agent.ask(question=, user_id=, book_id=, store=, current_page=, extra_pages=, illustrator=, history=, pointed=, on_event=)` | `AskResult` (`schemas/brain.py`) | never raises; returns a safe spoken line |
-| Gemini Live `ask_brain()` | `agent.ask_brain(question, **session)` | text to speak | same |
+| `POST /ask` (implemented, `routers/ask.py`) | `qa.get_question_service().ask(question, book=, page_lines=, current_line_id=, pointed_word=, session_id=, illustrator=)`, which wraps `agent.ask(...)` and keeps the last 4 turns per session | `QuestionReply` (answer, cited line ids, image URL, tool steps) | raises `QuestionUnavailableError` (down, or over `BRAIN_TIMEOUT_SECONDS`, 8 s) -> route returns 503 "Explanations are paused. Reading continues." |
+| `ask_brain()` (only if a Gemini chat is added) | `agent.ask_brain(question, **session)` | text to speak | never raises |
 | `POST /document` | `document_reasoner.read_document(ocr_lines=, image=)` | `ActionCard` | say "Everyday mode is paused" |
 | Everyday follow-up via `/ask` | `agent.ask(..., current_page=document_reasoner.document_page(ocr_lines))` | `AskResult` citing `doc:L3` | same as `/ask` |
 | `WS /trace` | pass `on_event=` to `agent.ask` | `TraceEvent` per step | trace is best-effort |
@@ -52,7 +53,8 @@ the unusual words readers ask about, so before the model sees the question,
 `text_utils.correct_to_page_words` replaces near-matches of page words ("port cullis" ->
 portcullis, "century" -> sentry, "sir coat" -> surcoat); only words printed on the injected
 pages are used. Pass `pointed=` (`PointedWord`: the word, line id and sentence the phone picked) so
-"what does this mean?" is about the word under the finger. Keep the last few turns and pass them as `history` for follow-ups. The
+"what does this mean?" is about the word under the finger. For follow-ups the phone sends back `session_id`; `QuestionService` keeps the last 4 turns
+and passes them to the agent as `history`. The
 `heard_as` fix shows on the trace screen.
 
 ## What the brain needs from Mick Ola
@@ -64,13 +66,14 @@ Gemini image client, and pass instances into `agent.ask`:
   `add_to_word_bank(user_id, book_id, word, context_sentence, page_id)`.
   `get_captured_pages` must only return pages the reader captured: that is the no-spoiler rule.
   `page_numbers` are printed labels (text), matching `pages.page_number`.
-- `Illustrator`: `illustrate(concept) -> url | None` (Gemini image generation).
+- `Illustrator`: `illustrate(concept) -> url | None`. Done: `app/gemini/illustrator.py`
+  (`GeminiIllustrator`) wraps Mick's IllustrationService; `/ask` passes it in.
 
 `InMemoryStore` and `NoIllustrator` are stand-ins for tests and eval.
 
-For the Live bridge: inject the current page text and book metadata into the Gemini session on
-open and on every page change, and route book questions to `ask_brain()` server-side when
-Gemini skips the tool call (it fires in only ~60-70% of sessions).
+Until `POST /page` stores pages, `/ask` builds a one-page in-memory store from the lines the
+phone sends, with no user id: answers can only use the current page, and `add_to_word_bank`
+writes go nowhere. A `BrainStore` on the real tables (plus a user id on `/ask`) fixes both.
 
 ## What the brain expects from Alex (phone)
 
@@ -86,8 +89,8 @@ and sends them back with the question.
 
 | Decision | Why |
 |---|---|
-| Gemini runs the conversation; Nemotron answers every book question | team decision 2026-11-14: Gemini is better at conversation, but only Nemotron's answers are grounded and checked before they are spoken |
-| `conversation_plan` removed from the page JSON (prompt `page_analyzer.v2`) | it only fed Talk About It, which Gemini now runs; differs from SOP 8.1 |
+| Nemotron answers every reader question behind `POST /ask` (`brain/qa.py`); Gemini only draws pictures | team decision 2026-11-14: with speech on the phone, a Gemini layer in front added two model hops and reworded Nemotron's checked answer with nothing checking the result |
+| `conversation_plan` removed from the page JSON (prompt `page_analyzer.v2`) | it only fed Talk About It, which is not being built by the brain; differs from SOP 8.1 |
 | Everyday mode keeps nothing on the server, not even in memory; the phone resends the lines for follow-ups | makes SOP 10 "not stored" strictly true; drops the SOP's `extract_action` tool, which was only a cache lookup |
 | `page_number` is the printed label as text ("12", "xiv"); `text_utils.page_order()` sorts roman front matter before arabic pages, and labels it cannot place are kept | matches `pages.page_number` varchar; the no-spoiler filter still needs an order |
 | Endpoint names follow the SOP (`/page`, `/ask`, `/document`), not CLAUDE.md's proposals | SOP wins on conflicts |
@@ -102,7 +105,7 @@ and sends them back with the question.
 | Fallback reading order is tilt-aware and reads columns one at a time (`geometry.visual_order`) | the old y-sort interleaved two columns |
 | `define_word` returns the word as printed, not the model's dictionary form | the phone matches it to what the reader pointed at |
 | OCR disagreements are word-level (`text_utils.word_differences`), not a whole-line similarity threshold | the old 0.9 line threshold could never flag a one-word misread ("busted" for "rusted" is 98% similar); found by the live smoke test |
-| `eval/smoke_brain.py`: end-to-end run of every job on a rendered, tilted photo with a finger, against the live model (Pillow is a dev-only dependency for it) | run it before a demo; 17 checks |
+| `eval/smoke_brain.py`: end-to-end run of every job on a rendered, tilted photo with a finger, against the live model, including `POST /ask` over HTTP (Pillow is a dev-only dependency for it) | run it before a demo; 18 checks |
 | Thinking pass off by default for all three jobs (`BRAIN_*_REASONING`) | SOP 9 latency targets; turn on per job if `make eval` shows it pays |
 | Timeouts: ask 8 s, document 15 s, page 30 s (background) | SOP 9 says 8 s per call; page analysis is not on the critical path |
 | Brain tuning lives in `brain/settings.py` (`BRAIN_` env prefix), not `app/config.py` | keeps brain changes inside `brain/` |

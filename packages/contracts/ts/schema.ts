@@ -148,6 +148,12 @@ export interface components {
              */
             page_lines?: components["schemas"]["PageLineIn"][];
             /**
+             * Pointed Word
+             * @description The word the reader is pointing at, as the phone picked it, so "what does this mean?" is about that word. Optional.
+             * @example portcullis
+             */
+            pointed_word?: string | null;
+            /**
              * Question
              * @description What the reader asked, as text (speech-to-text happens on the phone).
              * @example What does portcullis mean here?
@@ -168,7 +174,7 @@ export interface components {
             answer: string;
             /**
              * Cited Lines
-             * @description Line ids the book expert based its answer on.
+             * @description Line ids the answer is based on; every claim in `answer` cites one.
              */
             cited_lines: string[];
             /**
@@ -185,7 +191,7 @@ export interface components {
             tool_steps: string[];
             /**
              * Used Brain
-             * @description True if the book expert (Nemotron) was consulted.
+             * @description Always true: Nemotron answers every question.
              */
             used_brain: boolean;
         };

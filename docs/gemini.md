@@ -24,6 +24,11 @@ Not used: `gemini-3.8-live` (audio stream; see the design change above), Imagen 
 
 ## Conversation (`POST /ask`)
 
+> **Not wired since 2026-11-14:** `POST /ask` is answered by Nemotron (`app/brain/qa.py`), so
+> every spoken answer is grounded and cited. Gemini's role there is drawing pictures when the
+> agent calls `illustrate` (`app/gemini/illustrator.py`). The conversation service below
+> (`app/gemini/conversation.py`) is kept, unused, in case the team wants Gemini for Talk About It.
+
 ### Shape
 
 ```

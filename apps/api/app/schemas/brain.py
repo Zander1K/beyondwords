@@ -108,9 +108,10 @@ class TraceEvent(BaseModel):
 
 
 class PointedWord(BaseModel):
-    """The word the reader is pointing at, as the phone worked it out (finger tracking and word
-    picking run on the phone). Passed to agent.ask so "what does this mean?" is about it."""
+    """Where the reader is pointing, as the phone worked it out (finger tracking and word
+    picking run on the phone). Passed to agent.ask so "what does this mean?" is about it.
+    `word` is None when only the line under the finger is known."""
 
-    word: str
+    word: str | None = None
     line_id: str
     sentence: str | None = None
