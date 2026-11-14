@@ -13,7 +13,7 @@ Decisions left open during the step 1 scaffold (2026-11-14). Each one is also ma
 | 5 | ~~`books.level` scale~~ **Resolved:** the SOP's `books` table has no level, so the column was dropped (with `edition`). Still open: which public metadata source fills `books` (e.g. Open Library) and what goes in `metadata_source`. | Mick Ola | `apps/api/app/db/models.py` (`Book`) | 15 |
 | 6 | When does a word move from `learning` to `owned` in `word_bank.status` (e.g. N `solo_reads` in a row)? SOP section 5 gives the columns but not the rule. | Mick Ola + Matthew | `apps/api/app/db/models.py` (`WordBankEntry`) | 9 |
 | 7 | Which values can `LLM_PROVIDER` take (e.g. `nemotron`, `nvidia_build`, `gemini`, `muse_spark`)? | Matthew | `.env.example`, `apps/api/app/config.py`, `apps/api/app/brain/llm.py` | 3 |
-| 8 | Which tool generates the TypeScript types for `make contracts` (e.g. `openapi-typescript`)? | Mick Ola | `Makefile` (`contracts`), `packages/contracts/README.md` | 2 |
+| 8 | ~~Which tool generates the TypeScript types for `make contracts`?~~ Resolved 2026-11-14: openapi-typescript 7.13.0 (`packages/contracts`). | Mick Ola | `Makefile` (`contracts`), `packages/contracts/README.md` | 2 |
 | 9 | Does an Expo community DAT wrapper (e.g. `expo-meta-wearables-dat`) support the display and Neural Band, or do we need a native module? | Alex | `apps/mobile/src/glasses/index.ts` | 5 |
 | 10 | Which on-phone OCR and hand-tracking libraries (MediaPipe Hands vs Apple Vision; OCR lib)? | Alex | `apps/mobile/src/vision/index.ts` | 3–4 |
 | 11 | iOS bundle id and Android package name (needed for DAT development builds). | Alex | `apps/mobile/app.config.ts` | 5 |

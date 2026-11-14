@@ -1,8 +1,14 @@
 # API contracts
 
-Human-readable mirror of `packages/contracts`. TODO(Mick Ola): regenerate `openapi.json` and the
-TS types with `make contracts` (build order step 2). Until then, the live schema is at `/docs`
-(Swagger UI) or `/openapi.json` on a running API.
+Human-readable mirror of `packages/contracts`. Run `make contracts` after changing any API
+schema: it writes `packages/contracts/openapi.json` and the TypeScript types in
+`packages/contracts/ts/schema.ts` (openapi-typescript). Commit both. Import types from
+`@reading-companion/contracts` (friendly names in `ts/index.ts`). The live schema is also at
+`/docs` (Swagger UI) on a running API.
+
+Browser clients: the API allows CORS from the origins in `CORS_ORIGINS` (default
+`http://localhost:5173`, the web app's Vite dev server). Add your tunnel URL there when testing
+on a phone.
 
 | Method | Path | Status |
 |---|---|---|
@@ -11,7 +17,7 @@ TS types with `make contracts` (build order step 2). Until then, the live schema
 | DELETE | `/ask/sessions/{id}` | Implemented. Forget a conversation now (`204`). |
 | POST | `/books/identify` | Implemented (barcode / ISBN path). See below. |
 | GET | `/books/{id}` | Implemented. Book metadata for context (same fields as below, without `cached`). |
-| POST | `/illustrate` | Implemented. See `docs/gemini.md`, "Illustrations". |
+| POST | `/illustrate` | Implemented. Word, phrase or one sentence -> picture. See below. |
 | GET | `/illustrations/{id}` | Implemented. Image bytes (`image/png` or `image/jpeg`). |
 
 Other planned endpoints are listed in SOP section 5.
@@ -108,3 +114,69 @@ Response `200`:
 
 Errors: `503` with `{"detail": "Explanations are paused. Reading continues."}` when Gemini is
 unavailable; the app can speak the message as is (SOP 9). `422` for an empty or oversized request.
+
+## `POST /illustrate` and `GET /illustrations/{id}`
+
+Draw a picture of what the reader points at or asks about: one word, a short phrase, or one
+sentence (max 30 words / 200 characters). Two calls: the first returns a description and a
+link, the second returns the image bytes. Same text + book returns the cached picture.
+
+Request:
+
+```json
+{"text": "portcullis", "book_id": 3, "setting_era": "medieval England"}
+```
+
+`book_id` (from `/books/identify`) and `setting_era` are optional; both help draw the right
+thing for the book and period.
+
+Response `200`:
+
+```json
+{
+  "id": "4f1c…",
+  "text": "portcullis",
+  "kind": "word",
+  "scene": "A heavy iron grille gate raised above a castle gateway…",
+  "planned": true,
+  "mime_type": "image/png",
+  "url": "/illustrations/4f1c…"
+}
+```
+
+`url` is relative to the API base URL. Errors (`detail` is one short line the app can speak):
+
+| Status | When | What the app does |
+|---|---|---|
+| `422` | Not one word/phrase/sentence, or better explained than pictured | Speak `detail`; offer the definition instead |
+| `503` | Gemini down or slow: "Illustrations are paused. Reading continues." | Speak it once; keep reading |
+| `404` on `GET /illustrations/{id}` | Image expired (in-memory cache, cleared on API restart) | Call `POST /illustrate` again |
+
+Client sketch for the web or mobile app (`API_BASE_URL` as in `apps/web/src/config`):
+
+```ts
+import type { IllustrateRequest, IllustrateResponse } from "@reading-companion/contracts";
+
+export async function illustrate(
+  body: IllustrateRequest,
+  signal?: AbortSignal,
+): Promise<IllustrateResponse & { imageUrl: string }> {
+  const response = await fetch(`${API_BASE_URL}/illustrate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Accept: "application/json" },
+    body: JSON.stringify(body),
+    signal,
+  });
+  if (!response.ok) {
+    const { detail } = (await response.json().catch(() => ({}))) as { detail?: string };
+    throw new ApiError(
+      response.status,
+      detail ?? `POST /illustrate failed with ${response.status}`,
+      response.headers.get("X-Request-ID"),
+    );
+  }
+  const result = (await response.json()) as IllustrateResponse;
+  // Use imageUrl directly as an <img src>; the browser fetches GET /illustrations/{id}.
+  return { ...result, imageUrl: `${API_BASE_URL}${result.url}` };
+}
+```
