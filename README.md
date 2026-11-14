@@ -24,6 +24,11 @@ Docker (with Compose v2.24+), Python 3.11 + [uv](https://docs.astral.sh/uv/), No
 
 ## Quick start
 
+API only, no Docker (fastest): `make install && make api`, then open http://localhost:8000.
+Details in [`apps/api/README.md`](apps/api/README.md).
+
+Full stack:
+
 ```sh
 cp .env.example .env     # make dev does this for you if missing
 make install             # uv sync (api) + pnpm install (mobile)
@@ -38,6 +43,9 @@ pnpm mobile              # Expo dev server, scan the QR code with Expo Go
 | Command | Does |
 |---|---|
 | `make dev` | `docker compose up` (api + postgres) |
+| `make api` | Run the API on the host with reload (no Docker) |
+| `make db` | Start only PostgreSQL in Docker (pair with `make api`) |
+| `make format` | Auto-fix API lint and formatting |
 | `make migrate` | `alembic upgrade head` in the api container |
 | `make test` | pytest (api) + jest (mobile) |
 | `make lint` | ruff (api) + eslint/prettier/tsc (mobile) |

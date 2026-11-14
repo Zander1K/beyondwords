@@ -1,4 +1,7 @@
-"""POST /ask conversation: sessions, context, ask_brain / illustrate tools, failures.
+"""Gemini ConversationService: sessions, context, ask_brain / illustrate tools, failures.
+
+Not wired to POST /ask any more: Nemotron answers questions there (app/brain/qa.py,
+test_ask_route.py). Kept in case the team uses Gemini for Talk About It.
 
 Gemini is a scripted fake (no network, no key). Responses use the real google-genai types so the
 tool-call parsing is exercised for real.
@@ -10,21 +13,15 @@ from typing import Any
 
 import pytest
 from google.genai import types
-from httpx import ASGITransport, AsyncClient
 
-from app.books.library import Library
-from app.db.models import Book
 from app.gemini.context import BookContext, PageLine, ReadingContext
 from app.gemini.conversation import (
     ConversationError,
     ConversationErrorReason,
     ConversationService,
-    get_conversation_service,
 )
 from app.gemini.images import IllustrationService
 from app.gemini.tools import BrainAnswer, UnavailableBrain
-from app.main import app
-from app.routers.books import get_library
 
 PAGE = ReadingContext(
     book=BookContext(title="The Castle", author="A. Writer", setting_era="medieval England"),
@@ -199,80 +196,3 @@ async def test_ended_session_is_forgotten() -> None:
     service.end_session(first.session_id)
     await service.ask("Second?", PAGE, first.session_id)
     assert _sent_texts(models.requests[1]) == ["Second?"]
-
-
-# --- endpoint --------------------------------------------------------------------------------
-
-
-class OneBookStore:
-    async def get(self, book_id: int) -> Book | None:
-        if book_id != 7:
-            return None
-        return Book(id=7, title="Pride and Prejudice", author="Jane Austen", setting_era="Regency")
-
-    async def get_by_isbn(self, isbn: str) -> Book | None:
-        return None
-
-    async def add(self, book: Book) -> Book:
-        return book
-
-
-@pytest.fixture
-def overrides() -> Any:
-    def install(service: ConversationService) -> None:
-        app.dependency_overrides[get_conversation_service] = lambda: service
-        app.dependency_overrides[get_library] = lambda: Library(OneBookStore(), None)  # type: ignore[arg-type]
-
-    yield install
-    app.dependency_overrides.clear()
-
-
-def _http() -> AsyncClient:
-    return AsyncClient(transport=ASGITransport(app=app), base_url="http://test")
-
-
-async def test_post_ask_uses_book_from_library(overrides: Any) -> None:
-    service, models = _service(_text("It means proud and distant."))
-    overrides(service)
-    async with _http() as client:
-        response = await client.post(
-            "/ask",
-            json={
-                "question": "What does aloof mean?",
-                "book_id": 7,
-                "page_lines": [{"id": "L4", "text": "Mr. Darcy was aloof."}],
-                "current_line_id": "L4",
-            },
-        )
-    assert response.status_code == 200
-    body = response.json()
-    assert body["answer"] == "It means proud and distant."
-    assert body["session_id"] and body["cited_lines"] == [] and body["image_url"] is None
-    system = models.requests[0]["config"].system_instruction
-    assert "Title: Pride and Prejudice" in system and "[L4] Mr. Darcy was aloof." in system
-
-
-async def test_unknown_book_still_answers(overrides: Any) -> None:
-    service, models = _service(_text("Sure."))
-    overrides(service)
-    async with _http() as client:
-        response = await client.post("/ask", json={"question": "Hi?", "book_id": 999})
-    assert response.status_code == 200
-    assert "Unknown (the reader has not scanned" in models.requests[0]["config"].system_instruction
-
-
-async def test_gemini_failure_is_503_with_paused_message(overrides: Any) -> None:
-    service, _ = _service(configured=False)
-    overrides(service)
-    async with _http() as client:
-        response = await client.post("/ask", json={"question": "Hello?"})
-    assert response.status_code == 503
-    assert response.json()["detail"] == "Explanations are paused. Reading continues."
-
-
-async def test_end_session_endpoint(overrides: Any) -> None:
-    service, _ = _service()
-    overrides(service)
-    async with _http() as client:
-        response = await client.delete("/ask/sessions/abc123")
-    assert response.status_code == 204

@@ -37,14 +37,23 @@ class AskRequest(BaseModel):
     current_line_id: str | None = Field(
         default=None, max_length=32, description="The line the reader's finger is on."
     )
+    pointed_word: str | None = Field(
+        default=None,
+        max_length=64,
+        description="The word the reader is pointing at, as the phone picked it, so "
+        '"what does this mean?" is about that word. Optional.',
+        examples=["portcullis"],
+    )
 
 
 class AskResponse(BaseModel):
     session_id: str
     answer: str = Field(description="Two or three short sentences, written to be spoken aloud.")
-    cited_lines: list[str] = Field(description="Line ids the book expert based its answer on.")
+    cited_lines: list[str] = Field(
+        description="Line ids the answer is based on; every claim in `answer` cites one."
+    )
     image_url: str | None = Field(
         description="Set when an illustration was made; GET it to show on the display."
     )
-    used_brain: bool = Field(description="True if the book expert (Nemotron) was consulted.")
+    used_brain: bool = Field(description="Always true: Nemotron answers every question.")
     tool_steps: list[str] = Field(description="Tools called, in order (for the trace screen).")
