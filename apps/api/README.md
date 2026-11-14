@@ -1,11 +1,11 @@
 # api
 
-FastAPI service (Python 3.11, async, Pydantic v2, SQLAlchemy 2 async + aiomysql, Alembic).
+FastAPI service (Python 3.11, async, Pydantic v2, SQLAlchemy 2 async + asyncpg, Alembic, PostgreSQL).
 
 ## Get started (5 minutes)
 
 You need Python 3.11 and [uv](https://docs.astral.sh/uv/) (`brew install uv`). Docker is
-optional: it is only needed for a local MariaDB.
+optional: it is only needed for a local PostgreSQL.
 
 ```sh
 # from the repo root
@@ -20,9 +20,17 @@ every endpoint from the browser. `GET /health` works without a database and repo
 With a database:
 
 ```sh
-make db             # MariaDB in Docker on :3306
+make db             # PostgreSQL in Docker on :5432
 make migrate        # create the tables (or: cd apps/api && uv run alembic upgrade head)
 make api
+
+# or by hand:
+uv sync
+uv run uvicorn app.main:app --reload     # needs DATABASE_URL; /health still answers if the DB is down
+uv run pytest
+uv run ruff check . && uv run ruff format --check .
+uv run alembic upgrade head              # migrations live in ../../db/migrations
+uv run alembic revision --autogenerate -m "short summary"   # needs a running PostgreSQL
 ```
 
 Or run everything in Docker with `make dev`.
@@ -43,7 +51,7 @@ To call the API from a phone on the same Wi-Fi, use your laptop's LAN IP
 | `make test-api` | `pytest` |
 | `make lint-api` | `ruff check` + `ruff format --check` (CI-style) |
 | `make format` | Auto-fix lint and formatting |
-| `uv run alembic revision --autogenerate -m "summary"` | New migration (needs a running MariaDB) |
+| `uv run alembic revision --autogenerate -m "summary"` | New migration (needs a running PostgreSQL) |
 
 Run `make lint-api test-api` before pushing.
 

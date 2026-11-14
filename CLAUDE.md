@@ -33,8 +33,8 @@ All glasses I/O goes through one interface, `GlassesAdapter`, so a real `MetaDat
 1. User opens a book and points the glasses camera at a page.
 2. The app captures the frame (browser today, real glasses via `MetaDatAdapter` later), runs OCR + hand tracking, backend analyses the page.
 3. User runs a finger under a line; the current phrase is highlighted on the glasses display and read aloud (read-along).
-4. User asks questions by voice ("what does *aloof* mean here?", "why did he do that?"); Gemini Live answers, grounded by the backend brain.
-5. Progress and a personal word bank are saved to MariaDB.
+4. User asks questions by voice ("what does *aloof* mean here?", "why did he do that?"); the phone turns speech into text, Nemotron answers as text (grounded in the page, every claim cited), and the phone reads the answer aloud through the glasses.
+5. Progress and a personal word bank are saved to PostgreSQL.
 
 ## 2. Team and ownership
 
@@ -54,9 +54,9 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 | Web app | React + Vite (TypeScript, strict), React Router, Zustand, CSS modules, Vitest. The browser simulates the glasses via `WebSimulatorAdapter`; real DAT moves to a later `MetaDatAdapter` |
 | Hand tracking / OCR | In the browser: MediaPipe HandLandmarker (`@mediapipe/tasks-vision`); PaddleOCR (`ppu-paddle-ocr`, ONNX Runtime Web) in a Web Worker; each text line is found from the detector's map and flattened along its own curve before it is read, so curled and tilted pages and two-page spreads work |
 | API / middleware | FastAPI (Python 3.11+), async, Pydantic v2 |
-| Database | MariaDB (SQLAlchemy 2.x async + Alembic migrations) |
+| Database | PostgreSQL (SQLAlchemy 2.x async + asyncpg + Alembic migrations). Switched from MariaDB on 2026-11-14; the SOP still says MariaDB and needs updating. |
 | Brain | NVIDIA Nemotron 3.5 Super VL, served with vLLM on **Verda**. NVIDIA Build is the fallback (free tier ~40 req/min/key) |
-| Voice / conversation | Gemini Live, which calls our `ask_brain()` tool |
+| Voice / conversation | Speech-to-text and text-to-speech on the phone; Nemotron's reading-coach agent answers behind `POST /ask` (`brain/qa.py`), with follow-ups kept per session. Changed from Gemini Live (SOP) to a Gemini text conversation and then to Nemotron on 2026-11-14 so every spoken answer is grounded; the SOP still says Gemini Live. |
 | Illustrations | Gemini image generation via the `illustrate()` tool |
 | Model layer | Swappable via `brain/llm.py` so Meta Muse Spark can replace Gemini in production |
 
@@ -67,7 +67,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 ├── CLAUDE.md
 ├── README.md
 ├── .env.example
-├── docker-compose.yml            # api + mariadb for local dev
+├── docker-compose.yml            # api + postgres for local dev
 ├── Makefile                      # make dev, make test, make migrate, make lint
 ├── docs/
 │   ├── SOP.md                    # export of the SOP doc (reference only)
@@ -90,7 +90,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 │   │       │   └── meta-dat/        # MetaDatAdapter stub (real glasses via DAT, later)
 │   │       ├── vision/           # hand tracking (MediaPipe), OCR (PaddleOCR), line and word picking
 │   │       ├── reader/           # highlight state machine, phrase pacing, read-along
-│   │       ├── live/             # Gemini Live session + WebSocket client
+│   │       ├── live/             # conversation: speech-to-text, POST /ask, text-to-speech
 │   │       ├── api/              # typed client generated from packages/contracts
 │   │       ├── state/            # app state (Zustand)
 │   │       └── ui/               # components, spacing-first typography
@@ -111,7 +111,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 │           │   ├── tools/        # get_book_context, define_word, explain_passage, illustrate, get_progress ...
 │           │   ├── grounding.py  # check answers against page/book context
 │           │   └── prompts/      # versioned prompt files
-│           ├── gemini/           # Mick: Live session bridge, ask_brain() tool, image generation
+│           ├── gemini/           # Mick: image generation (+ illustrator for the brain), optional chat
 │           ├── db/               # Mick: models.py, session.py, repositories/
 │           └── tests/
 ├── db/
@@ -127,14 +127,18 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 
 Use a workspace tool for JS (pnpm workspaces) and keep Python deps in `apps/api` with `uv` or `pip-tools`. Do not add a monorepo build system (Nx, Turborepo) unless asked; a Makefile is enough for a hackathon.
 
-## 5. Data model (MariaDB)
+## 5. Data model (PostgreSQL)
 
 Tables: `users`, `books`, `user_books`, `pages`, `lines`, `word_bank`, `reading_events`.
 
-- `books`: **metadata only** (title, author, ISBN, edition, language, level). **Never store book text.** The library exists so the brain knows which book a word appears in and can give contextual help, and so progress can be tracked.
-- `pages` / `lines`: per-user captured page analysis (line boxes, phrase splits, hard-word flags), keyed to `user_books`.
-- `word_bank`: words the user struggled with or asked about, with the book and context sentence where they met it, plus review state.
-- `reading_events`: append-only log (line completed, word looked up, question asked, assist faded) used for progression and fading support.
+Columns follow SOP section 5; `apps/api/app/db/models.py` documents each one.
+
+- `users`: unique `username` (the only sign-in: no password, decided 2026-11-14), display name, `support_level` (listen / read_along / solo), voice, `glasses_type`; no contact details.
+- `books`: **metadata only** (ISBN, title, author, publication year, language, genre, setting/era, spoiler-free description, metadata source). **Never store book text.** The library exists so the brain knows which book a word appears in and can give contextual help, and so progress can be tracked.
+- `user_books`: where each reader is in each book (current page and line, started / last read / finished).
+- `pages` / `lines`: pages a reader captured (image hash and page JSON, never the image) and the captured line text with boxes. Line text is used only to ground that reader's answers and is deleted when the book is finished or on request.
+- `word_bank`: one row per reader per word: times rescued, solo reads, status (learning / owned), where it was last seen, context sentence.
+- `reading_events`: append-only log (page read, word rescued, question asked, mode changed) with mode and duration, used for progress metrics and fading support.
 - All schema changes go through Alembic migrations. Never edit the DB by hand. Seed data lives in `db/seed/`.
 
 ## 6. API surface (v1, keep stable; contracts live in `packages/contracts`)
@@ -148,18 +152,15 @@ Tables: `users`, `books`, `user_books`, `pages`, `lines`, `word_bank`, `reading_
 | POST | `/illustrate` | Prompt from passage -> image (Gemini) |
 | POST | `/progress` | Write reading events, update word bank |
 | GET | `/progress/{user_book_id}` | Progress summary |
-| WS | `/live` | Gemini Live session bridge |
+| POST | `/ask` | Reader question (text) -> short spoken-style answer from Nemotron, grounded with cited lines (implemented; replaces `WS /live`) |
 
 The paths marked above beyond `/books/identify`, `/progress` and `/live` are proposed; confirm against SOP section 5 and adjust. The **page JSON schema** is defined in SOP section 8.1. Implement it exactly as Pydantic models in `app/schemas/page.py`, generate OpenAPI, and generate TS types from it so the web app and backend can never drift.
 
 ## 7. How the pieces cooperate
 
-- **Finger tracking runs in the browser**, not on the glasses and not in the cloud: MediaPipe HandLandmarker finds the fingertip; OCR line boxes pick the nearest line; the reader module turns that into the current phrase.
-- **Glasses adapter rule:** all glasses I/O goes through `GlassesAdapter`. `navigator.mediaDevices` and browser audio APIs may only be used inside `apps/web/src/glasses/web-simulator/` (ESLint enforces it).
-- **Nemotron handles understanding**: reading order, phrase boundaries, hard words, document reasoning, grounding checks, conversation plans.
-- **Gemini Live is the voice**, and calls `ask_brain()`. Gemini tool calls are not guaranteed to fire (reported ~60-70%) and sessions last roughly 10-15 minutes, so:
-  - **Inject page and book context server-side** at session start and on every page change; never rely on the tool call to get context.
-  - Auto-reconnect and restore context when a session expires.
+- **Finger tracking runs on the phone**, not on the glasses and not in the cloud: MediaPipe Hands or Apple Vision finds the fingertip; OCR line boxes pick the nearest line; the reader module turns that into the current phrase.
+- **Nemotron handles understanding**: reading order, phrase boundaries, hard words, word meanings, document reasoning, and every answer to a reader's question, with grounding checks.
+- **Questions are text** (voice stays on the phone): `POST /ask` goes straight to Nemotron's agent with the page and book context. **Gemini draws pictures** when the agent calls its `illustrate` tool.
 - **Highlight shows on the glasses display only**, not on the paper. Ray-Ban Display: 600x600, ~20 degree FOV, right lens. Ray-Ban Meta Gen 2 has no display, so degrade to audio cues.
 - No eye tracking exists. Do not design around gaze.
 - Meta AI's own on-glasses vision is **not** exposed to apps. Our app uses the camera feed via DAT (in the web proof of concept, the browser camera stands in).
@@ -180,7 +181,7 @@ Implement graceful degradation, never a dead end:
 - Brain unavailable or slow -> fall back to local OCR + plain phrase splitting; show a subtle status, keep reading working.
 - Hand tracking lost -> keep last line, offer a manual next-line gesture (Neural Band or tap).
 - Rate limit (NVIDIA Build ~40 req/min/key) -> client-side queue, batching, cache page analyses by image hash.
-- Gemini Live session expires -> reconnect and re-inject context.
+- Nemotron unavailable or slower than 8 s -> `POST /ask` returns 503 "Explanations are paused. Reading continues."; reading keeps working.
 - Always log failures with a request id; never crash the reading session.
 
 Evaluation: `eval/pages/` holds a small set of real photos (curved book spines, shadows, glare, two-column, small print, children's books). `eval/run_eval.py` reports OCR line accuracy, reading-order accuracy and grounding pass rate. Run it before changing prompts or models.
@@ -192,7 +193,7 @@ Evaluation: `eval/pages/` holds a small set of real photos (curved book spines, 
 - No book text in the library, only metadata.
 - Secrets in `.env`, never in code or git. Provide `.env.example` with every variable name and a comment.
 
-Required env vars (names only): `DATABASE_URL`, `NEMOTRON_BASE_URL`, `NEMOTRON_API_KEY`, `NVIDIA_BUILD_API_KEY`, `GEMINI_API_KEY`, `LLM_PROVIDER`, `APP_NAME`, `LOG_LEVEL`.
+Required env vars (names only): `DATABASE_URL`, `NEMOTRON_BASE_URL`, `NEMOTRON_API_KEY`, `NVIDIA_BUILD_API_KEY`, `GEMINI_API_KEY`, `GEMINI_CHAT_MODEL`, `GEMINI_IMAGE_MODEL`, `GOOGLE_BOOKS_API_KEY`, `LLM_PROVIDER`, `APP_NAME`, `LOG_LEVEL`.
 
 ## 11. Coding conventions
 
@@ -206,8 +207,7 @@ Required env vars (names only): `DATABASE_URL`, `NEMOTRON_BASE_URL`, `NEMOTRON_A
 ## 12. Commands (create these in the Makefile)
 
 ```
-make dev        # docker compose up (api + mariadb); run the web app separately with `make web`
-make web        # pnpm --filter web dev (Vite, http://localhost:5173)
+make dev        # docker compose up (api + postgres), run mobile dev server separately
 make migrate    # alembic upgrade head
 make test       # pytest (api) + vitest (web)
 make lint       # ruff (api) + eslint/prettier/tsc (web)
@@ -223,7 +223,7 @@ make eval       # run eval/run_eval.py
 4. **Finger guidance** in the browser: hand tracking -> nearest line -> phrase highlight.
 5. **Glasses**: `MetaDatAdapter`: DAT camera stream in, display/audio out. Fall back to the web simulator if DAT or display APIs block us.
 6. **Word help**: tap or ask a word -> contextual definition + breakdown -> word bank row.
-7. **Gemini Live** conversation with server-side context injection and `ask_brain()`.
+7. **Questions** (`POST /ask`, text in and out) answered by Nemotron with server-side context and follow-ups.
 8. **Illustrations** and progress/fading.
 9. **Polish for demo**: demo book, runbook, offline-safe fallbacks.
 

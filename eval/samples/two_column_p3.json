@@ -1,0 +1,22 @@
+{
+  "kind": "book",
+  "page_id": "p3",
+  "page_number": 3,
+  "note": "Original sample text. Two columns: left column must be read before the right.",
+  "book": {"title": "Field Notes on Moss (eval sample)", "genre": "non-fiction", "language": "en-GB"},
+  "ocr_lines": [
+    {"id": "L1", "text": "Mosses have no true roots.", "bbox": [0.05, 0.10, 0.42, 0.04]},
+    {"id": "R1", "text": "In drought they curl and wait,", "bbox": [0.53, 0.10, 0.42, 0.04]},
+    {"id": "L2", "text": "Instead, thin rhizoids anchor", "bbox": [0.05, 0.15, 0.42, 0.04]},
+    {"id": "R2", "text": "then photosynthesise again", "bbox": [0.53, 0.15, 0.42, 0.04]},
+    {"id": "L3", "text": "them to bark and stone.", "bbox": [0.05, 0.20, 0.42, 0.04]},
+    {"id": "R3", "text": "within hours of rain.", "bbox": [0.53, 0.20, 0.42, 0.04]}
+  ],
+  "reading_order": ["L1", "L2", "L3", "R1", "R2", "R3"],
+  "hard_words": ["rhizoids", "photosynthesise", "drought"],
+  "questions": [
+    {"question": "How do mosses hold on without roots?", "answer_lines": ["p3:L2", "p3:L3"]},
+    {"question": "What happens after rain?", "answer_lines": ["p3:R2", "p3:R3"]},
+    {"question": "What do mosses do in a drought?", "answer_lines": ["p3:R1"]}
+  ]
+}

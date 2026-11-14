@@ -1,0 +1,14 @@
+{
+  "name": "@reading-companion/contracts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "API types generated from the FastAPI OpenAPI schema. Run `make contracts`.",
+  "types": "ts/index.ts",
+  "main": "ts/index.ts",
+  "scripts": {
+    "generate": "openapi-typescript openapi.json --output ts/schema.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

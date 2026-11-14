@@ -51,7 +51,7 @@ make web                 # web app on http://localhost:5173 (same as `pnpm --fil
 | `make dev` | `docker compose up` (api + mariadb) |
 | `make web` | Web app dev server (Vite) on http://localhost:5173 |
 | `make api` | Run the API on the host with reload (no Docker) |
-| `make db` | Start only MariaDB in Docker (pair with `make api`) |
+| `make db` | Start only PostgreSQL in Docker (pair with `make api`) |
 | `make format` | Auto-fix API lint and formatting |
 | `make migrate` | `alembic upgrade head` in the api container |
 | `make test` | pytest (api) + vitest (web) |
