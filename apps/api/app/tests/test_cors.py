@@ -2,11 +2,13 @@ from unittest.mock import AsyncMock, patch
 
 from httpx import ASGITransport, AsyncClient
 
-from app.config import Settings
+from app.config import Settings, get_settings
 from app.main import app
 from app.middleware import is_origin_allowed
 
-WEB_ORIGIN = "http://localhost:5173"
+# The web app origin the running app is configured to allow (CORS_ORIGINS in .env, default
+# http://localhost:5173), so the tests do not depend on which port a developer chose.
+WEB_ORIGIN = get_settings().cors_origin_list[0]
 
 
 async def test_preflight_from_web_dev_origin_is_allowed() -> None:
