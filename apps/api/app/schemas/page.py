@@ -1,5 +1,85 @@
-"""Page JSON schema (reading order, phrases, hard words).
+"""Page JSON schema (SOP section 8.1): output of POST /page, produced by brain/page_analyzer.py.
 
-TODO(Matthew/Mick Ola): build order step 2. Implement exactly as defined in SOP section 8.1.
-OPEN QUESTION: docs/SOP.md is not in the repo yet, so the schema cannot be written.
+Shared contract: the phone (Alex) renders from it and the API (Mick Ola) returns and stores
+it. Field names follow SOP 8.1 exactly. Changes need a note to both owners.
+
+Decisions recorded here (see docs/BRAIN.md):
+- bbox is [x, y, width, height] normalised to 0-1 of the page photo (top-left origin), so
+  it is independent of camera resolution. Resolves OPEN QUESTION 3 (proposal, confirm with Alex).
+- Line ids are per page ("L1", "L2", ..., "caption_1"). Across pages a line is cited as
+  "<page_id>:<line_id>", e.g. "p12:L2".
 """
+
+from typing import Literal
+
+from pydantic import BaseModel, Field
+
+BBox = list[float]  # [x, y, w, h], each 0-1
+
+
+class OcrLine(BaseModel):
+    """One line from on-device OCR, sent by the phone with the page photo."""
+
+    id: str = Field(description='Line id assigned by the phone, e.g. "L1"')
+    text: str
+    bbox: BBox = Field(min_length=4, max_length=4)
+    confidence: float | None = Field(default=None, ge=0, le=1)
+
+
+class Line(BaseModel):
+    id: str
+    text: str
+    bbox: BBox = Field(min_length=4, max_length=4)
+
+
+class Chunk(BaseModel):
+    """A phrase for the synced read-along highlight (phrase level, never single words)."""
+
+    line: str
+    text: str
+
+
+class HardWord(BaseModel):
+    word: str
+    line: str
+    syllables: list[str]
+    say_as: str = Field(description="Pronunciation respelling, stressed syllable in caps")
+    meaning: str = Field(description="Plain meaning in the context of this book")
+    illustratable: bool
+    confidence: float = Field(ge=0, le=1)
+
+
+class PlanQuestion(BaseModel):
+    type: Literal["predict", "clarify", "summarise"]
+    text: str
+    cites: list[str]
+
+
+class Recap(BaseModel):
+    text: str
+    cites: list[str]
+
+
+class ConversationPlan(BaseModel):
+    questions: list[PlanQuestion] = Field(default_factory=list)
+    revisit_word: str | None = None
+    recap: Recap | None = None
+
+
+class OcrDisagreement(BaseModel):
+    """A line where phone OCR and Nemotron read different words (SOP 9: ask to re-capture)."""
+
+    line: str
+    ocr_text: str
+    model_text: str
+    similarity: float = Field(ge=0, le=1)
+
+
+class PageAnalysis(BaseModel):
+    page_id: str
+    reading_order: list[str]
+    lines: list[Line]
+    chunks: list[Chunk]
+    hard_words: list[HardWord]
+    conversation_plan: ConversationPlan
+    ocr_disagreements: list[OcrDisagreement] = Field(default_factory=list)
