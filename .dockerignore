@@ -1,0 +1,10 @@
+# Keep the build context small and secret-free (the image only copies apps/api and db/migrations).
+.git
+.env
+**/.env
+**/.venv
+**/node_modules
+**/__pycache__
+apps/mobile
+apps/web
+eval/pages

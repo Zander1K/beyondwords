@@ -233,6 +233,13 @@ def heard_as_page_words(
         for j in range(i + 1, min(i + 4, len(run) + 1))
     }
     best: dict[str, tuple[float, str]] = {}
+    # A page word heard as two or three words joins up exactly, even across a short word the
+    # question uses ("a loof" -> aloof), so check every short run of tokens for that.
+    for i in range(len(tokens)):
+        for j in range(i + 2, min(i + 4, len(tokens) + 1)):
+            key = letters("".join(tokens[i:j]))
+            if len(key) >= 5 and key in vocab:
+                best[vocab[key]] = (1.0, " ".join(tokens[i:j]))
     for phrase in phrases:
         key = letters(phrase)
         if len(key) < 5:
@@ -244,6 +251,8 @@ def heard_as_page_words(
         for page_key, page_word in vocab.items():
             if abs(len(page_key) - len(key)) > max(2, len(page_key) // 3):
                 continue
+            if page_key.startswith(key) or key.startswith(page_key):
+                continue  # another form of the same word ("dancer" / "dancers"), not misheard
             matcher = SequenceMatcher(None, key, page_key)
             if matcher.quick_ratio() < threshold:
                 continue

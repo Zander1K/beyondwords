@@ -12,7 +12,8 @@ Phone / web app --HTTPS--> Aiven Runtime (FastAPI, port 8000) --SSL--> Aiven Pos
 
 ## What the repo already does for Runtime
 
-- `apps/api/Dockerfile` builds from the **repo root** (it copies `db/migrations`).
+- The API image is the `Dockerfile` at the **repo root** (it copies `apps/api` and `db/migrations`,
+  so the build context must be the root; Runtime uses the Dockerfile's folder as the context).
 - On every start the container runs `alembic upgrade head`, then starts uvicorn on port **8000**.
   Runtime has no pre-deploy step, so this is how new migrations reach the database. Set
   `RUN_MIGRATIONS=0` to skip it.
@@ -38,12 +39,16 @@ Phone / web app --HTTPS--> Aiven Runtime (FastAPI, port 8000) --SSL--> Aiven Pos
 ## Step 2: Pick the repo and the Dockerfile
 
 1. **Account**: `Zander1K`. **Repository**: `beyondwords`. **Branch**: `main`. Click **Next**.
-2. Choose the manifest: pick **`apps/api/Dockerfile`**.
+2. Choose the manifest: pick the root **`Dockerfile`**.
    **Do not pick `docker-compose.yml`**: it also declares a `postgres` service, and Runtime would
    create a second, paid PostgreSQL service.
 3. Click **Scan**. Then open the application's settings (the edit icon next to it) and check:
    - **Name**: `reading-companion-api` (lowercase letters, digits and `-`).
-   - **Build path**: `.` (repo root). **Dockerfile path**: `apps/api/Dockerfile`.
+   - **Build context directory**: `/` (repo root). **Containerfile path**: `/Dockerfile`. These
+     can't be edited in the console; if they show `/apps/api`, you picked an old file: delete the
+     draft and start again.
+   - **Environment variables**: the scan copies the Dockerfile's `ENV` lines in. Leave them or
+     delete them (the image sets them anyway); never leave a `PATH` without `/usr/bin`.
    - **Port**: `8000`, protocol **HTTP**, name `http` (Scan should read it from `EXPOSE 8000`).
 4. If the scan offers to create any data service, remove it: we connect the existing database in
    step 4.

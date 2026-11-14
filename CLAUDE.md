@@ -68,6 +68,7 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 ├── README.md
 ├── .env.example
 ├── docker-compose.yml            # api + postgres for local dev
+├── Dockerfile                    # API image; at the root so it can copy db/migrations (Aiven Runtime)
 ├── Makefile                      # make dev, make test, make migrate, make lint
 ├── docs/
 │   ├── SOP.md                    # export of the SOP doc (reference only)
@@ -96,7 +97,6 @@ Cross-boundary changes (API contracts, schema, shared types) need a note in the 
 │   │       └── ui/               # components, spacing-first typography
 │   └── api/                      # FastAPI service (Matthew + Mick)
 │       ├── pyproject.toml
-│       ├── Dockerfile
 │       ├── alembic.ini
 │       └── app/
 │           ├── main.py
