@@ -48,6 +48,35 @@ The Reader has two modes, switched in the dock (remembered for the browser sessi
   definition, picture), click it again or press Esc to close. Arrow keys, Enter and Esc work as in
   camera mode. Switching to Ebook starts the simulated glasses session for you.
 
+## Library, books and the word bank
+
+- **In the Reader:** with the camera on, press **📚 Scan book** and hold the book's barcode (or its cover) up.
+  A still is taken from the live view and read; the book is added and becomes the current one, and the result
+  shows on the glasses display and by the dock.
+- **Library** (`/library`): add a book by photographing its barcode, copyright page or cover, or by typing
+  the ISBN. Nemotron reads the ISBN off the photo (kept only if its check digit adds up) or, failing that, the
+  title and author, which are then searched (Google Books, then Open Library) and stored. New books get a
+  setting/era and a spoiler-free blurb added in the background. The book opened last is the **current book**.
+- **Context:** the current book's id is sent with every definition, question and picture request, so answers fit
+  the book. The Reader shows it as a "📖 Title" pill.
+- **Word bank** (`/words`): every word a reader looks up (opens a card on) or asks about by voice is saved with
+  the book and the line it was in, counted again on repeat lookups, and logged as a `word_rescued` event.
+  Photos are read and never kept; only book metadata is stored, never book text.
+
+## Text reader: Google Cloud Vision, with on-device fallback
+
+The camera is read with **Google Cloud Vision** when it is set up (`GOOGLE_VISION_API_KEY` in the root
+`.env`; the Cloud Vision API and billing must be on for the key's project), and with the on-device
+PaddleOCR otherwise. Controls > Camera > Text reader switches between them.
+
+- `POST /ocr/page` (a JPEG in, lines and words with positions out) and `GET /ocr/status`. The key stays on the server.
+- **Privacy:** with Google Vision, camera frames are sent to Google (through our server) to be read; we do not store them.
+  The on-device reader sends nothing anywhere. The Controls sheet says which one is in use.
+- **Cost control:** it does not read every frame. It reads when the picture changes a lot (a page turn), at most
+  every 2 s and 12 times a minute, and otherwise every 20 s; in between it reuses the last reading
+  (`src/vision/cloudPolicy.ts`). The first 1,000 images a month are free.
+- If Google fails for any reason the frame is read on-device and Google is left alone for a minute.
+
 ## Speech: ElevenLabs, with browser fallback
 
 Read-aloud and ask-by-voice use **ElevenLabs**, through the API (the key stays on the server; set

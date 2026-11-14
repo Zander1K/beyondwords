@@ -119,3 +119,16 @@ describe("deriveIssues", () => {
     expect(issues.map((i) => i.severity)).toEqual(["error", "warn"]);
   });
 });
+
+describe("the open book pill", () => {
+  it("names the open book, says when there is none, and is absent when unknown", () => {
+    const base = { camera: { kind: "off" }, session: "stopped" } as const;
+    const ids = (book?: string | null) =>
+      derivePills({ ...healthy, ...base, ...(book !== undefined ? { book } : {}) }).filter(
+        (p) => p.id === "book",
+      );
+    expect(ids("Lantern Days")[0]).toMatchObject({ label: "📖 Lantern Days", tone: "ok" });
+    expect(ids(null)[0]).toMatchObject({ label: "No book", tone: "off" });
+    expect(ids()).toEqual([]);
+  });
+});

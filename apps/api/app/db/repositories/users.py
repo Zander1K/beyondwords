@@ -47,11 +47,35 @@ async def get_or_create_user(session: AsyncSession, username: str) -> tuple[User
 
 ONBOARDING_VERSION = 1
 
+# Saved spacing uses the web app's own key names (what the other readers' rows already hold); the
+# API speaks snake_case. Both spellings are read, camelCase is written, and anything unreadable
+# is treated as "nothing saved" so odd settings can never stop someone signing in.
+_SPACING_KEYS = {
+    "letter_spacing": "letterSpacing",
+    "word_spacing": "wordSpacing",
+    "line_height": "lineHeight",
+    "font_size": "fontSize",
+}
+
+
+def spacing_from_storage(saved: object) -> Spacing | None:
+    if not isinstance(saved, dict):
+        return None
+    values = {snake: saved.get(snake, saved.get(camel)) for snake, camel in _SPACING_KEYS.items()}
+    try:
+        return Spacing(**values)
+    except (ValueError, TypeError):
+        return None
+
+
+def spacing_to_storage(spacing: Spacing) -> dict[str, float]:
+    return {camel: getattr(spacing, snake) for snake, camel in _SPACING_KEYS.items()}
+
 
 def to_profile(user: User) -> Profile:
     """The reader as the app sees them. `onboarded` lives in `settings` (no extra column)."""
-    settings = user.settings or {}
-    spacing = settings.get("spacing")
+    settings = user.settings if isinstance(user.settings, dict) else {}
+    onboarding = settings.get("onboarding")
     return Profile(
         id=user.id,
         username=user.username,
@@ -59,8 +83,13 @@ def to_profile(user: User) -> Profile:
         support_level=user.support_level,
         glasses_type=user.glasses_type,
         voice=user.voice,
-        spacing=Spacing(**spacing) if isinstance(spacing, dict) else None,
-        onboarded=bool((settings.get("onboarding") or {}).get("completed_at")),
+        spacing=spacing_from_storage(settings.get("spacing")),
+        # Done setup here, or already set up some other way (a glasses type or voice is on file).
+        onboarded=bool(
+            (isinstance(onboarding, dict) and onboarding.get("completed_at"))
+            or user.glasses_type
+            or user.voice
+        ),
     )
 
 
@@ -82,9 +111,9 @@ async def complete_onboarding(
     if answers.display_name is not None:
         user.display_name = answers.display_name.strip() or None
     # Assign a new dict: SQLAlchemy does not see changes made inside a JSON value.
-    settings = dict(user.settings or {})
+    settings = dict(user.settings) if isinstance(user.settings, dict) else {}
     if answers.spacing is not None:
-        settings["spacing"] = answers.spacing.model_dump()
+        settings["spacing"] = spacing_to_storage(answers.spacing)
     settings["onboarding"] = {
         "completed_at": datetime.now(UTC).isoformat(),
         "version": ONBOARDING_VERSION,

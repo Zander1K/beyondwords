@@ -17,13 +17,15 @@ export interface ReaderHealth {
   scan: ScanState;
   tracking: TrackingStats;
   handLost: boolean;
+  /** The title of the book the reader has open; null when they have none; left out = unknown. */
+  book?: string | null;
 }
 
 /** ok = working, busy = loading, warn = check this, error = failed, off = not in use. */
 export type PillTone = "ok" | "busy" | "warn" | "error" | "off";
 
 export interface StatusPill {
-  id: "camera" | "glasses" | "page" | "hands";
+  id: "camera" | "glasses" | "page" | "hands" | "book";
   label: string;
   tone: PillTone;
   /** Extra detail for the tooltip (rates and timings). */
@@ -65,6 +67,20 @@ export function derivePills(h: ReaderHealth): StatusPill[] {
     });
   } else {
     pills.push({ id: "glasses", label: "Glasses off", tone: "off" });
+  }
+
+  // The open book: what definitions and answers are fitted to.
+  if (h.book !== undefined) {
+    pills.push(
+      h.book
+        ? { id: "book", label: `📖 ${h.book}`, tone: "ok", detail: "The book your answers fit." }
+        : {
+            id: "book",
+            label: "No book",
+            tone: "off",
+            detail: "Add one in the Library so answers can fit your book.",
+          },
+    );
   }
 
   // Camera off: there is no camera page to report on (an ebook shows its own page).

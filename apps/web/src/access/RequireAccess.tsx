@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { Navigate, Outlet, useLocation } from "react-router";
 
 import { GlassesProvider } from "@/glasses";
-import { useSettings } from "@/state";
+import { useBooks, useSettings } from "@/state";
 
 import { useAccess } from "./store";
 
@@ -33,6 +33,16 @@ export function RequireAccess() {
       fontSize: saved.font_size,
     });
   }, [saved, setSpacing]);
+
+  // Their books (and which is open) once the server has told us who they are.
+  const profileId = profile?.id;
+  const loadBooks = useBooks((b) => b.load);
+  const clearBooks = useBooks((b) => b.clear);
+  useEffect(() => {
+    if (profileId === undefined) return;
+    void loadBooks(profileId);
+    return () => clearBooks();
+  }, [profileId, loadBooks, clearBooks]);
 
   if (!user) {
     return <Navigate to="/" replace state={{ needAccess: true, from: location.pathname }} />;

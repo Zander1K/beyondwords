@@ -33,3 +33,4 @@ export {
   stripReadsToLines,
   type StripRead,
 } from "./ocr";
+export { CloudOcr, CloudOcrError, cloudOcrAvailable } from "./cloudOcr";

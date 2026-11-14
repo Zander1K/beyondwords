@@ -23,6 +23,8 @@ class BrainSettings(BaseSettings):
     ask_timeout_s: float = 8.0
     page_timeout_s: float = 30.0
     document_timeout_s: float = 15.0
+    # Reading a book from a photo, and giving a new book its background: one-off, so patient.
+    cover_timeout_s: float = 45.0
 
     # Retries: SOP section 9 says exponential backoff, at most 3 attempts.
     max_attempts: int = 3

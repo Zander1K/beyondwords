@@ -4,7 +4,7 @@
 // The page comes from the camera scan (or the ebook); with no text there is nothing to show.
 import { useEffect, useRef, useState } from "react";
 
-import { askQuestion } from "@/api";
+import { askQuestion, recordWord, wordsAskedAbout } from "@/api";
 import {
   type GlassesAdapter,
   type GlassesGesture,
@@ -372,6 +372,14 @@ export function useReaderController() {
         at.position.word !== undefined
           ? current.lines[at.position.line]?.words?.[at.position.word]?.text
           : undefined;
+      // "What does portcullis mean?": the word asked about goes in the word bank, with its line.
+      const pageWords = current.lines.flatMap(
+        (l) => l.words?.map((w) => w.text) ?? l.text.split(" "),
+      );
+      for (const asked of wordsAskedAbout(question, pageWords, pointed)) {
+        const line = current.lines.find((l) => l.text.toLowerCase().includes(asked));
+        recordWord(asked, line?.text ?? "", "ask");
+      }
       const reply = await askQuestion({
         question,
         page_lines: current.lines

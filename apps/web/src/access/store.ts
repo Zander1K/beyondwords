@@ -1,7 +1,7 @@
 // Who is signed in. Kept in sessionStorage (this tab only) and read back on load.
 import { create } from "zustand";
 
-import { loginUser, type Profile } from "@/api";
+import { loginUser, type Profile, setApiUser } from "@/api";
 
 import {
   ACCESS_PASSWORD_SHA256,
@@ -10,6 +10,9 @@ import {
   parseSession,
   SESSION_KEY,
 } from "./access";
+
+/** How long to wait before each new try at loading the profile, after the server did not answer. */
+const PROFILE_RETRY_MS = [2000, 5000, 10_000, 20_000, 30_000] as const;
 
 /** The part of `Storage` used here, so tests can pass a fake. */
 export interface SessionStorageLike {
@@ -70,6 +73,25 @@ export function createAccessStore(
     }
   };
   const saved = read();
+  // The server may not be up yet when someone signs in (it is started separately): keep asking
+  // for their profile, a little less often each time, for as long as they stay signed in as them.
+  function loadProfile(username: string, attempt = 0): void {
+    if (!register) return;
+    void register(username)
+      .then((profile) => {
+        // Only if the same person is still signed in when the server answers.
+        if (store.getState().user === username) store.getState().setProfile(profile);
+      })
+      .catch(() => {
+        const wait = PROFILE_RETRY_MS[attempt];
+        if (wait === undefined) return;
+        setTimeout(() => {
+          const now = store.getState();
+          if (now.user === username && !now.profile) loadProfile(username, attempt + 1);
+        }, wait);
+      });
+  }
+
   const remember = (username: string, userId: number) => {
     try {
       storage?.setItem(SESSION_KEY, JSON.stringify({ username, at: Date.now(), userId }));
@@ -84,6 +106,7 @@ export function createAccessStore(
     onboardingSkipped: false,
     setProfile: (profile) => {
       set({ profile, userId: profile.id });
+      setApiUser(profile.id);
       const user = get().user;
       if (user) remember(user, profile.id);
     },
@@ -100,12 +123,7 @@ export function createAccessStore(
         // Storage refused (full, blocked): they are still signed in for this page load.
       }
       set({ user: name.value, userId: null, profile: null, onboardingSkipped: false });
-      void register?.(name.value)
-        .then((profile) => {
-          // Only if the same person is still signed in when the server answers.
-          if (get().user === name.value) get().setProfile(profile);
-        })
-        .catch(() => undefined);
+      loadProfile(name.value);
       return { ok: true, username: name.value };
     },
     signOut: () => {
@@ -114,17 +132,12 @@ export function createAccessStore(
       } catch {
         // Nothing stored that could be removed.
       }
+      setApiUser(null);
       set({ user: null, userId: null, profile: null, onboardingSkipped: false });
     },
   }));
   // A reload while signed in: ask the server for the profile again.
-  if (saved && register) {
-    void register(saved.username)
-      .then((profile) => {
-        if (store.getState().user === saved.username) store.getState().setProfile(profile);
-      })
-      .catch(() => undefined);
-  }
+  if (saved && register) loadProfile(saved.username);
   return store;
 }
 

@@ -219,3 +219,17 @@
   color: var(--glass-text-dim);
   font-size: 0.84rem;
 }
+
+.readerChoice {
+  display: grid;
+  gap: 0.3rem;
+  margin: 0.4rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.readerChoice legend {
+  padding: 0;
+  margin-bottom: 0.2rem;
+  font-weight: 600;
+}

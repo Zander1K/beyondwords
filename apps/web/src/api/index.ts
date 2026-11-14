@@ -28,3 +28,18 @@ export {
   wordCardNow,
 } from "./words";
 export { type ApiStatus, useApiStatus } from "./useApiStatus";
+export { getApiContext, setApiBook, setApiUser, withBook } from "./context";
+export {
+  addBookByIsbn,
+  type BookInfo,
+  listBooks,
+  listWords,
+  openBook,
+  recordWord,
+  resetRecordedWords,
+  type ScanResult,
+  scanBook,
+  type WordBankItem,
+} from "./library";
+export { wordsAskedAbout } from "./askedWords";
+export { frameToJpeg, preparePhoto } from "./photo";

@@ -31,3 +31,19 @@ class BookRepository:
             return existing
         await self._session.refresh(book)
         return book
+
+    async def set_context(
+        self, book_id: int, setting_era: str | None, description: str | None
+    ) -> Book | None:
+        """Fill in `setting_era` and `description_spoiler_free` where they are empty. Never
+        overwrites a value that is already there (it may have been written or reviewed by hand)."""
+        book = await self.get(book_id)
+        if book is None:
+            return None
+        if setting_era and not book.setting_era:
+            book.setting_era = setting_era[:255]
+        if description and not book.description_spoiler_free:
+            book.description_spoiler_free = description
+        await self._session.commit()
+        await self._session.refresh(book)
+        return book

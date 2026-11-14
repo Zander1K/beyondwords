@@ -291,3 +291,63 @@ describe("the access store", () => {
     expect(store.getState().profile).toBeNull();
   });
 });
+
+const memoryStorage = (): SessionStorageLike => {
+  const data = new Map<string, string>();
+  return {
+    getItem: (k) => data.get(k) ?? null,
+    setItem: (k, v) => void data.set(k, v),
+    removeItem: (k) => void data.delete(k),
+  };
+};
+
+describe("loading the profile when the server is not up yet", () => {
+  it("keeps trying, and signs the reader in properly once the server answers", async () => {
+    vi.useFakeTimers();
+    try {
+      const reply = (p: Profile) => p;
+      const register = vi
+        .fn()
+        .mockRejectedValueOnce(new Error("down"))
+        .mockRejectedValueOnce(new Error("down"))
+        .mockImplementation(async () =>
+          reply({
+            id: 9,
+            username: "ada",
+            display_name: null,
+            support_level: "read_along",
+            glasses_type: null,
+            voice: null,
+            spacing: null,
+            onboarded: true,
+          }),
+        );
+      const store = createAccessStore(memoryStorage(), TEST_DIGEST, register);
+      store.getState().signIn("ada", TEST_PASSWORD);
+      await vi.advanceTimersByTimeAsync(100);
+      expect(store.getState().userId).toBeNull(); // the server is not answering yet
+      await vi.advanceTimersByTimeAsync(2100); // first retry: still down
+      expect(store.getState().userId).toBeNull();
+      await vi.advanceTimersByTimeAsync(5100); // second retry: up
+      expect(store.getState().userId).toBe(9);
+      expect(register).toHaveBeenCalledTimes(3);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("stops trying once they sign out", async () => {
+    vi.useFakeTimers();
+    try {
+      const register = vi.fn().mockRejectedValue(new Error("down"));
+      const store = createAccessStore(memoryStorage(), TEST_DIGEST, register);
+      store.getState().signIn("ada", TEST_PASSWORD);
+      await vi.advanceTimersByTimeAsync(100);
+      store.getState().signOut();
+      await vi.advanceTimersByTimeAsync(120_000);
+      expect(register).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

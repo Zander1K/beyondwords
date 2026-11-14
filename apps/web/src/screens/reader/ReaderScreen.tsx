@@ -13,7 +13,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { GlassesHudLayer, useControlsShortcut } from "@/glasses";
 import { currentPhrase, EMPTY_PAGE } from "@/reader";
-import { useReaderStore } from "@/state";
+import { useBooks, useReaderStore } from "@/state";
 
 import { CameraView } from "./CameraView";
 import { EbookView } from "./EbookView";
@@ -26,6 +26,7 @@ import { IssueStack, StatusPills } from "./ReaderStatus";
 import { useCamera } from "./useCamera";
 import { useFullscreen } from "./useFullscreen";
 import { useHandTracking } from "./useHandTracking";
+import { useBookScan } from "./useBookScan";
 import { useLiveScan } from "./useLiveScan";
 import { useReaderController } from "./useReaderController";
 import { type OverlayHand, VisionOverlay } from "./VisionOverlay";
@@ -53,6 +54,7 @@ export function ReaderScreen() {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const scan = useReaderStore((s) => s.scan);
   const handLost = useReaderStore((s) => s.handLost);
+  const bookTitle = useBooks((b) => b.current?.title ?? null);
   const live = cam.stream !== null;
   const [mode, setMode] = useState<ReaderMode>(readMode);
   const [ebookPageNo, setEbookPageNo] = useState(0);
@@ -81,6 +83,7 @@ export function ReaderScreen() {
   }, [ebook, r.session, r.offline, startSession]);
 
   const toggleControls = useCallback(() => setControlsOpen((open) => !open), []);
+  const bookScan = useBookScan(videoRef);
   const askAboutPage = r.actions.askAboutPage;
   const tracking = useHandTracking(videoRef, live, toggleControls, () => void askAboutPage());
 
@@ -105,8 +108,9 @@ export function ReaderScreen() {
       scan,
       tracking: tracking.stats,
       handLost,
+      book: bookTitle,
     }),
-    [cam.camera, r.session, r.asleep, r.offline, scan, tracking.stats, handLost],
+    [cam.camera, r.session, r.asleep, r.offline, scan, tracking.stats, handLost, bookTitle],
   );
   const pills = useMemo(() => derivePills(health), [health]);
   const issues = useMemo(() => {
@@ -223,6 +227,11 @@ export function ReaderScreen() {
           onAsk={() => void askAboutPage()}
         />
 
+        {bookScan.note && (
+          <p className={styles.wakeNote} role="status">
+            {bookScan.note}
+          </p>
+        )}
         {r.heyMeta.note && (
           <p className={styles.wakeNote} role="status">
             {r.heyMeta.note}
@@ -279,6 +288,21 @@ export function ReaderScreen() {
               disabled={cam.camera.kind === "starting"}
             >
               Camera on
+            </button>
+          )}
+          {ebook ? null : (
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void bookScan.scan()}
+              disabled={bookScan.busy || !live}
+              title={
+                live
+                  ? "Hold a book's barcode (or its cover) up to the camera to add it to your library. The photo is read by the reading model and not kept."
+                  : "Turn the camera on to scan a book."
+              }
+            >
+              {bookScan.busy ? "Reading book…" : "📚 Scan book"}
             </button>
           )}
           <button

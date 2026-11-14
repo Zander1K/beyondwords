@@ -29,6 +29,7 @@ dev = [
     "pytest-asyncio>=0.24",
     # Renders test page photos for eval/smoke_brain.py (dev only; the API does not use it).
     "pillow>=10.4",
+    "aiosqlite>=0.22.1",
 ]
 
 [tool.ruff]

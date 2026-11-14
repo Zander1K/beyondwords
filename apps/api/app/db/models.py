@@ -33,8 +33,11 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-# JSONB on PostgreSQL (binary, indexable); plain JSON elsewhere (the SQLite structure test).
+# JSONB on PostgreSQL (binary, indexable); plain JSON elsewhere (the SQLite tests).
 JSONType = JSON().with_variant(JSONB(), "postgresql")
+# BIGINT on PostgreSQL. SQLite only auto-numbers a column typed exactly INTEGER, so tests that run
+# on an in-memory SQLite database need this variant. PostgreSQL and the migrations are unchanged.
+BigIntPK = BigInteger().with_variant(Integer(), "sqlite")
 
 
 class Base(DeclarativeBase):
@@ -93,7 +96,7 @@ class User(Base):
     __tablename__ = "users"
     __table_args__ = (UniqueConstraint("username", name="uq_users_username"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     # Not in the SOP table. Stored lowercased (app.schemas.users.normalize_username), so the
     # unique constraint makes "Mick" and "mick" the same reader. Every other table links to `id`.
     username: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -117,7 +120,7 @@ class Book(Base):
     # Unique so /books/identify can find a cached record by ISBN. NULL may repeat.
     __table_args__ = (UniqueConstraint("isbn", name="uq_books_isbn"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     isbn: Mapped[str | None] = mapped_column(String(17))
     title: Mapped[str] = mapped_column(String(512), nullable=False)
     author: Mapped[str | None] = mapped_column(String(512))
@@ -138,7 +141,7 @@ class UserBook(Base):
     __tablename__ = "user_books"
     __table_args__ = (UniqueConstraint("user_id", "book_id", name="uq_user_books_user_book"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -162,7 +165,7 @@ class Page(Base):
         UniqueConstraint("user_id", "book_id", "image_hash", name="uq_pages_user_book_image"),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -185,7 +188,7 @@ class Line(Base):
     __tablename__ = "lines"
     __table_args__ = (UniqueConstraint("page_id", "line_id", name="uq_lines_page_line"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     page_id: Mapped[int] = mapped_column(
         ForeignKey("pages.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -206,7 +209,7 @@ class WordBankEntry(Base):
     # One row per reader per word, so a repeat rescue increments times_rescued.
     __table_args__ = (UniqueConstraint("user_id", "word", name="uq_word_bank_user_word"),)
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -236,7 +239,7 @@ class ReadingEvent(Base):
 
     __tablename__ = "reading_events"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     user_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )

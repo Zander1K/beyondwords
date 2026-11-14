@@ -118,7 +118,7 @@ async def test_onboarding_saves_answers_marks_onboarded_and_logs_the_start() -> 
     saved = await complete_onboarding(session, 7, OnboardingRequest(**ANSWERS))  # type: ignore[arg-type]
     assert saved is user
     assert (user.support_level, user.glasses_type, user.display_name) == ("solo", "gen2", "Ada")
-    assert user.settings["spacing"]["line_height"] == 1.9
+    assert user.settings["spacing"]["lineHeight"] == 1.9  # saved like the other readers
     assert user.settings["onboarding"]["completed_at"]
     profile = to_profile(user)  # type: ignore[arg-type]
     assert profile.onboarded is True and profile.spacing is not None

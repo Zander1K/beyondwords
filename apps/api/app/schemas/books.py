@@ -1,5 +1,8 @@
 """Request/response models for the book library (SOP section 5: /books/identify, /books/{id})."""
 
+from datetime import datetime
+from typing import Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -36,3 +39,32 @@ class IdentifyBookResponse(BookResponse):
     cached: bool = Field(
         description="True if the book was already in our library (no external lookup made)."
     )
+
+
+class AddBookRequest(IdentifyBookRequest):
+    """A book added to a reader's library by typing or scanning its ISBN."""
+
+
+class UserBookResponse(BookResponse):
+    """A book in a reader's library."""
+
+    last_read_at: datetime | None = Field(
+        description="When they last opened it (newest = current)."
+    )
+    finished: bool
+
+
+class CoverReadOut(BaseModel):
+    """What the model read off the photo (the ISBN only if its check digit added up)."""
+
+    isbn: str | None
+    title: str | None
+    author: str | None
+
+
+class ScanBookResponse(UserBookResponse):
+    cached: bool = Field(description="True if the book was already in our library.")
+    found_by: Literal["isbn", "title"] = Field(
+        description="'title' when no ISBN could be read, so the printed title was searched."
+    )
+    read: CoverReadOut

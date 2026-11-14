@@ -15,12 +15,13 @@ from typing import Any
 
 import httpx
 
-from app.books.isbn import isbn13_to_isbn10
+from app.books.isbn import InvalidISBNError, isbn13_to_isbn10, normalise_isbn
 
 logger = logging.getLogger(__name__)
 
 GOOGLE_BOOKS_URL = "https://www.googleapis.com/books/v1/volumes"
 OPEN_LIBRARY_BOOKS_URL = "https://openlibrary.org/api/books"
+OPEN_LIBRARY_SEARCH_URL = "https://openlibrary.org/search.json"
 _RETRY_DELAY_SECONDS = 0.35
 
 
@@ -43,6 +44,16 @@ def _year(value: Any) -> int | None:
     # "2003", "2003-01-30" (Google) or "January 30, 2003" (Open Library).
     match = re.search(r"\b(1[4-9]\d\d|20\d\d)\b", str(value)) if value is not None else None
     return int(match.group(1)) if match else None
+
+
+def _first_isbn13(candidates: list[str]) -> str | None:
+    """The first valid ISBN in a list (10- or 13-digit), as an ISBN-13."""
+    for raw in candidates:
+        try:
+            return normalise_isbn(str(raw))
+        except InvalidISBNError:
+            continue
+    return None
 
 
 def _clip(value: str | None, limit: int) -> str | None:
@@ -81,6 +92,85 @@ class BookMetadataClient:
                 return found
         if len(errors) == 2:
             raise ProviderError("; ".join(errors))
+        return None
+
+    async def search(self, title: str, author: str | None = None) -> BookMetadata | None:
+        """Find a book by what is printed on its cover when its ISBN could not be read.
+
+        Google Books, then Open Library; the first match that carries an ISBN-13 (so the book can
+        then be stored and recognised like any scanned one). None if neither finds one. Raises
+        ProviderError only if both sources failed.
+        """
+        errors: list[str] = []
+        for name, source in (
+            ("google_books", self._google_search),
+            ("open_library", self._open_library_search),
+        ):
+            try:
+                found = await source(title, author)
+            except ProviderError as exc:
+                logger.warning("Book search via %s failed: %s", name, exc)
+                errors.append(f"{name}: {exc}")
+                continue
+            if found is not None:
+                return found
+        if len(errors) == 2:
+            raise ProviderError("; ".join(errors))
+        return None
+
+    async def _google_search(self, title: str, author: str | None) -> BookMetadata | None:
+        query = f'intitle:"{title}"' + (f'+inauthor:"{author}"' if author else "")
+        params = {"q": query, "printType": "books", "maxResults": "5"}
+        if self._google_key:
+            params["key"] = self._google_key
+        data = await self._get_json(GOOGLE_BOOKS_URL, params)
+        for item in data.get("items") or []:
+            info = item.get("volumeInfo") or {}
+            isbn = next(
+                (
+                    i.get("identifier")
+                    for i in info.get("industryIdentifiers") or []
+                    if i.get("type") == "ISBN_13" and i.get("identifier")
+                ),
+                None,
+            )
+            name = " ".join(t for t in (info.get("title"), info.get("subtitle")) if t)
+            if not isbn or not name:
+                continue
+            return BookMetadata(
+                isbn=isbn,
+                title=_clip(name, 512) or name,
+                author=_clip(", ".join(info.get("authors") or []), 512),
+                publication_year=_year(info.get("publishedDate")),
+                language=_clip(info.get("language"), 16),
+                genre=_clip((info.get("categories") or [None])[0], 128),
+                source="google_books",
+            )
+        return None
+
+    async def _open_library_search(self, title: str, author: str | None) -> BookMetadata | None:
+        params = {
+            "title": title,
+            "limit": "5",
+            "fields": "title,author_name,first_publish_year,isbn,language,subject",
+        }
+        if author:
+            params["author"] = author
+        data = await self._get_json(OPEN_LIBRARY_SEARCH_URL, params)
+        for doc in data.get("docs") or []:
+            isbn = _first_isbn13(doc.get("isbn") or [])
+            if not isbn or not doc.get("title"):
+                continue
+            return BookMetadata(
+                isbn=isbn,
+                title=_clip(doc["title"], 512) or doc["title"],
+                author=_clip(", ".join(doc.get("author_name") or []), 512),
+                # The WORK's first year, which is the era a reader's context needs.
+                publication_year=_year(doc.get("first_publish_year")),
+                language=_clip((doc.get("language") or [None])[0], 16),
+                genre=_clip((doc.get("subject") or [None])[0], 128),
+                source="open_library",
+            )
         return None
 
     async def _get_json(self, url: str, params: dict[str, str]) -> dict[str, Any]:

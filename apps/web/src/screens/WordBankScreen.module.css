@@ -1,0 +1,56 @@
+.bank {
+  display: grid;
+  gap: var(--space-3);
+  max-width: 44rem;
+}
+
+.count {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.word {
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.head strong {
+  font-size: 1.15em;
+}
+
+.times {
+  color: var(--color-accent);
+  font-size: 0.85em;
+}
+
+.when {
+  margin-left: auto;
+  color: var(--color-muted);
+  font-size: 0.85em;
+}
+
+.from,
+.sentence {
+  margin: var(--space-1) 0 0;
+  color: var(--color-muted);
+}
+
+.sentence {
+  font-style: italic;
+}

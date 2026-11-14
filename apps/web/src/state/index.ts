@@ -6,3 +6,4 @@ export {
   type SpacingSettings,
 } from "./settings";
 export { type ReaderStore, type ScanState, useReaderStore } from "./reader";
+export { useBooks } from "./book";

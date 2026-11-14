@@ -7,6 +7,8 @@
 import { API_BASE_URL } from "@/config";
 import type { Page } from "@/reader";
 
+import { withBook } from "./context";
+
 import { type AnalyzeLine, mockAnalyzePage } from "./mock";
 
 /** Mirrors apps/api/app/schemas/health.py:HealthResponse. */
@@ -48,7 +50,7 @@ export class ApiError extends Error {
   }
 }
 
-async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
+export async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     headers: { Accept: "application/json" },
     signal,
@@ -64,7 +66,7 @@ async function getJson<T>(path: string, signal?: AbortSignal): Promise<T> {
   return (await response.json()) as T;
 }
 
-async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
+export async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
@@ -83,7 +85,7 @@ async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): P
 
 /** A question about the page (real call: POST /ask, answered by the brain). */
 export function askQuestion(body: AskRequest, signal?: AbortSignal): Promise<AskResponse> {
-  return postJson<AskResponse>("/ask", body, signal);
+  return postJson<AskResponse>("/ask", withBook(body), signal);
 }
 
 /** Mirrors apps/api/app/schemas/words.py:DefineWordResponse. */
@@ -102,7 +104,7 @@ export function defineWordRemote(
   body: { word: string; sentence: string; book_id?: number | null },
   signal?: AbortSignal,
 ): Promise<DefineWordResponse> {
-  return postJson<DefineWordResponse>("/words/define", body, signal);
+  return postJson<DefineWordResponse>("/words/define", withBook(body), signal);
 }
 
 /** Mirrors apps/api/app/schemas/users.py:Spacing. */
@@ -176,7 +178,7 @@ export function illustrate(
   body: { text: string; book_id?: number | null },
   signal?: AbortSignal,
 ): Promise<IllustrateResponse> {
-  return postJson<IllustrateResponse>("/illustrate", body, signal);
+  return postJson<IllustrateResponse>("/illustrate", withBook(body), signal);
 }
 
 export function getHealth(signal?: AbortSignal): Promise<HealthResponse> {

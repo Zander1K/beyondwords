@@ -4,7 +4,14 @@
 import { create } from "zustand";
 
 import type { GlassesGesture, SessionState, WordCard } from "@/glasses";
-import { fetchIllustration, fetchWordCard, isLoading, willIllustrate, wordCardNow } from "@/api";
+import {
+  fetchIllustration,
+  fetchWordCard,
+  isLoading,
+  recordWord,
+  willIllustrate,
+  wordCardNow,
+} from "@/api";
 import {
   type Box,
   currentPhrase,
@@ -40,6 +47,27 @@ function cardFor(page: Page, position: ReaderPosition): WordCard | undefined {
   return pointed
     ? wordCardNow(pointed.text, page.lines[position.line]?.text ?? "")
     : currentPhrase(page, position)?.hardWord?.card;
+}
+
+/**
+ * A word card has just opened on the word under the finger or mouse: add it to the reader's word
+ * bank (with the book and the line it was in). Nothing for a stray mark or an OCR misread.
+ */
+function noteLookup(page: Page, position: ReaderPosition): void {
+  if (position.word === undefined) return;
+  const line = page.lines[position.line];
+  const word = line?.words?.[position.word];
+  if (!line || !word) return;
+  if (wordCardNow(word.text, line.text).problem === "not-found") return;
+  recordWord(word.text, line.text, "define");
+}
+
+/** A different word card is showing now than before: that is a lookup. */
+function lookupIfOpened(before: ReaderState): void {
+  const { reader, page } = useReaderStore.getState();
+  if (reader.view === "card" && reader.card && reader.card !== before.card) {
+    noteLookup(page, reader.position);
+  }
 }
 
 /**
@@ -122,11 +150,13 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   handLost: false,
   applyGesture: (gesture) => {
     const page = get().page;
+    const before = get().reader;
     let step = readerStep(page, get().reader, gesture);
     if (step.outcome === "card-opened") {
       step = { ...step, state: { ...step.state, card: cardFor(page, step.state.position) } };
     }
     if (step.state !== get().reader) set({ reader: step.state });
+    if (step.outcome === "card-opened") lookupIfOpened(before);
     refreshCard();
     return step;
   },
@@ -156,6 +186,7 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
   setAsleep: (asleep) => set({ asleep }),
   setScan: (scan) => set({ scan }),
   setPosition: (position) => {
+    const before = get().reader;
     set((s) => {
       const { page, reader } = s;
       const cur = reader.position;
@@ -183,6 +214,8 @@ export const useReaderStore = create<ReaderStore>((set, get) => ({
       // ([ASSUMPTION]: the finger moved on).
       return { reader: { ...reader, position, view: "phrase", cardFocus: 0, card: undefined } };
     });
+    // The card followed the finger (or mouse) to another word: that is a lookup of that word.
+    if (before.view === "card") lookupIfOpened(before);
     refreshCard();
   },
   setHandLost: (handLost) => set((s) => (s.handLost === handLost ? {} : { handLost })),

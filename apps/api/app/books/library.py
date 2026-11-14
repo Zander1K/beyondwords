@@ -23,10 +23,14 @@ class BookStore(Protocol):
     async def get(self, book_id: int) -> Book | None: ...
     async def get_by_isbn(self, isbn: str) -> Book | None: ...
     async def add(self, book: Book) -> Book: ...
+    async def set_context(
+        self, book_id: int, setting_era: str | None, description: str | None
+    ) -> Book | None: ...
 
 
 class MetadataSource(Protocol):
     async def lookup(self, isbn13: str) -> BookMetadata | None: ...
+    async def search(self, title: str, author: str | None = None) -> BookMetadata | None: ...
 
 
 class LibraryErrorReason(StrEnum):
@@ -46,6 +50,9 @@ class LibraryError(Exception):
 class IdentifiedBook:
     book: Book
     cached: bool  # True when it was already in our library (no external call made)
+    # How the book was found: "isbn" (typed, scanned or read off the photo) or "title" (the ISBN
+    # could not be read, so the title and author printed on it were searched).
+    found_by: str = "isbn"
 
 
 class Library:
@@ -96,6 +103,38 @@ class Library:
             logger.warning("Library insert failed: database error", exc_info=True)
             raise LibraryError(LibraryErrorReason.UNAVAILABLE, "database unavailable") from exc
         return IdentifiedBook(saved, cached=False)
+
+    async def identify_from_cover(
+        self, isbn: str | None, title: str | None, author: str | None
+    ) -> IdentifiedBook:
+        """The book in a cover photo: by its ISBN if one was read, else by the title (and author)
+        printed on it. Either way it ends in `identify_by_isbn`, so the book is stored and cached
+        like any other, and a title search that finds an edition resolves to that exact ISBN."""
+        if isbn:
+            return await self.identify_by_isbn(isbn)
+        if not title:
+            raise LibraryError(
+                LibraryErrorReason.NOT_FOUND, "no ISBN or title could be read from the photo"
+            )
+        try:
+            found = await self._metadata.search(title, author)
+        except ProviderError as exc:
+            raise LibraryError(
+                LibraryErrorReason.UNAVAILABLE, "book metadata services unavailable"
+            ) from exc
+        if found is None:
+            raise LibraryError(LibraryErrorReason.NOT_FOUND, f"no book found for “{title}”")
+        identified = await self.identify_by_isbn(found.isbn)
+        return IdentifiedBook(identified.book, identified.cached, found_by="title")
+
+    async def add_context(
+        self, book_id: int, setting_era: str | None, description: str | None
+    ) -> Book | None:
+        """Fill in a book's background, only where it has none (never overwrite a reviewed one)."""
+        try:
+            return await self._store.set_context(book_id, setting_era, description)
+        except SQLAlchemyError as exc:
+            raise LibraryError(LibraryErrorReason.UNAVAILABLE, "database unavailable") from exc
 
     async def get(self, book_id: int) -> Book | None:
         try:

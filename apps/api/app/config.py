@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     # generating speech for a long phrase can take a little longer).
     elevenlabs_timeout_seconds: float = 15.0
 
+    # Google Cloud Vision (reads text from camera frames). Optional: without a key /ocr/* answers
+    # 503 and the web app reads text on-device instead. Needs the Cloud Vision API and billing
+    # enabled on the key's project.
+    google_vision_api_key: str = ""
+    # Reading a page photo takes about a second; a little longer on a slow connection.
+    google_vision_timeout_seconds: float = 12.0
+
     # Browser origins allowed to call the API (CORS) and open the /live WebSocket.
     # Comma-separated. Default: the web app's Vite dev server. Same as Alex's ui-dat-development.
     cors_origins: str = "http://localhost:5173"

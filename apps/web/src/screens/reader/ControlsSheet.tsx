@@ -8,6 +8,7 @@ import { GlassesControlsPanel } from "@/glasses";
 import type { Page, ReaderPosition } from "@/reader";
 
 import styles from "./ControlsSheet.module.css";
+import { useOcrState } from "./ocrEngine";
 import { GESTURE_GUIDE } from "./gestureGuide";
 
 type TabId = "reading" | "gestures" | "camera" | "glasses";
@@ -46,6 +47,11 @@ export function ControlsSheet({
   onBoxes,
 }: Props) {
   const [tab, setTab] = useState<TabId>("reading");
+  const ocrChoice = useOcrState((o) => o.choice);
+  const setOcrChoice = useOcrState((o) => o.setChoice);
+  const cloudAvailable = useOcrState((o) => o.cloudAvailable);
+  const ocrUsing = useOcrState((o) => o.using);
+  const ocrProblem = useOcrState((o) => o.problem);
 
   return (
     <aside
@@ -162,8 +168,43 @@ export function ControlsSheet({
               />
               Show text boxes (debug)
             </label>
+            <fieldset className={styles.readerChoice}>
+              <legend>Text reader</legend>
+              <label className={styles.toggle}>
+                <input
+                  type="radio"
+                  name="ocr"
+                  checked={ocrChoice === "cloud"}
+                  onChange={() => setOcrChoice("cloud")}
+                  disabled={cloudAvailable === false}
+                />
+                Google Cloud Vision (more accurate)
+              </label>
+              <label className={styles.toggle}>
+                <input
+                  type="radio"
+                  name="ocr"
+                  checked={ocrChoice === "local"}
+                  onChange={() => setOcrChoice("local")}
+                />
+                On this device (private, works offline)
+              </label>
+            </fieldset>
+            <p className={styles.note} role="status">
+              {cloudAvailable === false
+                ? "Google Cloud Vision isn't set up on the server, so text is read on this device."
+                : ocrProblem
+                  ? `${ocrProblem} Reading on this device for now.`
+                  : ocrUsing === "cloud"
+                    ? "Reading with Google Cloud Vision."
+                    : ocrUsing === "local"
+                      ? "Reading on this device."
+                      : "Starts when the camera is on."}
+            </p>
             <p className={styles.note}>
-              Camera frames stay in this browser tab: nothing is saved or uploaded.
+              {ocrChoice === "cloud" && cloudAvailable !== false
+                ? "With Google Cloud Vision, camera frames are sent to Google to be read (through our server). They are not saved by us."
+                : "Camera frames stay in this browser tab: nothing is saved or uploaded."}
             </p>
           </>
         )}
