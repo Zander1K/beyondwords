@@ -48,4 +48,7 @@ async def define_word(
         timeout_s=settings.ask_timeout_s,
     )
     lang = (book.language or "en-GB").replace("-", "_") if book else "en_GB"
-    return WordBreakdown(**definition.model_dump(), syllables=syllabify(word, lang))
+    # Keep the word the reader pointed at, even if the model returned its dictionary form.
+    clean = word.strip(" .,;:!?\"'()[]“”‘’") or word
+    fields = {**definition.model_dump(), "word": clean}
+    return WordBreakdown(**fields, syllables=syllabify(clean, lang))

@@ -25,6 +25,7 @@ from collections import OrderedDict
 
 from pydantic import BaseModel, Field
 
+from app.brain.geometry import visual_order
 from app.brain.llm import LLMClient, Message, get_llm, image_part, text_part
 from app.brain.prompts import load_prompt
 from app.brain.settings import get_brain_settings
@@ -36,6 +37,7 @@ from app.brain.text_utils import (
     split_phrases,
     syllabify,
     syllables_match_word,
+    word_differences,
     word_in_text,
 )
 from app.schemas.brain import BookContext, ReaderProfile
@@ -51,8 +53,9 @@ from app.schemas.page import (
 logger = logging.getLogger(__name__)
 
 PROMPT_VERSION = "page_analyzer.v2"
-# Below this similarity, phone OCR and Nemotron are reading different words on a line.
-DISAGREEMENT_THRESHOLD = 0.9
+# A line is flagged when OCR and Nemotron read any word differently (text_utils.word_differences).
+# A whole-line similarity threshold missed single-word errors: "busted" for "rusted" in a
+# 47-character line is still 98% similar.
 
 
 class _DraftLine(BaseModel):
@@ -98,7 +101,8 @@ def image_hash(image: bytes) -> str:
 
 
 def _visual_order(ocr_lines: list[OcrLine]) -> list[str]:
-    return [line.id for line in sorted(ocr_lines, key=lambda line: (line.bbox[1], line.bbox[0]))]
+    # Tilt- and column-aware (geometry.visual_order), not raw image y.
+    return visual_order(ocr_lines)
 
 
 def fallback_page(page_id: str, ocr_lines: list[OcrLine]) -> PageAnalysis:
@@ -167,8 +171,8 @@ def repair(
             ocr = by_id.get(draft_line.id)
             if not ocr or not draft_line.text.strip():
                 continue
-            score = similarity(ocr.text, draft_line.text)
-            if score < DISAGREEMENT_THRESHOLD:
+            if word_differences(ocr.text, draft_line.text):
+                score = similarity(ocr.text, draft_line.text)
                 disagreements.append(
                     OcrDisagreement(
                         line=ocr.id,

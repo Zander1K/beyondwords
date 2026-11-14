@@ -14,6 +14,8 @@ Metrics (SOP 11):
                            the hyphenation dictionary
 - grounded answer rate     questions answered with a valid citation to a correct line
 - ungrounded claims        sentences the grounding check had to remove
+- misheard words fixed     speech-to-text style questions ("port cullis") whose answer names
+                           the page's word ("must_mention")
 - everyday extraction      deadline, amount and action all correct
 - latency                  median and max seconds per page analysis
 
@@ -96,7 +98,7 @@ async def eval_book(spec: dict, image: bytes | None, llm) -> dict:
         lines=[Line(id=ln.id, text=ln.text, bbox=ln.bbox) for ln in ocr],
     )
     store = InMemoryStore(books={1: book} if book else {}, pages={(1, 1): [page]})
-    grounded, removed = [], 0
+    grounded, removed, misheard = [], 0, []
     for q in spec.get("questions", []):
         result = await agent.ask(
             question=q["question"], user_id=1, book_id=1, store=store, current_page=page, llm=llm
@@ -104,6 +106,8 @@ async def eval_book(spec: dict, image: bytes | None, llm) -> dict:
         cited = {f"{c.page_id}:{c.line_id}" for c in result.citations}
         grounded.append(result.grounded and bool(cited & set(q["answer_lines"])))
         removed += len(result.removed_sentences)
+        if q.get("must_mention"):
+            misheard.append(letters(q["must_mention"]) in letters(result.answer))
 
     return {
         "reading_order": _lcs([i for i in analysis.reading_order], truth_order) / len(truth_order),
@@ -111,6 +115,7 @@ async def eval_book(spec: dict, image: bytes | None, llm) -> dict:
         "syllable_accuracy": sum(syllable_ok) / len(syllable_ok) if syllable_ok else None,
         "grounded_answers": grounded,
         "ungrounded_claims": removed,
+        "misheard_fixed": misheard,
         "seconds": seconds,
         "ocr_disagreements": len(analysis.ocr_disagreements),
     }
@@ -167,6 +172,7 @@ async def main() -> int:
         return [r[key] for r in per_page.values() if r.get(key) is not None]
 
     answers = [g for gs in collect("grounded_answers") for g in gs]
+    misheard = [m for ms in collect("misheard_fixed") for m in ms]
     seconds = collect("seconds")
     summary = {
         "reading_order_accuracy": _mean(collect("reading_order")),
@@ -174,6 +180,7 @@ async def main() -> int:
         "syllable_accuracy": _mean(collect("syllable_accuracy")),
         "grounded_answer_rate": _mean([float(a) for a in answers]),
         "ungrounded_claims": sum(collect("ungrounded_claims")),
+        "misheard_words_fixed": _mean([float(m) for m in misheard]),
         "everyday_extraction_accuracy": _mean([float(x) for x in collect("everyday_correct")]),
         "median_seconds": round(statistics.median(seconds), 2) if seconds else None,
         "max_seconds": round(max(seconds), 2) if seconds else None,

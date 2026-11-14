@@ -4,6 +4,7 @@ These are what routers pass into, and get back from, `app.brain`:
 - BookContext / ReaderProfile / CapturedPage: context the API loads from MariaDB.
 - AskResult: POST /ask (reading-coach agent).
 - ActionCard: POST /document (Everyday mode).
+- PointedWord: the word the phone says the reader is pointing at (POST /ask).
 - TraceEvent: one agent step, for WS /trace.
 """
 
@@ -104,3 +105,12 @@ class TraceEvent(BaseModel):
     name: str
     detail: dict[str, Any] = Field(default_factory=dict)
     ms: int | None = None
+
+
+class PointedWord(BaseModel):
+    """The word the reader is pointing at, as the phone worked it out (finger tracking and word
+    picking run on the phone). Passed to agent.ask so "what does this mean?" is about it."""
+
+    word: str
+    line_id: str
+    sentence: str | None = None

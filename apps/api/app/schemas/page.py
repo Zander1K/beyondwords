@@ -9,11 +9,20 @@ Decisions recorded here (see docs/BRAIN.md):
 - bbox is [x, y, width, height] normalised to 0-1 of the page photo (top-left origin), so
   it is independent of camera resolution. Resolves OPEN QUESTION 3 (proposal, confirm with Alex).
 - Line ids are per page ("L1", "L2", ..., "caption_1").
+- `quad` (optional) is the four corners of a line as the camera saw it, so tilted and receding
+  text is described exactly: [top-left, top-right, bottom-right, bottom-left] in the TEXT's own
+  orientation, each [x, y] normalised 0-1, top-left origin (Apple Vision uses a bottom-left
+  origin: flip y). The fallback reading order uses it on tilted pages; bbox alone is the
+  upright box around the line and overlaps its neighbours when lines slant.
 """
+
+from typing import Annotated
 
 from pydantic import BaseModel, Field
 
 BBox = list[float]  # [x, y, w, h], each 0-1
+Point = Annotated[list[float], Field(min_length=2, max_length=2)]  # [x, y], each 0-1
+Quad = Annotated[list[Point], Field(min_length=4, max_length=4)]  # TL, TR, BR, BL
 
 
 class OcrLine(BaseModel):
@@ -23,6 +32,8 @@ class OcrLine(BaseModel):
     text: str
     bbox: BBox = Field(min_length=4, max_length=4)
     confidence: float | None = Field(default=None, ge=0, le=1)
+    # Optional: line corners, for the tilt-aware fallback reading order (see module doc).
+    quad: Quad | None = None
 
 
 class Line(BaseModel):

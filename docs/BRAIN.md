@@ -6,9 +6,14 @@ except where the decisions below differ.
 ## Scope
 
 Nemotron does page analysis, word meanings, Everyday-mode document reading, and answers every
-**question about the book** (grounded, cited, spoiler-free). **Gemini handles the conversation
-itself**: voice, turn-taking, encouragement, "not now", Talk About It and small talk. Any book
-question in a conversation goes to `ask_brain()` / `POST /ask`; Gemini speaks the answer.
+**question about the book** (grounded, cited, spoiler-free). Finger tracking and working out
+which word the reader is pointing at are the phone's job (CLAUDE.md section 7, SOP 6); the phone
+sends the brain the word.
+
+Questions can come **straight from the phone's speech-to-text** to `POST /ask` as text, with no
+Gemini involved: misheard page words are fixed in code first (see "Questions from
+speech-to-text"), and `answer` is plain text for the phone's TTS. If the team also uses Gemini
+for conversation (Talk About It, small talk), it calls the same agent through `ask_brain()`.
 
 The brain is plain async Python with no FastAPI or DB imports. Routers (Mick Ola) call these
 functions and map the results to HTTP. Nothing here touches `app/db`, `app/gemini` or `routers/`.
@@ -19,7 +24,7 @@ functions and map the results to HTTP. Nothing here touches `app/db`, `app/gemin
 |---|---|---|---|
 | `POST /page` | `page_analyzer.analyze_page(page_id=, ocr_lines=, image=, book=, profile=)` | `PageAnalysis` (`schemas/page.py`) | return `page_analyzer.fallback_page(page_id, ocr_lines)`; phone says "Explanations are paused. Reading continues." |
 | `POST /words/define` (proposed, not in the SOP) | `tools.define.define_word(word, sentence, book)` | `WordBreakdown` (word, syllables, say_as, meaning, illustratable) | use `text_utils.syllabify(word)` only |
-| `POST /ask` | `agent.ask(question=, user_id=, book_id=, store=, current_page=, extra_pages=, illustrator=, history=, on_event=)` | `AskResult` (`schemas/brain.py`) | never raises; returns a safe spoken line |
+| `POST /ask` | `agent.ask(question=, user_id=, book_id=, store=, current_page=, extra_pages=, illustrator=, history=, pointed=, on_event=)` | `AskResult` (`schemas/brain.py`) | never raises; returns a safe spoken line |
 | Gemini Live `ask_brain()` | `agent.ask_brain(question, **session)` | text to speak | same |
 | `POST /document` | `document_reasoner.read_document(ocr_lines=, image=)` | `ActionCard` | say "Everyday mode is paused" |
 | Everyday follow-up via `/ask` | `agent.ask(..., current_page=document_reasoner.document_page(ocr_lines))` | `AskResult` citing `doc:L3` | same as `/ask` |
@@ -31,11 +36,24 @@ functions and map the results to HTTP. Nothing here touches `app/db`, `app/gemin
 
 1. `POST /page` returns `hard_words`, each with syllables, `say_as`, an in-context meaning and
    `illustratable`. The phone caches them.
-2. Reader points at a word and pinches (gesture is Alex's call). The phone finds the word from
-   its own word-level OCR boxes (the page JSON only has line boxes).
+2. Reader points at a word and pinches (gesture is Alex's call). The phone works out the word
+   from the fingertip and its OCR boxes (instant, works offline).
 3. Word is in `hard_words`: show it from the cache, no model call (SOP 9 "instant from cache").
    Otherwise: `POST /words/define` with the word and its sentence -> `define_word()`.
 4. The router adds the word to `word_bank` and logs a `word_rescued` event.
+
+If OCR misread the word, the page JSON's `ocr_disagreements` holds Nemotron's reading of that
+line (`model_text`); the phone can take the word's spelling from there before step 3.
+
+## Questions from speech-to-text
+
+`agent.ask()` takes the phone's transcript as `question`. Speech recognition mishears exactly
+the unusual words readers ask about, so before the model sees the question,
+`text_utils.correct_to_page_words` replaces near-matches of page words ("port cullis" ->
+portcullis, "century" -> sentry, "sir coat" -> surcoat); only words printed on the injected
+pages are used. Pass `pointed=` (`PointedWord`: the word, line id and sentence the phone picked) so
+"what does this mean?" is about the word under the finger. Keep the last few turns and pass them as `history` for follow-ups. The
+`heard_as` fix shows on the trace screen.
 
 ## What the brain needs from Mick Ola
 
@@ -57,8 +75,9 @@ Gemini skips the tool call (it fires in only ~60-70% of sessions).
 ## What the brain expects from Alex (phone)
 
 `POST /page` and `POST /document` send the photo plus OCR lines as `OcrLine`:
-`{"id": "L1", "text": "...", "bbox": [x, y, w, h], "confidence": 0.97}` with **bbox normalised
-0-1** of the photo, top-left origin. Line ids are the phone's; the page JSON echoes them, so
+`{"id": "L1", "text": "...", "bbox": [x, y, w, h], "confidence": 0.97, "quad": [...]}` with
+**bbox normalised 0-1** of the photo, top-left origin. `quad` (optional) is the line's four
+corners; the fallback reading order uses it on tilted pages. Line ids are the phone's; the page JSON echoes them, so
 the highlight can map chunks back to boxes. Every chunk belongs to one line and a line's chunks
 rejoin exactly to its text. For Everyday follow-ups the phone keeps the document's OCR lines
 and sends them back with the question.
@@ -76,7 +95,14 @@ and sends them back with the question.
 | Captured line text is stored per reader until the book is finished or on request (OPEN QUESTION 2) | SOP 5 "Book data rule" and SOP 10 data inventory say so |
 | `LLM_PROVIDER` is `nemotron` (Verda, NVIDIA Build fallback if `NVIDIA_BUILD_API_KEY` is set) or `nvidia_build` (OPEN QUESTION 7) | Gemini is the voice, not a reasoning provider (SOP 8.4) |
 | Line text in the page JSON comes from phone OCR; Nemotron's different readings go in `ocr_disagreements` | the phone highlights OCR boxes; SOP 9 asks to re-capture on disagreement |
-| Citations look like `[p12:L2]` or `[book]`; uncited sentences are removed; one re-ask if nothing survives | SOP 8.2 |
+| Citations look like `[p12:L2]` or `[book]`; uncited sentences are removed; one re-ask if nothing survives **or a sentence was removed**, keeping the better-grounded answer; if the re-ask fails, the grounded part of the first answer is kept | SOP 8.2; models sometimes give a correct word meaning without its citation, and the re-ask recovers it (~1 s extra, only then) |
+| `OcrLine.quad` (optional line corners) added to the contract | tilt-aware fallback reading order; upright boxes overlap neighbouring lines when the page slants |
+| No backend pointing endpoint: the phone picks the word and sends it | agreed design (CLAUDE.md 7, SOP 6): instant, offline, no round trip. A server-side pointing check with a Nemotron crop was built and dropped on 2026-11-14 |
+| Misheard page words are corrected in code before the model sees the question (prompt `reading_coach.v2`) | prompting the model about mishearings made it comment on them ("the word is sentry, not century") and hurt unrelated answers; fixing the text first gave 9/9 on misheard and normal questions |
+| Fallback reading order is tilt-aware and reads columns one at a time (`geometry.visual_order`) | the old y-sort interleaved two columns |
+| `define_word` returns the word as printed, not the model's dictionary form | the phone matches it to what the reader pointed at |
+| OCR disagreements are word-level (`text_utils.word_differences`), not a whole-line similarity threshold | the old 0.9 line threshold could never flag a one-word misread ("busted" for "rusted" is 98% similar); found by the live smoke test |
+| `eval/smoke_brain.py`: end-to-end run of every job on a rendered, tilted photo with a finger, against the live model (Pillow is a dev-only dependency for it) | run it before a demo; 17 checks |
 | Thinking pass off by default for all three jobs (`BRAIN_*_REASONING`) | SOP 9 latency targets; turn on per job if `make eval` shows it pays |
 | Timeouts: ask 8 s, document 15 s, page 30 s (background) | SOP 9 says 8 s per call; page analysis is not on the critical path |
 | Brain tuning lives in `brain/settings.py` (`BRAIN_` env prefix), not `app/config.py` | keeps brain changes inside `brain/` |
@@ -91,4 +117,7 @@ and sends them back with the question.
   opencode config, `"tools": true`).
 - Eval has no meaning-quality metric yet; consider a "meaning correct in context" check per
   hard word, since word meanings are core to the NVIDIA submission.
+- Hard-word recall (0.75-0.94) and syllable accuracy (0.5-0.86) swing between runs on the 4
+  samples (page_analyzer prompt unchanged): too few pages to tell; recheck on the 20-page set,
+  and try `BRAIN_PAGE_REASONING=true` there.
 - First real `make eval --label baseline` once the 20-page set exists.

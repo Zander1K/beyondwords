@@ -29,14 +29,21 @@ Book page:
   "ocr_lines": [{"id": "L1", "text": "...", "bbox": [0.1, 0.1, 0.8, 0.04]}],
   "reading_order": ["L1", "L2"],
   "hard_words": ["portcullis"],
-  "questions": [{"question": "What is a portcullis?", "answer_lines": ["p12:L3"]}]
+  "questions": [
+    {"question": "What is a portcullis?", "answer_lines": ["p12:L3"]},
+    {"question": "what does port cullis mean", "answer_lines": ["p12:L3"], "must_mention": "portcullis"}
+  ]
 }
 ```
 
 `ocr_lines` is what the phone's OCR returns for the photo (bbox normalised 0-1, see
 `apps/api/app/schemas/page.py`). Until Alex's OCR is wired, type the lines in from the photo.
 `hard_words` are the words a dyslexic reader would flag; `questions` have 3 per page with the
-lines a correct answer must cite.
+lines a correct answer must cite. Add one or two questions typed the way speech-to-text would
+mishear them, with `must_mention` set to the page word the answer has to use.
+
+If the phone OCR gives line corner points, include them as `quad` on each line (see
+`apps/api/app/schemas/page.py`).
 
 Everyday document:
 

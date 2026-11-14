@@ -89,7 +89,7 @@ async def test_future_pages_are_never_fetched() -> None:
     result = await ask(
         question="What is inside?", user_id=1, book_id=7, store=_store(), current_page=P12, llm=llm
     )
-    tool_result = llm.calls[1]["messages"][-1].content
+    tool_result = next(m.content for m in llm.calls[1]["messages"] if m.role == "tool")
     assert "dragon" not in tool_result
     assert "dragon" not in result.answer
     assert result.answer == "The pages you've read so far don't say."
@@ -147,3 +147,50 @@ async def test_captured_pages_never_beyond_current_page_label() -> None:
 
     only = await get_captured_pages(ctx, page_numbers=["XII", 11])
     assert [p["page_id"] for p in only["pages"]] == ["p0", "p11"]
+
+
+async def test_dropped_sentence_triggers_one_rewrite() -> None:
+    llm = FakeLLM(
+        "A portcullis is a heavy castle gate. It groaned upward [p12:L2].",
+        "A portcullis is a heavy castle gate [p12:L2]. It groaned upward [p12:L2].",
+    )
+    result = await ask(
+        question="What is a portcullis?",
+        user_id=1,
+        book_id=7,
+        store=_store(),
+        current_page=P12,
+        llm=llm,
+    )
+    assert result.grounded and result.removed_sentences == []
+    assert result.answer.startswith("A portcullis is a heavy castle gate.")
+    assert '"A portcullis is a heavy castle gate."' in llm.calls[1]["messages"][-1].content
+
+
+async def test_rewrite_failing_keeps_the_grounded_part() -> None:
+    llm = FakeLLM("A gate. It groaned upward [p12:L2].", LLMError("timeout"))
+    result = await ask(
+        question="?", user_id=1, book_id=7, store=_store(), current_page=P12, llm=llm
+    )
+    assert result.answer == "It groaned upward."
+
+
+async def test_misheard_word_is_fixed_before_the_model_sees_it() -> None:
+    from app.schemas.brain import PointedWord
+
+    llm = FakeLLM("A portcullis is a heavy castle gate [p12:L2].")
+    pointed = PointedWord(
+        word="portcullis", line_id="L2", sentence="The portcullis groaned upward."
+    )
+    await ask(
+        question="what does port cullis mean",
+        user_id=1,
+        book_id=7,
+        store=_store(),
+        current_page=P12,
+        pointed=pointed,
+        llm=llm,
+    )
+    sent = llm.calls[0]["messages"]
+    assert sent[-1].content == "what does portcullis mean"
+    assert '"reader_is_pointing_at"' in sent[1].content and "p12:L2" in sent[1].content

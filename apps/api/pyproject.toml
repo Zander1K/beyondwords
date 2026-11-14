@@ -23,6 +23,8 @@ dev = [
     "ruff>=0.6",
     "pytest>=8",
     "pytest-asyncio>=0.24",
+    # Renders test page photos for eval/smoke_brain.py (dev only; the API does not use it).
+    "pillow>=10.4",
 ]
 
 [tool.ruff]
