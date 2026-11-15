@@ -15,7 +15,7 @@ export const HERO_TITLE: readonly { text: string; accent?: boolean }[] = [
 export const HERO = {
   pill: "Comfortable reading on smart glasses",
   description: `${APP_NAME} reads with you, not for you. Point at a line in a real book and it keeps your place, highlights the phrase you are on, and explains hard words in context, so reading feels comfortable.`,
-  note: "Invite-only demo. You will need a username and the access password.",
+  note: "Open demo. Any username works, no password needed.",
 } as const;
 
 export const IDEA = {
@@ -76,7 +76,7 @@ export const TEAM = {
 export const FINAL = {
   title: "See it read with you.",
   accent: "read with you.",
-  description: `Sign in with your username and the access password to try ${APP_NAME} yourself.`,
+  description: `Pick any username, no password, to try ${APP_NAME} yourself.`,
 } as const;
 
 export const FOOTER = {

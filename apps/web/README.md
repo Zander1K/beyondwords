@@ -23,7 +23,7 @@ The API should be running for the Settings screen's connection check (`make api`
 | Path                         | What                                                                                                                                                                          |
 | ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `src/landing/`               | The public landing page (`/`): black and blue, after ALX Studio's design. Its one call to action, "Test this App", opens the access dialog. Copy is in `content.ts`           |
-| `src/access/`                | Who may use the app: the username and password check, the session, and `RequireAccess`, which guards every app route                                                          |
+| `src/access/`                | Who may use the app: the username sign-in, the session, and `RequireAccess`, which guards every app route                                                                     |
 | `src/screens/`               | Library, Reader, Word Bank, Settings                                                                                                                                          |
 | `src/glasses/`               | The glasses layer. Everything else talks to the glasses only through `GlassesAdapter`                                                                                         |
 | `src/glasses/adapter.ts`     | `GlassesAdapter` interface                                                                                                                                                    |
@@ -122,17 +122,15 @@ Content).
 ## Landing page and access
 
 `/` is a public landing page. Its one call to action, **Test this App**, asks for a **username**
-(2 to 32 characters) and the **access password**, then opens the app (Reader). The app's own
+(3 to 32 characters) and opens the app (Reader). **Any username works and there is no password**:
+a new name starts a new reader, a known one carries on where that reader left off. The app's own
 routes (`/library`, `/reader`, `/words`, `/settings`) send anyone who has not signed in back to
-the landing page, and bring them to where they were headed once they have. The sign-in lasts
-for the browser tab (`sessionStorage`); **Sign out** is in the app header.
+the landing page, and bring them to where they were headed once they have. The sign-in is kept in
+the browser (`localStorage`), so readers stay signed in after closing the tab; **Sign out** is in
+the app header.
 
-**This is a courtesy gate for a demo, not security.** The check runs in the browser, so anyone
-who reads the page's code can find it, and the SHA-256 digest of the password in
-`src/access/access.ts` can be guessed offline. The repository holds only that digest, not the
-password. To change the password: `printf '%s' 'the new password' | shasum -a 256` and paste the
-hex into `ACCESS_PASSWORD_SHA256`. If the app ever needs real protection, the check has to move
-to the API (FastAPI), which must then refuse unauthenticated calls.
+**This is not security.** Anyone can type anyone's username. It only tells readers apart; if the
+app ever needs real protection, sign-in has to move to the API (FastAPI).
 
 The landing page uses the Geist font from Google Fonts (a `<link>` in `index.html`); without a
 connection it falls back to the system font. The app's name comes from `APP_NAME` in `.env`

@@ -1,20 +1,8 @@
-// Access to the app: a username and a shared password, checked in the browser.
-//
-// HONEST NOTE: this is a courtesy gate for a demo, not security. Everything here runs in the
-// visitor's browser, so anyone who opens the developer tools can read the check, and the digest
-// below can be guessed offline. Keeping the digest rather than the password only stops the
-// password sitting in plain text in the repository. If the app ever has to be truly protected,
-// the check must move to the server (FastAPI) and the API must refuse unauthenticated calls.
-import { sha256Hex } from "./sha256";
+// Access to the app: any username gets in, no password. A username is the whole account: a new
+// one starts a new reader, a known one carries on where that reader left off. Nothing here is
+// security (anyone can type anyone's name); it only tells readers apart.
 
-/**
- * SHA-256 of the access password (not the password itself; see the note above). To change the
- * password: `printf '%s' 'the new password' | shasum -a 256`, and paste the hex here.
- */
-export const ACCESS_PASSWORD_SHA256 =
-  "cc71aa7fdf277df21c9ed1e8e74164fa95edde471cb51aebca157737602acaf1";
-
-/** Where a sign-in is kept: this tab only, gone when it closes. */
+/** Where a sign-in is kept: this browser (localStorage), so it survives closing the tab. */
 export const SESSION_KEY = "beyondwords.session";
 
 // Same rules as the API (apps/api/app/schemas/users.py), so a name that signs in here is one the
@@ -51,22 +39,6 @@ export function checkUsername(raw: string): UsernameCheck {
     };
   }
   return { ok: true, value };
-}
-
-/** Equal strings, taking the same time wherever they first differ. */
-function sameDigest(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
-  let diff = 0;
-  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
-  return diff === 0;
-}
-
-/**
- * Whether `input` is the access password. Spaces around it are ignored (phone keyboards add
- * them). `digest` is only for tests, which use a password of their own.
- */
-export function checkPassword(input: string, digest: string = ACCESS_PASSWORD_SHA256): boolean {
-  return sameDigest(sha256Hex(input.trim()), digest);
 }
 
 export interface Session {

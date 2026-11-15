@@ -1,4 +1,4 @@
-// "Test this App" opens this: a username and the access password. A native <dialog>, so focus is
+// "Test this App" opens this: a username. A native <dialog>, so focus is
 // trapped, Escape closes it and the page behind is inert without any code of ours. On success it
 // hands the username back; the page then takes them into the app.
 import { type FormEvent, useEffect, useId, useRef, useState } from "react";
@@ -16,20 +16,16 @@ interface Props {
 
 type Problem = Extract<SignInResult, { ok: false }>;
 
-/** A pause before the answer: it feels deliberate, and slows down guessing a little. */
+/** A short pause before the answer, so the button press feels acknowledged. */
 const CHECK_MS = 450;
 
 export function AccessDialog({ open, onClose, onSuccess }: Props) {
   const dialog = useRef<HTMLDialogElement>(null);
   const usernameInput = useRef<HTMLInputElement>(null);
-  const passwordInput = useRef<HTMLInputElement>(null);
   const signIn = useAccess((s) => s.signIn);
   const ids = useId();
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [show, setShow] = useState(false);
   const [problem, setProblem] = useState<Problem | null>(null);
-  const [attempt, setAttempt] = useState(0);
   const [busy, setBusy] = useState(false);
 
   // Open and close the dialog with `open`; start in the username field.
@@ -47,8 +43,6 @@ export function AccessDialog({ open, onClose, onSuccess }: Props) {
   // Whenever the dialog closes (the X, Escape, the backdrop or a successful sign-in), forget what
   // was typed so the next opening starts clean.
   function handleClose() {
-    setPassword("");
-    setShow(false);
     setProblem(null);
     setBusy(false);
     onClose();
@@ -60,22 +54,17 @@ export function AccessDialog({ open, onClose, onSuccess }: Props) {
     setBusy(true);
     setProblem(null);
     await new Promise((resolve) => setTimeout(resolve, CHECK_MS));
-    const result = signIn(username, password);
+    const result = signIn(username);
     setBusy(false);
     if (result.ok) {
       onSuccess(result.username);
       return;
     }
     setProblem(result);
-    setAttempt((n) => n + 1);
-    // Back to the field that needs fixing, with a wrong password selected for retyping.
-    const field = result.field === "username" ? usernameInput.current : passwordInput.current;
-    field?.focus();
-    if (result.field === "password") field?.select();
+    usernameInput.current?.focus();
   }
 
   const usernameProblem = problem?.field === "username" ? problem.message : null;
-  const passwordProblem = problem?.field === "password" ? problem.message : null;
 
   return (
     <dialog
@@ -105,13 +94,14 @@ export function AccessDialog({ open, onClose, onSuccess }: Props) {
           </svg>
         </button>
 
-        <p className={styles.eyebrow}>Invite-only demo</p>
+        <p className={styles.eyebrow}>Open demo</p>
         <h2 id={`${ids}-title`} className={styles.title}>
           Test Beyond Words
         </h2>
         <p id={`${ids}-lede`} className={styles.lede}>
-          Choose a username (3 to 32 letters, numbers, dots, dashes or underscores) and enter the
-          access password. A new username starts a new reader.
+          Any username works, with no password. Choose 3 to 32 letters, numbers, dots, dashes or
+          underscores. A new username starts a new reader; the same one picks up where you left off,
+          and this browser keeps you signed in.
         </p>
 
         <form className={styles.form} onSubmit={submit} noValidate>
@@ -135,44 +125,6 @@ export function AccessDialog({ open, onClose, onSuccess }: Props) {
             {usernameProblem && (
               <p id={`${ids}-user-error`} className={styles.error} role="alert">
                 {usernameProblem}
-              </p>
-            )}
-          </div>
-
-          <div className={styles.field}>
-            <label htmlFor={`${ids}-pass`}>Password</label>
-            <div
-              className={styles.passwordRow}
-              key={`shake-${attempt}`}
-              data-shake={passwordProblem ? "true" : undefined}
-            >
-              <input
-                ref={passwordInput}
-                id={`${ids}-pass`}
-                name="password"
-                type={show ? "text" : "password"}
-                autoComplete="current-password"
-                autoCapitalize="none"
-                spellCheck={false}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                aria-invalid={passwordProblem ? true : undefined}
-                aria-describedby={passwordProblem ? `${ids}-pass-error` : undefined}
-                required
-              />
-              <button
-                type="button"
-                className={styles.reveal}
-                onClick={() => setShow((s) => !s)}
-                aria-pressed={show}
-                aria-label={show ? "Hide password" : "Show password"}
-              >
-                {show ? "Hide" : "Show"}
-              </button>
-            </div>
-            {passwordProblem && (
-              <p id={`${ids}-pass-error`} className={styles.error} role="alert">
-                {passwordProblem}
               </p>
             )}
           </div>

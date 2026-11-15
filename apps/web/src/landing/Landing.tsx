@@ -1,7 +1,7 @@
 // The landing page: the first thing anyone sees. Black and blue, built the way ALX Studio's site
 // is (inset rounded hero with a pixel dot texture, two-tone headlines, ringed dark cards, a dark
 // call-to-action shell). It has ONE call to action, "Test this App", which asks for a username
-// and the access password and then opens the app. Copy lives in content.ts.
+// (any one, no password) and then opens the app. Copy lives in content.ts.
 import { type CSSProperties, type ReactNode, useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 

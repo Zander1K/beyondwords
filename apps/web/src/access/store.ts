@@ -1,15 +1,9 @@
-// Who is signed in. Kept in sessionStorage (this tab only) and read back on load.
+// Who is signed in. Kept in localStorage (this browser) and read back on load, so readers stay signed in.
 import { create } from "zustand";
 
 import { loginUser, type Profile, setApiUser } from "@/api";
 
-import {
-  ACCESS_PASSWORD_SHA256,
-  checkPassword,
-  checkUsername,
-  parseSession,
-  SESSION_KEY,
-} from "./access";
+import { checkUsername, parseSession, SESSION_KEY } from "./access";
 
 /** How long to wait before each new try at loading the profile, after the server did not answer. */
 const PROFILE_RETRY_MS = [2000, 5000, 10_000, 20_000, 30_000] as const;
@@ -22,7 +16,7 @@ export interface SessionStorageLike {
 }
 
 export type SignInResult =
-  { ok: true; username: string } | { ok: false; field: "username" | "password"; message: string };
+  { ok: true; username: string } | { ok: false; field: "username"; message: string };
 
 /** Tells the server who signed in (POST /users/login); resolves to the reader's profile. */
 export type RegisterUser = (username: string) => Promise<Profile>;
@@ -41,14 +35,14 @@ export interface AccessState {
   onboardingSkipped: boolean;
   setProfile: (profile: Profile) => void;
   skipOnboarding: () => void;
-  signIn: (username: string, password: string) => SignInResult;
+  signIn: (username: string) => SignInResult;
   signOut: () => void;
 }
 
-/** The browser's sessionStorage, or nothing when it is unavailable (private mode, tests). */
+/** The browser's localStorage, or nothing when it is unavailable (private mode, tests). */
 function browserStorage(): SessionStorageLike | null {
   try {
-    return typeof sessionStorage === "undefined" ? null : sessionStorage;
+    return typeof localStorage === "undefined" ? null : localStorage;
   } catch {
     return null;
   }
@@ -56,13 +50,11 @@ function browserStorage(): SessionStorageLike | null {
 
 /**
  * @param storage where a sign-in is kept (a fake in tests).
- * @param passwordDigest SHA-256 of the password to accept (a test password of their own in tests).
  * @param register called after a sign-in to find or create the reader on the server. If it fails
  *   (API or database down) they are still signed in: the demo never blocks on the backend.
  */
 export function createAccessStore(
   storage: SessionStorageLike | null = browserStorage(),
-  passwordDigest: string = ACCESS_PASSWORD_SHA256,
   register?: RegisterUser,
 ) {
   const read = () => {
@@ -111,12 +103,9 @@ export function createAccessStore(
       if (user) remember(user, profile.id);
     },
     skipOnboarding: () => set({ onboardingSkipped: true }),
-    signIn: (username, password) => {
+    signIn: (username) => {
       const name = checkUsername(username);
       if (!name.ok) return { ok: false, field: "username", message: name.message };
-      if (!checkPassword(password, passwordDigest)) {
-        return { ok: false, field: "password", message: "That password isn't right. Try again." };
-      }
       try {
         storage?.setItem(SESSION_KEY, JSON.stringify({ username: name.value, at: Date.now() }));
       } catch {
@@ -142,4 +131,4 @@ export function createAccessStore(
 }
 
 /** The app's one access store. */
-export const useAccess = createAccessStore(undefined, undefined, loginUser);
+export const useAccess = createAccessStore(undefined, loginUser);
